@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "//": "Port 3100, not 3000: Windows reserves the TCP range 2947-3046 on this machine (netsh interface ipv4 show excludedportrange protocol=tcp), so binding 3000 fails. 3100 sits outside every excluded range. The -p flag is passed through to `next dev` explicitly rather than relying on PORT propagating.",
+      "name": "dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev", "--", "-p", "3100"],
+      "port": 3100
+    }
+  ]
+}

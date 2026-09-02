@@ -1,0 +1,49 @@
+{
+  "name": "orchid",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Orchid / ارکید — Persian RTL lingerie storefront",
+  "engines": {
+    "node": ">=20.11.0 <23"
+  },
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "node .next/standalone/server.js",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "node --env-file=.env scripts/migrate.mjs",
+    "db:seed": "tsx --conditions=react-server scripts/seed.ts",
+    "db:studio": "drizzle-kit studio",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "prepare:logo": "node scripts/prepare-logo.mjs",
+    "mock:images": "tsx --conditions=react-server scripts/mock-images.ts"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.38.3",
+    "isomorphic-dompurify": "^2.19.0",
+    "mysql2": "^3.12.0",
+    "next": "^15.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "server-only": "^0.0.1",
+    "sharp": "^0.33.5",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.1",
+    "@tailwindcss/postcss": "^4.0.0",
+    "@types/node": "^22.10.6",
+    "@types/react": "^19.0.7",
+    "@types/react-dom": "^19.0.3",
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.30.2",
+    "tailwindcss": "^4.0.0",
+    "tsx": "^4.23.13",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

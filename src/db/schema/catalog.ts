@@ -1,0 +1,282 @@
+import {
+  bigint,
+  boolean,
+  foreignKey,
+  index,
+  int,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  uniqueIndex,
+  varchar,
+} from 'drizzle-orm/mysql-core'
+
+/**
+ * Categories. Self-referencing hierarchy, one level of nesting is what the UI
+ * exposes but the schema does not forbid more.
+ */
+export const categories = mysqlTable(
+  'categories',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    parentId: bigint('parent_id', { mode: 'number', unsigned: true }),
+
+    name: varchar('name', { length: 120 }).notNull(),
+    /** Persian, stored decoded. Emitted percent-encoded. Planning §H. */
+    slug: varchar('slug', { length: 190 }).notNull(),
+    description: text('description'),
+    imagePath: varchar('image_path', { length: 255 }),
+
+    sortOrder: int('sort_order').notNull().default(0),
+    isVisible: boolean('is_visible').notNull().default(true),
+
+    seoTitle: varchar('seo_title', { length: 190 }),
+    seoDescription: varchar('seo_description', { length: 320 }),
+
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => [
+    uniqueIndex('categories_slug_unq').on(t.slug),
+    index('categories_parent_idx').on(t.parentId),
+    index('categories_visible_sort_idx').on(t.isVisible, t.sortOrder),
+  ],
+)
+
+/**
+ * Products. Deliberately carries NO price and NO stock — both live on the
+ * variant, which is the sellable unit. Planning package §D-1.
+ */
+export const products = mysqlTable(
+  'products',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+
+    name: varchar('name', { length: 190 }).notNull(),
+    slug: varchar('slug', { length: 190 }).notNull(),
+    shortDescription: varchar('short_description', { length: 320 }),
+    description: text('description'),
+
+    primaryCategoryId: bigint('primary_category_id', { mode: 'number', unsigned: true }),
+
+    /**
+     * Persian-normalised haystack: name + short description + tags + category
+     * names, folded through normalizePersian(). FULLTEXT indexed in a manual
+     * migration — drizzle-kit does not emit FULLTEXT. Planning §D-2.
+     */
+    searchText: text('search_text'),
+
+    isActive: boolean('is_active').notNull().default(true),
+    /** Archived products 410 rather than 404 — they existed once. §74. */
+    isArchived: boolean('is_archived').notNull().default(false),
+
+    isFeatured: boolean('is_featured').notNull().default(false),
+    isNewArrival: boolean('is_new_arrival').notNull().default(false),
+    isBestseller: boolean('is_bestseller').notNull().default(false),
+
+    /** Denormalised from approved reviews only. Never fabricated. §62. */
+    ratingSum: int('rating_sum').notNull().default(0),
+    ratingCount: int('rating_count').notNull().default(0),
+
+    viewCount: int('view_count').notNull().default(0),
+    salesCount: int('sales_count').notNull().default(0),
+
+    seoTitle: varchar('seo_title', { length: 190 }),
+    seoDescription: varchar('seo_description', { length: 320 }),
+
+    publishedAt: timestamp('published_at'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => [
+    uniqueIndex('products_slug_unq').on(t.slug),
+    index('products_category_active_idx').on(t.primaryCategoryId, t.isActive, t.createdAt),
+    index('products_active_created_idx').on(t.isActive, t.createdAt),
+    index('products_featured_idx').on(t.isFeatured, t.isActive),
+    index('products_bestseller_idx').on(t.isBestseller, t.isActive),
+    index('products_new_idx').on(t.isNewArrival, t.isActive),
+  ],
+)
+
+/** Many-to-many: a product may surface in several categories. */
+export const productCategories = mysqlTable(
+  'product_categories',
+  {
+    productId: bigint('product_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    categoryId: bigint('category_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => categories.id, { onDelete: 'cascade' }),
+  },
+  (t) => [
+    uniqueIndex('product_category_unq').on(t.productId, t.categoryId),
+    index('product_category_cat_idx').on(t.categoryId),
+  ],
+)
+
+/** An option TYPE on one product — سایز, رنگ, مدل. */
+export const productOptions = mysqlTable(
+  'product_options',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    productId: bigint('product_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+
+    name: varchar('name', { length: 60 }).notNull(),
+    /** Drives UI affordance: a colour renders swatches, a size renders pills. */
+    kind: mysqlEnum('kind', ['size', 'color', 'other']).notNull().default('other'),
+    sortOrder: int('sort_order').notNull().default(0),
+  },
+  (t) => [index('product_options_product_idx').on(t.productId)],
+)
+
+/** A concrete VALUE of an option — ۷۵B, مشکی. */
+export const productOptionValues = mysqlTable(
+  'product_option_values',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    optionId: bigint('option_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => productOptions.id, { onDelete: 'cascade' }),
+
+    value: varchar('value', { length: 80 }).notNull(),
+    /** Hex for colour options, so swatches need no lookup table. */
+    swatchHex: varchar('swatch_hex', { length: 7 }),
+    sortOrder: int('sort_order').notNull().default(0),
+  },
+  (t) => [
+    index('option_values_option_idx').on(t.optionId),
+    uniqueIndex('option_value_unq').on(t.optionId, t.value),
+  ],
+)
+
+/**
+ * The sellable unit. Price, discount and stock live here and nowhere else.
+ *
+ * `stockQty` carries a CHECK (stock_qty >= 0) constraint added in a manual
+ * migration — the database, not application code, has the final word on
+ * overselling. §35.
+ */
+export const productVariants = mysqlTable(
+  'product_variants',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    productId: bigint('product_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+
+    sku: varchar('sku', { length: 64 }).notNull(),
+
+    /** Toman. Integer minor units, never a float. Planning §D-3. */
+    price: bigint('price', { mode: 'number', unsigned: true }).notNull(),
+    /** When set and lower than price, this is what the customer pays. */
+    discountPrice: bigint('discount_price', { mode: 'number', unsigned: true }),
+
+    stockQty: int('stock_qty').notNull().default(0),
+    lowStockThreshold: int('low_stock_threshold').notNull().default(3),
+
+    imageId: bigint('image_id', { mode: 'number', unsigned: true }),
+    isActive: boolean('is_active').notNull().default(true),
+
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => [
+    uniqueIndex('variants_sku_unq').on(t.sku),
+    index('variants_product_idx').on(t.productId),
+    index('variants_stock_idx').on(t.stockQty),
+    index('variants_active_idx').on(t.isActive),
+  ],
+)
+
+/**
+ * Pivot resolving a variant to exactly one value per option.
+ *
+ * This is the table that makes faceted filtering an indexed join instead of a
+ * full scan over a JSON column, and it is why §19's filters stay cheap.
+ */
+export const variantOptionValues = mysqlTable(
+  'variant_option_values',
+  {
+    variantId: bigint('variant_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => productVariants.id, { onDelete: 'cascade' }),
+    optionId: bigint('option_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => productOptions.id, { onDelete: 'cascade' }),
+    /**
+     * The foreign key is declared below with an explicit name rather than
+     * inline. Drizzle's generated name for this one —
+     * `variant_option_values_option_value_id_product_option_values_id_fk` —
+     * is 65 characters, one over MySQL's 64-character identifier limit, and
+     * the migration fails on it. Naming it here keeps it short and stable.
+     */
+    optionValueId: bigint('option_value_id', { mode: 'number', unsigned: true }).notNull(),
+  },
+  (t) => [
+    /** One value per option per variant — enforced, not assumed. */
+    uniqueIndex('variant_option_unq').on(t.variantId, t.optionId),
+    index('variant_option_value_idx').on(t.optionValueId),
+    foreignKey({
+      name: 'variant_option_values_value_fk',
+      columns: [t.optionValueId],
+      foreignColumns: [productOptionValues.id],
+    }).onDelete('cascade'),
+  ],
+)
+
+export const productImages = mysqlTable(
+  'product_images',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    productId: bigint('product_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+
+    /** Relative to UPLOAD_DIR. Never an absolute path, never user-supplied. */
+    path: varchar('path', { length: 255 }).notNull(),
+
+    /** Required on the primary image — enforced in the admin form. §72. */
+    alt: varchar('alt', { length: 255 }),
+
+    width: int('width').notNull(),
+    height: int('height').notNull(),
+
+    isPrimary: boolean('is_primary').notNull().default(false),
+    sortOrder: int('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('product_images_product_idx').on(t.productId, t.sortOrder),
+    index('product_images_primary_idx').on(t.productId, t.isPrimary),
+  ],
+)
+
+export const tags = mysqlTable(
+  'tags',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    name: varchar('name', { length: 80 }).notNull(),
+    slug: varchar('slug', { length: 120 }).notNull(),
+  },
+  (t) => [uniqueIndex('tags_slug_unq').on(t.slug)],
+)
+
+export const productTags = mysqlTable(
+  'product_tags',
+  {
+    productId: bigint('product_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    tagId: bigint('tag_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => tags.id, { onDelete: 'cascade' }),
+  },
+  (t) => [
+    uniqueIndex('product_tag_unq').on(t.productId, t.tagId),
+    index('product_tag_tag_idx').on(t.tagId),
+  ],
+)
