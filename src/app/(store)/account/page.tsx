@@ -2,6 +2,7 @@ import Link from 'next/link'
 
 import { EmptyState, OrderStatusBadge, Price } from '@/components/ui'
 import { listForUser } from '@/modules/orders/queries'
+import { addressCount, wishlistCount } from '@/modules/account/service'
 import { requireUser } from '@/lib/session'
 import { formatJalali } from '@/lib/jalali'
 import { toPersianDigits } from '@/lib/persian'
@@ -10,19 +11,50 @@ export const metadata = { title: 'پیشخوان' }
 
 export default async function AccountPage() {
   const user = await requireUser()
-  const orders = await listForUser(user.id, 5)
+
+  const [orders, wishlist, addresses] = await Promise.all([
+    listForUser(user.id, 4),
+    wishlistCount(user.id),
+    addressCount(user.id),
+  ])
+
+  const awaiting = orders.filter(
+    (o) => o.status === 'awaiting_payment' || o.status === 'payment_verification',
+  ).length
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl md:text-3xl text-ink">پیشخوان</h1>
+    <div className="space-y-10">
+      <header>
+        <p className="eyebrow mb-3">حساب کاربری</p>
+        <h1 className="section-title">
+          {user.fullName ? `سلام ${user.fullName.split(' ')[0]}` : 'پیشخوان'}
+        </h1>
+      </header>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+        <Tile
+          href="/account/orders"
+          label="سفارش‌ها"
+          value={orders.length}
+          hint={awaiting > 0 ? `${toPersianDigits(awaiting)} در انتظار پرداخت` : undefined}
+          tone={awaiting > 0 ? 'attention' : 'plain'}
+        />
+        <Tile href="/account/wishlist" label="علاقه‌مندی‌ها" value={wishlist} />
+        <Tile
+          href="/account/addresses"
+          label="نشانی‌ها"
+          value={addresses}
+          hint={addresses === 0 ? 'هنوز ثبت نشده' : undefined}
+        />
+      </div>
 
       <section aria-labelledby="recent-orders">
-        <div className="flex items-center justify-between mb-5">
+        <div className="mb-5 flex items-center justify-between">
           <h2 id="recent-orders" className="text-lg text-ink">
             آخرین سفارش‌ها
           </h2>
           {orders.length > 0 && (
-            <Link href="/account/orders" className="text-sm text-accent-2 hover:underline">
+            <Link href="/account/orders" className="link-rule text-sm">
               مشاهده همه
             </Link>
           )}
@@ -40,13 +72,13 @@ export default async function AccountPage() {
               <li key={order.id}>
                 <Link
                   href={`/account/orders/${order.id}`}
-                  className="card p-5 flex flex-wrap items-center justify-between gap-4 hover:border-accent-3 transition-colors"
+                  className="card flex flex-wrap items-center justify-between gap-4 p-5 transition-colors hover:border-accent-3"
                 >
                   <div>
-                    <p className="font-medium text-ink nums">
+                    <p className="nums font-medium text-ink">
                       {toPersianDigits(order.orderNumber)}
                     </p>
-                    <p className="text-sm text-ink-subtle nums mt-1">
+                    <p className="nums mt-1 text-sm text-ink-subtle">
                       {formatJalali(order.createdAt)} —{' '}
                       {toPersianDigits(Number(order.itemCount))} کالا
                     </p>
@@ -62,5 +94,32 @@ export default async function AccountPage() {
         )}
       </section>
     </div>
+  )
+}
+
+function Tile({
+  href,
+  label,
+  value,
+  hint,
+  tone = 'plain',
+}: {
+  href: string
+  label: string
+  value: number
+  hint?: string
+  tone?: 'plain' | 'attention'
+}) {
+  return (
+    <Link
+      href={href}
+      className={`card group/tile p-4 transition-colors hover:border-accent-3 md:p-5 ${
+        tone === 'attention' ? 'border-warning/40 bg-warning-bg/40' : ''
+      }`}
+    >
+      <p className="text-xs text-ink-muted">{label}</p>
+      <p className="nums mt-2 text-2xl text-ink">{toPersianDigits(value)}</p>
+      <p className="mt-1 text-xs text-ink-subtle">{hint ?? ' '}</p>
+    </Link>
   )
 }

@@ -6,11 +6,10 @@ import { blogPosts } from '@/db/schema'
 import { ResponsiveImage } from '@/components/media'
 import { Breadcrumbs, EmptyState, Pagination } from '@/components/ui'
 import { CACHE_TAGS, cached } from '@/lib/cache'
-import { breadcrumbSchema, buildMetadata, jsonLd } from '@/lib/seo'
+import { breadcrumbSchema, buildMetadata } from '@/lib/seo'
 import { formatJalali } from '@/lib/jalali'
+import { JsonLd } from '@/components/json-ld'
 
-// Dynamic with cached data — see lib/cache.ts for why the build must not
-// depend on a reachable database.
 export const dynamic = 'force-dynamic'
 
 const PAGE_SIZE = 12
@@ -72,10 +71,7 @@ export default async function BlogIndexPage({
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbSchema(breadcrumbItems)) }}
-      />
+      <JsonLd data={breadcrumbSchema(breadcrumbItems)} />
 
       <div className="container-page py-6">
         <Breadcrumbs items={breadcrumbItems} />

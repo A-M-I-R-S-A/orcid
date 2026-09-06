@@ -13,15 +13,6 @@ import { slugify, uniqueSlug } from '@/lib/slug'
 import { deleteImageSet, processUpload } from '@/lib/images'
 import * as service from './admin-service'
 
-/**
- * Catalogue admin actions.
- *
- * Revalidation is deliberate rather than blanket: a product edit invalidates
- * that product's page, its category, and the homepage — because ISR is what
- * keeps TTFB low (§L), and a stale price is exactly the thing that must not
- * survive a save.
- */
-
 async function revalidateProduct(productId: number) {
   const [row] = await db
     .select({ slug: products.slug, categoryId: products.primaryCategoryId })
@@ -31,8 +22,6 @@ async function revalidateProduct(productId: number) {
 
   if (!row) return
 
-  // Product changes affect the sitemap and the homepage's cached product
-  // lists, not just the product page itself.
   invalidate(CACHE_TAGS.products, CACHE_TAGS.homepage, CACHE_TAGS.sitemap)
 
   revalidatePath(`/product/${encodeURIComponent(row.slug)}`)
@@ -49,8 +38,6 @@ async function revalidateProduct(productId: number) {
     if (category) revalidatePath(`/category/${encodeURIComponent(category.slug)}`)
   }
 }
-
-/* ── Products ───────────────────────────────────────────────────────────── */
 
 export async function createProductAction(
   input: service.ProductInput,
@@ -109,15 +96,11 @@ export async function restoreProductAction(productId: number): Promise<ActionRes
   }
 }
 
-/* ── Variants ───────────────────────────────────────────────────────────── */
-
 export async function saveVariantAction(
   productId: number,
   input: service.VariantInput,
 ): Promise<ActionResult<{ id: number }>> {
   try {
-    // Price and inventory are separately permissioned — a stock clerk should
-    // be able to correct a count without being able to change a price. §57.
     const admin = await requirePermission(input.id ? 'products.price' : 'products.update')
 
     if (!input.sku?.trim()) throw errors.validation('کد کالا (SKU) الزامی است.')
@@ -127,8 +110,6 @@ export async function saveVariantAction(
 
     return ok({ id })
   } catch (error) {
-    // A duplicate SKU surfaces as a database error; translate it rather than
-    // showing the customer-facing generic message to an operator who can fix it.
     if ((error as { code?: string }).code === 'ER_DUP_ENTRY') {
       return fail(errors.conflict('این کد کالا (SKU) قبلاً استفاده شده است.'))
     }
@@ -190,8 +171,6 @@ export async function deleteVariantAction(
   }
 }
 
-/* ── Options ────────────────────────────────────────────────────────────── */
-
 export async function saveOptionAction(
   productId: number,
   input: { id?: number; name: string; kind: 'size' | 'color' | 'other'; sortOrder: number },
@@ -229,8 +208,6 @@ export async function saveOptionValueAction(
   }
 }
 
-/* ── Images ─────────────────────────────────────────────────────────────── */
-
 export async function uploadProductImageAction(
   formData: FormData,
 ): Promise<ActionResult<{ id: number }>> {
@@ -244,8 +221,6 @@ export async function uploadProductImageAction(
     if (!Number.isInteger(productId) || productId <= 0) throw errors.validation('محصول نامعتبر است.')
     if (!(file instanceof File)) throw errors.validation('فایلی انتخاب نشده است.')
 
-    // processUpload does the real validation: it DECODES the image, which is
-    // the only check that a declared type and extension cannot fake. §76.
     const id = await service.addProductImage(productId, file, alt)
     await revalidateProduct(productId)
 
@@ -298,8 +273,6 @@ export async function updateImageAltAction(
   }
 }
 
-/* ── Categories ─────────────────────────────────────────────────────────── */
-
 export async function saveCategoryAction(input: {
   id?: number
   name: string
@@ -316,8 +289,6 @@ export async function saveCategoryAction(input: {
 
     if (!input.name?.trim()) throw errors.validation('نام دسته‌بندی الزامی است.')
 
-    // A category cannot be its own parent — a cycle would hang the breadcrumb
-    // walk (which is depth-capped, but a broken tree is still broken).
     if (input.id && input.parentId === input.id) {
       throw errors.validation('یک دسته‌بندی نمی‌تواند والد خودش باشد.')
     }
@@ -419,8 +390,6 @@ export async function deleteCategoryAction(categoryId: number): Promise<ActionRe
   try {
     const admin = await requirePermission('categories.manage')
 
-    // Products reference the category; deleting it would orphan them. Refusing
-    // with a clear reason beats a foreign-key error the operator cannot read.
     const [inUse] = await db
       .select({ id: products.id })
       .from(products)
@@ -492,8 +461,6 @@ export async function uploadCategoryImageAction(
       .set({ imagePath: processed.path })
       .where(eq(categories.id, categoryId))
 
-    // Replace, not accumulate — an orphaned image set is dead disk space that
-    // nothing will ever clean up.
     if (existing?.imagePath) await deleteImageSet(existing.imagePath)
 
     invalidate(CACHE_TAGS.categories, CACHE_TAGS.homepage)

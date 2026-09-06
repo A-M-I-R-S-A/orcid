@@ -8,7 +8,6 @@ import { db } from '@/db'
 import { products } from '@/db/schema'
 import { sql } from 'drizzle-orm'
 
-/** Category management. §42. */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'دسته‌بندی‌ها' }
 

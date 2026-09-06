@@ -2,15 +2,6 @@ import 'server-only'
 
 import DOMPurify from 'isomorphic-dompurify'
 
-/**
- * HTML sanitisation for CMS and blog bodies. §75.
- *
- * These fields are written by authenticated administrators, so this is not
- * about distrusting the author — it is about a compromised admin session not
- * becoming stored XSS that fires for every visitor. The content is rendered
- * with dangerouslySetInnerHTML, so it must pass through here first, always.
- */
-
 const ALLOWED_TAGS = [
   'p', 'br', 'hr',
   'h2', 'h3', 'h4',
@@ -34,41 +25,60 @@ export function sanitizeHtml(dirty: string): string {
   return DOMPurify.sanitize(dirty, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
-    // Belt and braces on top of the tag allowlist.
     FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input'],
     FORBID_ATTR: ['onerror', 'onload', 'onclick', 'style'],
-    // data: URIs in an href are a phishing and script vector; images are
-    // served from our own media route, so nothing legitimate needs them.
     ALLOW_DATA_ATTR: false,
     ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|\/)/i,
   })
 }
 
-/**
- * The Enamad badge is a special case: it is a third-party <a><img></a> snippet
- * that must keep the attributes Enamad's verification depends on, which the
- * general allowlist would strip.
- *
- * It is still sanitised — scripts and event handlers are removed — but the
- * tag set is narrowed to exactly what a trust badge needs, rather than widened.
- */
 export function sanitizeEnamad(dirty: string): string {
-  return DOMPurify.sanitize(dirty, {
+  const clean = DOMPurify.sanitize(dirty, {
     ALLOWED_TAGS: ['a', 'img', 'div', 'span'],
     ALLOWED_ATTR: [
       'href', 'target', 'rel',
       'src', 'alt', 'width', 'height',
       'id', 'class', 'style',
-      // Enamad's own verification hooks.
+      'loading', 'decoding',
       'referrerpolicy', 'code', 'cid',
     ],
     FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
     FORBID_ATTR: ['onerror', 'onload', 'onclick'],
     ALLOWED_URI_REGEXP: /^(?:https?:|\/)/i,
   })
+
+  return withBadgeAttributes(dirty, clean)
 }
 
-/** Strips every tag — for meta descriptions and excerpts built from a body. */
+function withBadgeAttributes(original: string, clean: string): string {
+  const lift = (attribute: string, pattern: RegExp): string | null => {
+    const found = original.match(new RegExp(`\\s${attribute}\\s*=\\s*["']([^"']*)["']`, 'i'))
+    const value = found?.[1]
+    return value && pattern.test(value) ? value : null
+  }
+
+  const code = lift('code', /^[A-Za-z0-9_-]{1,64}$/)
+  const cid = lift('cid', /^[A-Za-z0-9_-]{1,64}$/)
+  const referrer = lift('referrerpolicy', /^(no-referrer|origin|unsafe-url|no-referrer-when-downgrade)$/i)
+
+  let out = clean
+
+  if (/\starget\s*=\s*["']_blank["']/i.test(original)) {
+    out = out.replace(/<a\b(?![^>]*\starget\s*=)/gi, '<a target="_blank" rel="noopener noreferrer"')
+  }
+
+  if (referrer) {
+    out = out.replace(
+      new RegExp('<(a|img)\\b(?![^>]*\\sreferrerpolicy\\s*=)', 'gi'),
+      `<$1 referrerpolicy="${referrer}"`,
+    )
+  }
+  if (code) out = out.replace(/<img\b(?![^>]*\scode\s*=)/gi, `<img code="${code}"`)
+  if (cid) out = out.replace(/<img\b(?![^>]*\scid\s*=)/gi, `<img cid="${cid}"`)
+
+  return out.replace(/<img\b(?![^>]*\sloading\s*=)/gi, '<img loading="lazy" decoding="async"')
+}
+
 export function stripHtml(dirty: string): string {
   return DOMPurify.sanitize(dirty, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
     .replace(/\s+/g, ' ')

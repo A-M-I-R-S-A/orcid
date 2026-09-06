@@ -2,6 +2,7 @@ import { notFound, permanentRedirect } from 'next/navigation'
 import Link from 'next/link'
 
 import { ProductGallery, ProductPurchasePanel } from '@/components/product-detail'
+import { sizeGuide } from '@/modules/content/queries'
 import { ProductGrid } from '@/components/product-card'
 import { Breadcrumbs, SectionHeading, StarRating } from '@/components/ui'
 import { ReviewSection } from '@/components/reviews'
@@ -13,34 +14,20 @@ import {
 } from '@/modules/catalog/queries'
 import * as reviewService from '@/modules/reviews/service'
 import { getCurrentUser } from '@/lib/session'
-import { getNamespace } from '@/lib/settings'
+import { JsonLd } from '@/components/json-ld'
 import {
   breadcrumbSchema,
   buildMetadata,
-  jsonLd,
   productSchema,
   shouldIndex,
 } from '@/lib/seo'
 
-/**
- * Product page. §17 / §63.
- *
- * Everything a search engine needs — name, description, price, availability,
- * breadcrumbs, reviews, structured data — is rendered on the server. The only
- * client JavaScript is the gallery and variant picker, and the page is
- * complete and purchasable-looking without it.
- */
 export const revalidate = 600
 
 interface Props {
   params: Promise<{ slug: string }>
 }
 
-/**
- * Resolves the slug, following a rename through the redirect table.
- * Returning the redirect rather than 404ing is what §66 asks for — a renamed
- * product must not lose the links pointing at it.
- */
 async function resolve(rawSlug: string) {
   const slug = decodeURIComponent(rawSlug)
   const product = await getProductBySlug(slug)
@@ -68,8 +55,6 @@ export async function generateMetadata({ params }: Props) {
     description: product.seoDescription || product.shortDescription,
     path: `/product/${encodeURIComponent(product.slug)}`,
     imagePath: primaryImage?.path,
-    // Archived and inactive products are excluded by the same predicate the
-    // sitemap uses, so the two can never disagree. §H.
     index: shouldIndex(product),
     type: 'product',
   })
@@ -81,29 +66,14 @@ export default async function ProductPage({ params }: Props) {
 
   if (!product) notFound()
 
-  /*
-   * Archived and inactive products both return 404.
-   *
-   * §74 asks for 410 on permanently withdrawn products, and the planning
-   * package said we would emit it. We do not, for a concrete framework reason:
-   * an App Router *page* cannot set an arbitrary HTTP status — `notFound()`
-   * gives 404 and there is no `gone()`. Emitting a real 410 would require
-   * either Node-runtime middleware (not stable in this Next version) or a
-   * database lookup in edge middleware on every request, which is a poor trade
-   * on shared hosting.
-   *
-   * The practical cost is small: Google treats 404 and 410 almost identically,
-   * 410 only de-indexing marginally faster. What matters more is handled —
-   * archived products are excluded from the sitemap and marked noindex by the
-   * same `shouldIndex` predicate, so they leave the index either way.
-   */
   if (product.isArchived || !product.isActive) notFound()
 
-  const [trail, related, reviews, user] = await Promise.all([
+  const [trail, related, reviews, user, guide] = await Promise.all([
     product.primaryCategoryId ? categoryTrail(product.primaryCategoryId) : Promise.resolve([]),
     relatedProducts(product.id, product.primaryCategoryId, 4),
     reviewService.listForProduct(product.id),
     getCurrentUser(),
+    sizeGuide(),
   ])
 
   const ownReview = user ? await reviewService.getOwnReview(user.id, product.id) : null
@@ -129,8 +99,6 @@ export default async function ProductPage({ params }: Props) {
       images: product.images.map((i) => i.path),
       price: minPrice,
       inStock,
-      // §62: passed only when approved reviews actually exist. productSchema
-      // omits AggregateRating entirely when the count is zero.
       ratingValue,
       ratingCount: product.ratingCount,
     }),
@@ -139,10 +107,7 @@ export default async function ProductPage({ params }: Props) {
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLd(schemas) }}
-      />
+      <JsonLd data={schemas} />
 
       <div className="container-page py-6">
         <Breadcrumbs items={breadcrumbItems} />
@@ -177,7 +142,7 @@ export default async function ProductPage({ params }: Props) {
             )}
 
             <div className="mt-8">
-              <ProductPurchasePanel product={product} />
+              <ProductPurchasePanel product={product} sizeGuide={guide} />
             </div>
           </div>
         </div>
@@ -212,7 +177,7 @@ export default async function ProductPage({ params }: Props) {
 
         {related.length > 0 && (
           <section className="mt-20 pt-12 border-t border-line">
-            <SectionHeading eyebrow="شاید بپسندید" title="محصولات مرتبط" />
+            <SectionHeading title="محصولات مرتبط" />
             <ProductGrid products={related} priorityCount={0} />
           </section>
         )}

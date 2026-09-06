@@ -7,8 +7,6 @@ import { saveAdminUserAction, saveRolePermissionsAction } from '@/modules/admin/
 import { formatJalaliDateTime } from '@/lib/jalali'
 import { toPersianDigits } from '@/lib/persian'
 
-/* ── Accounts ───────────────────────────────────────────────────────────── */
-
 interface AdminUser {
   id: number
   username: string
@@ -225,8 +223,6 @@ function AdminUserForm({
     </div>
   )
 }
-
-/* ── Role permissions ───────────────────────────────────────────────────── */
 
 interface Role {
   id: number

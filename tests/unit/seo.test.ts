@@ -10,15 +10,6 @@ import {
   siteUrl,
 } from '@/lib/seo'
 
-/**
- * SEO. §59 is the highest-priority requirement, and two of its rules are the
- * kind that break silently:
- *
- *   - AggregateRating must never appear without real approved reviews (§62).
- *   - Indexability must be decided in ONE place, so the sitemap and the page
- *     metadata cannot disagree (§68).
- */
-
 describe('shouldIndex', () => {
   it('indexes a live product', () => {
     expect(shouldIndex({ isActive: true, isArchived: false })).toBe(true)
@@ -126,8 +117,6 @@ describe('productSchema — §62 never fabricate ratings', () => {
   })
 
   it('converts Toman to Rial for the IRR currency code', () => {
-    // The stored unit is Toman; schema.org expects an ISO code, and IRR is
-    // Rial. Quoting a Toman figure under IRR would be a factual error.
     const schema = productSchema({ ...base, price: 285_000 })
     const offer = schema.offers as Record<string, string>
     expect(offer.priceCurrency).toBe('IRR')
@@ -161,8 +150,6 @@ describe('breadcrumbSchema', () => {
 
 describe('jsonLd serialisation', () => {
   it('escapes < so a product name cannot break out of the script tag', () => {
-    // A product literally named "</script><script>alert(1)</script>" is the
-    // attack; escaping the angle bracket is the defence.
     const output = jsonLd({ name: '</script><script>alert(1)</script>' })
     expect(output).not.toContain('</script>')
     expect(output).toContain('\\u003c')

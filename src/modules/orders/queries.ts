@@ -3,19 +3,21 @@ import 'server-only'
 import { and, desc, eq, gte, sql } from 'drizzle-orm'
 
 import { db } from '@/db'
-import { orderItems, orders, payments, productVariants, products, reviews, users } from '@/db/schema'
+import {
+  auditLogs,
+  orderItems,
+  orders,
+  payments,
+  productVariants,
+  products,
+  reviews,
+  smsMessages,
+  users,
+} from '@/db/schema'
+import { AUDIT_ACTIONS, type AuditAction } from '@/lib/audit'
 import { errors } from '@/lib/errors'
-
-/**
- * Order reads.
- *
- * Customer-facing queries are ALWAYS scoped by userId in the WHERE clause.
- * §36 also governs what comes back: `internalNote` is deliberately absent from
- * every customer projection, because an admin note about a suspicious payment
- * must never surface in the account area.
- */
-
-/* ── Customer ───────────────────────────────────────────────────────────── */
+import { ORDER_STATUS_LABELS, type OrderStatus } from '@/lib/order-status'
+import { escapeLike, toLatinDigits } from '@/lib/persian'
 
 export async function listForUser(userId: number, limit = 50) {
   return db
@@ -34,7 +36,15 @@ export async function listForUser(userId: number, limit = 50) {
     .limit(limit)
 }
 
-/** Scoped by userId — a guessed order id belongs to nobody. */
+export async function countForUser(userId: number): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`COUNT(*)` })
+    .from(orders)
+    .where(eq(orders.userId, userId))
+
+  return Number(row?.count ?? 0)
+}
+
 export async function getForUser(userId: number, orderId: number) {
   const [order] = await db
     .select({
@@ -54,7 +64,6 @@ export async function getForUser(userId: number, orderId: number) {
       shipAddressLine: orders.shipAddressLine,
       shipPostalCode: orders.shipPostalCode,
       customerNote: orders.customerNote,
-      // internalNote is intentionally NOT selected. §36.
       paidAt: orders.paidAt,
       shippedAt: orders.shippedAt,
       deliveredAt: orders.deliveredAt,
@@ -74,8 +83,6 @@ export async function getForUser(userId: number, orderId: number) {
         status: payments.status,
         referenceCode: payments.referenceCode,
         referenceSubmittedAt: payments.referenceSubmittedAt,
-        // adminNote is exposed ONLY for rejections, where the customer needs
-        // to know what to fix. Assembled below rather than selected blindly.
         adminNote: payments.adminNote,
         amount: payments.amount,
       })
@@ -110,7 +117,31 @@ export async function getByNumberForUser(userId: number, orderNumber: string) {
   return row ? getForUser(userId, row.id) : null
 }
 
-/* ── Admin ──────────────────────────────────────────────────────────────── */
+function buildOrderSearch(raw: string) {
+  const query = toLatinDigits(raw).trim()
+  if (!query) return null
+
+  const like = `%${escapeLike(query)}%`
+  const clauses = [
+    sql`${orders.orderNumber} LIKE ${like}`,
+    sql`${orders.shipFullName} LIKE ${like}`,
+    sql`REPLACE(REPLACE(${orders.shipPhone}, '-', ''), ' ', '') LIKE ${like}`,
+    sql`${orders.shipPostalCode} LIKE ${like}`,
+    sql`EXISTS (SELECT 1 FROM payments p WHERE p.order_id = ${orders.id} AND p.reference_code LIKE ${like})`,
+  ]
+
+  const digits = query.replace(/\D/g, '')
+  if (digits.length > 0 && digits.length <= 15) {
+    const sequence = `%${digits.padStart(6, '0')}`
+    clauses.push(sql`${orders.orderNumber} LIKE ${sequence}`)
+
+    if (/^\d+$/.test(query) && Number(query) <= Number.MAX_SAFE_INTEGER) {
+      clauses.push(sql`${orders.id} = ${Number(query)}`)
+    }
+  }
+
+  return sql`(${sql.join(clauses, sql` OR `)})`
+}
 
 export async function listForAdmin(options: {
   status?: string
@@ -126,10 +157,8 @@ export async function listForAdmin(options: {
     conditions.push(sql`${orders.status} = ${options.status}`)
   }
   if (options.search) {
-    const term = `%${options.search}%`
-    conditions.push(
-      sql`(${orders.orderNumber} LIKE ${term} OR ${orders.shipPhone} LIKE ${term} OR ${orders.shipFullName} LIKE ${term})`,
-    )
+    const search = buildOrderSearch(options.search)
+    if (search) conditions.push(search)
   }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined
@@ -188,6 +217,119 @@ export async function getForAdmin(orderId: number) {
   }
 }
 
+export interface TimelineEvent {
+  at: Date
+  kind: 'created' | 'status' | 'payment' | 'note' | 'sms'
+  title: string
+  detail?: string | null
+  actor?: string | null
+}
+
+export async function timelineForAdmin(orderId: number): Promise<TimelineEvent[]> {
+  const [order] = await db
+    .select({
+      createdAt: orders.createdAt,
+      paidAt: orders.paidAt,
+      shippedAt: orders.shippedAt,
+      deliveredAt: orders.deliveredAt,
+      cancelledAt: orders.cancelledAt,
+    })
+    .from(orders)
+    .where(eq(orders.id, orderId))
+    .limit(1)
+
+  if (!order) return []
+
+  const [paymentRows, auditRows, smsRows] = await Promise.all([
+    db
+      .select({
+        id: payments.id,
+        referenceCode: payments.referenceCode,
+        referenceSubmittedAt: payments.referenceSubmittedAt,
+      })
+      .from(payments)
+      .where(eq(payments.orderId, orderId)),
+
+    db
+      .select({
+        at: auditLogs.createdAt,
+        action: auditLogs.action,
+        summary: auditLogs.summary,
+        actorName: auditLogs.actorName,
+        entityType: auditLogs.entityType,
+        entityId: auditLogs.entityId,
+        metadata: auditLogs.metadata,
+      })
+      .from(auditLogs)
+      .where(
+        sql`(${auditLogs.entityType} = 'order' AND ${auditLogs.entityId} = ${String(orderId)})
+            OR (${auditLogs.entityType} = 'payment' AND ${auditLogs.entityId} IN (
+              SELECT CAST(id AS CHAR) FROM payments WHERE order_id = ${orderId}))`,
+      )
+      .orderBy(auditLogs.createdAt),
+
+    db
+      .select({
+        event: smsMessages.event,
+        status: smsMessages.status,
+        createdAt: smsMessages.createdAt,
+        sentAt: smsMessages.sentAt,
+      })
+      .from(smsMessages)
+      .where(eq(smsMessages.orderId, orderId)),
+  ])
+
+  const events: TimelineEvent[] = [
+    { at: order.createdAt, kind: 'created', title: 'سفارش ثبت شد' },
+  ]
+
+  for (const payment of paymentRows) {
+    if (payment.referenceSubmittedAt) {
+      events.push({
+        at: payment.referenceSubmittedAt,
+        kind: 'payment',
+        title: 'کد رهگیری پرداخت ثبت شد',
+        detail: payment.referenceCode,
+      })
+    }
+  }
+
+  for (const row of auditRows) {
+    const meta = (row.metadata ?? {}) as { from?: string; to?: string }
+
+    events.push({
+      at: row.at,
+      kind: row.action === 'order.note' ? 'note' : row.action.startsWith('payment.') ? 'payment' : 'status',
+      title: AUDIT_ACTIONS[row.action as AuditAction] ?? row.action,
+      detail:
+        meta.from && meta.to
+          ? `${ORDER_STATUS_LABELS[meta.from as OrderStatus] ?? meta.from} → ${ORDER_STATUS_LABELS[meta.to as OrderStatus] ?? meta.to}`
+          : row.summary,
+      actor: row.actorName,
+    })
+  }
+
+  for (const message of smsRows) {
+    if (message.status === 'sent' && message.sentAt) {
+      events.push({
+        at: message.sentAt,
+        kind: 'sms',
+        title: 'پیامک برای مشتری ارسال شد',
+        detail: SMS_EVENT_LABELS[message.event] ?? message.event,
+      })
+    }
+  }
+
+  return events.sort((a, b) => a.at.getTime() - b.at.getTime())
+}
+
+const SMS_EVENT_LABELS: Record<string, string> = {
+  order_confirmation: 'تأیید ثبت سفارش',
+  payment_approved: 'تأیید پرداخت',
+  order_shipped: 'ارسال سفارش',
+  otp: 'کد ورود',
+}
+
 export async function addInternalNote(orderId: number, note: string): Promise<void> {
   const [order] = await db
     .select({ id: orders.id })
@@ -200,14 +342,6 @@ export async function addInternalNote(orderId: number, note: string): Promise<vo
   await db.update(orders).set({ internalNote: note }).where(eq(orders.id, orderId))
 }
 
-/* ── Dashboard ──────────────────────────────────────────────────────────── */
-
-/**
- * Dashboard counters in ONE round trip rather than a dozen.
- * Revenue counts only orders that actually reached `paid` or beyond — booking
- * revenue on an unverified card-to-card claim would overstate the number that
- * matters most.
- */
 export async function dashboardStats() {
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000)
 
@@ -237,7 +371,10 @@ export async function dashboardStats() {
       .from(orders)
       .where(sql`${orders.status} IN ('paid','processing','shipped','delivered')`),
 
-    db.select({ count: sql<number>`COUNT(*)` }).from(users),
+    db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(users)
+      .where(sql`${users.phoneVerifiedAt} IS NOT NULL`),
 
     db
       .select({ count: sql<number>`COUNT(*)` })
@@ -315,7 +452,6 @@ export async function dashboardStats() {
   }
 }
 
-/** New customers per day, for a small dashboard sparkline. */
 export async function signupTrend(days = 14) {
   const since = new Date(Date.now() - days * 86_400_000)
 
@@ -325,7 +461,7 @@ export async function signupTrend(days = 14) {
       count: sql<number>`COUNT(*)`,
     })
     .from(users)
-    .where(gte(users.createdAt, since))
+    .where(and(gte(users.createdAt, since), sql`${users.phoneVerifiedAt} IS NOT NULL`))
     .groupBy(sql`DATE(${users.createdAt})`)
     .orderBy(sql`DATE(${users.createdAt})`)
 

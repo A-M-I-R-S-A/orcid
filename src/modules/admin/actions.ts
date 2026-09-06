@@ -14,16 +14,6 @@ import * as sms from '@/modules/sms/service'
 import { requireAdmin, requirePermission, login as loginService } from './auth'
 import type { OrderStatus } from '@/lib/order-status'
 
-/**
- * Admin actions.
- *
- * EVERY action begins with `requirePermission`. That call is the enforcement
- * point §57 asks for — the UI hides controls a user cannot use, but hiding is
- * never the control, and a hand-crafted request hits this line first.
- */
-
-/* ── Authentication ─────────────────────────────────────────────────────── */
-
 export async function adminLoginAction(input: {
   username: string
   password: string
@@ -39,8 +29,6 @@ export async function adminLoginAction(input: {
 
     return ok(undefined)
   } catch (error) {
-    // No username in the log context — a failed login is already audited, and
-    // repeating it here would duplicate a personal identifier across two sinks.
     return fail(error, { action: 'adminLogin' })
   }
 }
@@ -53,8 +41,6 @@ export async function adminLogoutAction(): Promise<ActionResult<void>> {
     return fail(error, { action: 'adminLogout' })
   }
 }
-
-/* ── Payments ───────────────────────────────────────────────────────────── */
 
 export async function approvePaymentAction(input: {
   paymentId: number
@@ -94,8 +80,6 @@ export async function rejectPaymentAction(input: {
     return fail(error, { action: 'rejectPayment', paymentId: input.paymentId })
   }
 }
-
-/* ── Orders ─────────────────────────────────────────────────────────────── */
 
 export async function updateOrderStatusAction(input: {
   orderId: number
@@ -143,8 +127,6 @@ export async function addOrderNoteAction(input: {
     return fail(error, { action: 'addOrderNote', orderId: input.orderId })
   }
 }
-
-/* ── Reviews ────────────────────────────────────────────────────────────── */
 
 export async function moderateReviewAction(input: {
   reviewId: number
@@ -194,8 +176,6 @@ export async function deleteReviewAction(reviewId: number): Promise<ActionResult
   }
 }
 
-/* ── SMS ────────────────────────────────────────────────────────────────── */
-
 export async function approveSmsAction(messageIds: number[]): Promise<ActionResult<{ approved: number }>> {
   try {
     const admin = await requirePermission('sms.approve')
@@ -233,13 +213,6 @@ export async function cancelSmsAction(messageIds: number[]): Promise<ActionResul
   }
 }
 
-/**
- * Manual queue drain.
- *
- * This is the fallback for a host with no cron (planning §N-3). Approving a
- * message never sends it; something has to run the worker, and if there is no
- * scheduler then an administrator pressing this button is that something.
- */
 export async function dispatchSmsAction(): Promise<ActionResult<{ sent: number; failed: number }>> {
   try {
     await requirePermission('sms.approve')
@@ -251,8 +224,6 @@ export async function dispatchSmsAction(): Promise<ActionResult<{ sent: number; 
     return fail(error, { action: 'dispatchSms' })
   }
 }
-
-/* ── Session probe ──────────────────────────────────────────────────────── */
 
 export async function pingAdminAction(): Promise<ActionResult<{ username: string }>> {
   try {

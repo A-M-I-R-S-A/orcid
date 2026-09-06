@@ -10,14 +10,6 @@ import { isPayable } from '@/lib/order-status'
 import { toPersianDigits } from '@/lib/persian'
 import { formatJalaliDateTime } from '@/lib/jalali'
 
-/**
- * Card-to-card payment. §29 / §30.
- *
- * Shows the admin-configured bank details, then takes the کد رهگیری. The order
- * then sits in «در انتظار تأیید پرداخت» until a human verifies it — nothing on
- * this page can move it to paid, because no such transition exists for a
- * customer (§34, lib/order-status.ts).
- */
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
@@ -34,15 +26,12 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
   const orderId = Number(id)
   if (!Number.isInteger(orderId) || orderId <= 0) notFound()
 
-  // Scoped by user — a guessed order id resolves to nothing.
   const order = await getForUser(user.id, orderId)
   if (!order) notFound()
 
   const provider = getProvider(order.paymentMethod)
   if (!provider) notFound()
 
-  // Already settled or awaiting review — send them to the order page rather
-  // than letting them submit a second reference against a paid order.
   if (!isPayable(order.status)) {
     redirect(`/account/orders/${orderId}`)
   }
@@ -80,8 +69,6 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
           </div>
         )}
 
-        {/* Amount first and largest — it is the number they must type into a
-            banking app, and getting it wrong costs both sides a support cycle. */}
         <div className="card p-6 mb-6 text-center bg-surface-sunken">
           <p className="text-sm text-ink-muted mb-2">مبلغ قابل پرداخت</p>
           <p className="text-3xl">
@@ -104,8 +91,6 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
 
             <div className="flex justify-between gap-4 items-center">
               <dt className="text-sm text-ink-muted">شماره کارت</dt>
-              {/* Card numbers are LTR and grouped in fours — a 16-digit string
-                  rendered RTL and ungrouped is genuinely hard to transcribe. */}
               <dd
                 dir="ltr"
                 className="font-medium nums tracking-wider text-lg select-all"
@@ -155,7 +140,6 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
   )
 }
 
-/** 6037991234567890 → 6037 9912 3456 7890 */
 function formatCardNumber(value: string): string {
   const digits = value.replace(/\D/g, '')
   if (digits.length !== 16) return value

@@ -8,7 +8,6 @@ import { formatPrice } from '@/lib/money'
 import { formatJalaliDateTime } from '@/lib/jalali'
 import { toPersianDigits } from '@/lib/persian'
 
-/** Order management. §44. */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'سفارش‌ها' }
 
@@ -44,24 +43,46 @@ export default async function AdminOrdersPage({
         ]}
       />
 
-      <form method="get" action="/admin/orders" className="flex gap-2 mb-5">
+      <form method="get" action="/admin/orders" className="mb-5">
         <input type="hidden" name="status" value={status} />
-        <input
-          name="q"
-          type="search"
-          defaultValue={q ?? ''}
-          placeholder="جستجوی شماره سفارش، نام یا موبایل…"
-          className="field flex-1 max-w-md py-2.5"
-        />
-        <button type="submit" className="btn btn-secondary btn-sm">
-          جستجو
-        </button>
+        <div className="flex gap-2">
+          <input
+            name="q"
+            type="search"
+            defaultValue={q ?? ''}
+            placeholder="شماره سفارش، کد رهگیری، نام، موبایل یا کد پستی…"
+            aria-describedby="order-search-hint"
+            className="field flex-1 max-w-md py-2.5"
+          />
+          <button type="submit" className="btn btn-secondary btn-sm">
+            جستجو
+          </button>
+          {q && (
+            <Link href={`/admin/orders?status=${encodeURIComponent(status)}`} className="btn btn-ghost btn-sm">
+              پاک کردن
+            </Link>
+          )}
+        </div>
+        <p id="order-search-hint" className="mt-2 text-xs text-ink-subtle">
+          شماره سفارش را کامل یا بخشی از آن وارد کنید — مثلاً <span className="nums">۴۲</span> یا{' '}
+          <span className="nums">ORC-۱۴۰۵-۰۰۰۰۴۲</span>. ارقام فارسی و انگلیسی هر دو پذیرفته می‌شوند.
+        </p>
       </form>
 
-      <p className="text-sm text-ink-muted mb-3 nums">{toPersianDigits(total)} سفارش</p>
+      <p className="text-sm text-ink-muted mb-3 nums">
+        {toPersianDigits(total)} سفارش
+        {q && <span className="text-ink-subtle"> برای «{q}»</span>}
+      </p>
 
       {items.length === 0 ? (
-        <AdminEmpty title="سفارشی یافت نشد" />
+        <AdminEmpty
+          title="سفارشی یافت نشد"
+          description={
+            q
+              ? 'عبارت جستجو را بررسی کنید، یا جستجو را پاک کنید تا همهٔ سفارش‌ها نمایش داده شود.'
+              : undefined
+          }
+        />
       ) : (
         <>
           <TableWrap>

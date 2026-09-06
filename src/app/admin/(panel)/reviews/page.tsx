@@ -9,7 +9,6 @@ import { hasPermission } from '@/lib/permissions'
 import { formatJalaliDateTime } from '@/lib/jalali'
 import { maskPhone, toPersianDigits } from '@/lib/persian'
 
-/** Review moderation. §37 / §38. */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'دیدگاه‌ها' }
 
@@ -69,8 +68,6 @@ export default async function AdminReviewsPage({
                     <p className="text-xs text-ink-subtle mt-1">
                       {review.authorName || 'بدون نام'}
                       {' — '}
-                      {/* Masked: moderating a review does not require reading a
-                          full customer phone number off the screen. */}
                       <span className="nums">{maskPhone(review.authorPhone)}</span>
                     </p>
                   </div>

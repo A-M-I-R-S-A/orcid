@@ -6,7 +6,6 @@ import { hasPermission } from '@/lib/permissions'
 import { DEFAULT_THEME, THEME_FIELDS, getTheme } from '@/lib/theme'
 import { AVAILABLE_FONTS, getTypography } from '@/lib/typography'
 
-/** Theme and typography. §48 / §49. */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ظاهر سایت' }
 

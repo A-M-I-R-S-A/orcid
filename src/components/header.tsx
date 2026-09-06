@@ -5,29 +5,15 @@ import { cartCount } from '@/modules/cart/service'
 import { getCurrentUser } from '@/lib/session'
 import { getNamespace } from '@/lib/settings'
 import { toPersianDigits } from '@/lib/persian'
+import { CategoryNav } from './category-nav'
 import { MobileNav } from './mobile-nav'
 import { SearchField } from './search-field'
 
-/**
- * Site header. §12.
- *
- * A server component — the only interactive parts (the mobile drawer and the
- * search field) are small client islands. Rendering the whole header on the
- * client would put the navigation and the cart count behind hydration for no
- * benefit.
- *
- * ── Why two rows on desktop ───────────────────────────────────────────────
- * One row had to carry the logo, six category links, a search field and two
- * icon buttons. At 1280–1440 — the widths most customers are actually on —
- * every one of those was squeezed to its minimum and the whole bar read as
- * cramped. Splitting identity and tools from navigation gives the categories
- * their own line at a comfortable size, which is what a shop's navigation is
- * for. Below `lg` it collapses back to a single row plus the drawer.
- */
 export async function Header() {
-  const [categories, site, user] = await Promise.all([
+  const [categories, site, social, user] = await Promise.all([
     listCategories(),
     getNamespace('site'),
+    getNamespace('social'),
     getCurrentUser(),
   ])
 
@@ -36,48 +22,67 @@ export async function Header() {
   const topLevel = categories.filter((c) => c.parentId === null).slice(0, 6)
 
   return (
-    <header className="sticky top-0 z-40 border-b border-line bg-bg/95 backdrop-blur-sm">
+    <header
+      id="site-header"
+      className="sticky top-0 z-40 border-b border-line bg-bg/95 backdrop-blur-sm"
+    >
       {site.announcementText ? (
         <div className="band px-4 py-2 text-center text-sm">{site.announcementText}</div>
       ) : null}
 
       <div className="container-page">
-        <div className="flex h-[68px] items-center justify-between gap-4 md:h-[84px]">
-          {/* Mobile menu — the drawer itself is the client island. */}
+        <div className="header-bar flex h-[68px] items-center justify-between gap-4">
           <div className="lg:hidden">
             <MobileNav
-              categories={topLevel.map((c) => ({ name: c.name, slug: c.slug }))}
+              categories={topLevel.map((c) => ({
+                name: c.name,
+                slug: c.slug,
+                imagePath: c.imagePath ?? null,
+              }))}
               isSignedIn={Boolean(user)}
+              fullName={user?.fullName ?? null}
+              cartCount={count}
+              social={{
+                instagram: social.instagram,
+                telegram: social.telegram,
+                whatsapp: social.whatsapp,
+              }}
             />
           </div>
 
           <Link href="/" className="shrink-0" aria-label={`${siteName} — صفحه اصلی`}>
-            {/* The logo is never mirrored in RTL. §J. */}
             <img
               src={site.logoPath ? `/api/media/${site.logoPath}` : '/logo.png'}
               alt={siteName}
               width={138}
               height={44}
-              // The header mark is the first paint on every page — eager.
               loading="eager"
               fetchPriority="high"
-              className="h-9 w-auto object-contain object-center md:h-11"
+              className="header-logo h-9 w-auto object-contain object-center"
             />
           </Link>
 
           <div className="hidden flex-1 justify-center md:flex">
-            <div className="w-full max-w-md">
+            <div className="w-full max-w-sm">
               <SearchField />
             </div>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 md:border-s md:border-line md:ps-2">
             <IconLink
               href={user ? '/account' : '/login'}
               label={user ? 'حساب کاربری' : 'ورود به حساب'}
             >
               <path d="M12 12a4 4 0 100-8 4 4 0 000 8z" />
               <path d="M4 21c0-3.6 3.6-6 8-6s8 2.4 8 6" />
+            </IconLink>
+
+            <IconLink
+              href={user ? '/account/wishlist' : '/login?next=/account/wishlist'}
+              label="علاقه‌مندی‌ها"
+              className="hidden sm:inline-flex"
+            >
+              <path d="M12 20s-7-4.4-7-9.2A4 4 0 0112 8.6 4 4 0 0119 10.8C19 15.6 12 20 12 20z" />
             </IconLink>
 
             <Link
@@ -112,29 +117,10 @@ export async function Header() {
         </div>
       </div>
 
-      {/* Category navigation gets its own line from lg up. */}
-      <nav
-        aria-label="ناوبری اصلی"
-        className="hidden border-t border-line/70 lg:block"
-      >
-        <div className="container-page">
-          <ul className="flex items-stretch gap-8">
-            {topLevel.map((category) => (
-              <li key={category.id}>
-                <NavLink href={`/category/${encodeURIComponent(category.slug)}`}>
-                  {category.name}
-                </NavLink>
-              </li>
-            ))}
-            <li>
-              <NavLink href="/blog">مجله</NavLink>
-            </li>
-          </ul>
-        </div>
-      </nav>
+      <CategoryNav
+        categories={topLevel.map((c) => ({ id: c.id, name: c.name, slug: c.slug }))}
+      />
 
-      {/* Search moves below the bar on mobile, where the header row has no
-          room for it and it is a primary action. */}
       <div className="container-page pb-3 md:hidden">
         <SearchField />
       </div>
@@ -142,39 +128,21 @@ export async function Header() {
   )
 }
 
-/**
- * A nav link with a rule that draws in under it on hover. The rule is a
- * pseudo-free element rather than `border-bottom`, so it animates from the
- * inline start without shifting the text by a pixel.
- */
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link
-      href={href}
-      className="group/nav relative flex h-12 items-center text-[15px] text-ink transition-colors duration-300 hover:text-accent-2"
-    >
-      {children}
-      <span
-        aria-hidden="true"
-        className="absolute inset-x-0 bottom-0 h-[2px] origin-[100%_50%] scale-x-0 bg-accent-2 transition-transform duration-400 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover/nav:scale-x-100 ltr:origin-[0_50%]"
-      />
-    </Link>
-  )
-}
-
 function IconLink({
   href,
   label,
   children,
+  className,
 }: {
   href: string
   label: string
   children: React.ReactNode
+  className?: string
 }) {
   return (
     <Link
       href={href}
-      className="rounded-full p-2.5 transition-colors hover:bg-surface-sunken"
+      className={`rounded-full p-2.5 transition-colors hover:bg-surface-sunken ${className ?? ''}`}
       aria-label={label}
     >
       <svg

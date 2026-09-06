@@ -3,11 +3,12 @@ import { eq } from 'drizzle-orm'
 
 import { db } from '@/db'
 import { pages } from '@/db/schema'
+import { ResponsiveImage } from '@/components/media'
 import { Breadcrumbs } from '@/components/ui'
-import { breadcrumbSchema, buildMetadata, jsonLd, shouldIndex } from '@/lib/seo'
+import { breadcrumbSchema, buildMetadata, shouldIndex } from '@/lib/seo'
 import { sanitizeHtml } from '@/lib/sanitize'
+import { JsonLd } from '@/components/json-ld'
 
-/** CMS pages — about, contact, FAQ, terms, privacy, shipping, returns. §53. */
 export const revalidate = 3600
 
 interface Props {
@@ -49,10 +50,7 @@ export default async function CmsPage({ params }: Props) {
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbSchema(breadcrumbItems)) }}
-      />
+      <JsonLd data={breadcrumbSchema(breadcrumbItems)} />
 
       <div className="container-page py-6">
         <Breadcrumbs items={breadcrumbItems} />
@@ -63,9 +61,24 @@ export default async function CmsPage({ params }: Props) {
           <h1 className="text-3xl md:text-5xl text-ink leading-[1.4]">{page.title}</h1>
         </header>
 
+        {page.imagePath && (
+          <figure className="mb-10 max-w-3xl">
+            <div className="frame bg-surface-sunken p-3 sm:p-5">
+              <ResponsiveImage
+                path={page.imagePath}
+                alt={page.title}
+                width={1200}
+                height={900}
+                sizes="(min-width: 768px) 48rem, 100vw"
+                className="mx-auto h-auto w-full object-contain"
+              />
+            </div>
+          </figure>
+        )}
+
         {page.body && (
           <div
-            className="prose text-ink-muted"
+            className="prose max-w-3xl text-ink-muted"
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(page.body) }}
           />
         )}

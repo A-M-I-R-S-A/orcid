@@ -12,18 +12,9 @@ import { enforce } from '@/lib/rate-limit'
 import { createAdminSession, getCurrentAdmin } from '@/lib/session'
 import type { AdminPrincipal } from '@/lib/permissions'
 
-/**
- * Admin authentication and the authorisation guards.
- *
- * §57: `requirePermission` is called from services, not from pages. A check
- * written in a page component protects one route; the same check inside
- * `productService.update()` protects every present and future caller.
- */
-
 const MAX_FAILED = 8
 const LOCKOUT_MS = 15 * 60 * 1000
 
-/** Same message for every failure — never reveal which half was wrong. */
 const GENERIC_LOGIN_ERROR = 'نام کاربری یا رمز عبور اشتباه است.'
 
 export async function login(
@@ -50,8 +41,6 @@ export async function login(
     .limit(1)
 
   if (!account) {
-    // Spend comparable time on an unknown username so response timing does not
-    // reveal whether the account exists.
     await verifyPassword(password, 'scrypt:16384:8:1:00:00')
     throw errors.validation(GENERIC_LOGIN_ERROR)
   }
@@ -84,8 +73,6 @@ export async function login(
     throw errors.validation(GENERIC_LOGIN_ERROR)
   }
 
-  // A disabled account is checked AFTER the password, so this cannot be used
-  // to enumerate which usernames exist.
   if (!account.isActive) {
     throw errors.forbidden('این حساب کاربری غیرفعال است.')
   }
@@ -116,19 +103,12 @@ export async function login(
   return principal
 }
 
-/* ── Guards ─────────────────────────────────────────────────────────────── */
-
-/** Throws when nobody is signed in. Use in every admin page and action. */
 export async function requireAdmin(): Promise<AdminPrincipal> {
   const admin = await getCurrentAdmin()
   if (!admin) throw errors.unauthenticated()
   return admin
 }
 
-/**
- * Throws unless the current administrator holds `permission`.
- * This is the function §57 is about — call it in the service, not the page.
- */
 export async function requirePermission(permission: Permission): Promise<AdminPrincipal> {
   const admin = await requireAdmin()
   if (!hasPermission(admin, permission)) {
@@ -137,13 +117,10 @@ export async function requirePermission(permission: Permission): Promise<AdminPr
   return admin
 }
 
-/** Non-throwing variant, for deciding whether to render a control. */
 export async function can(permission: Permission): Promise<boolean> {
   const admin = await getCurrentAdmin()
   return admin ? hasPermission(admin, permission) : false
 }
-
-/* ── Account management ─────────────────────────────────────────────────── */
 
 export async function listAdmins() {
   return db
@@ -178,11 +155,6 @@ export async function listRoles() {
     .orderBy(roles.id)
 }
 
-/**
- * Guard against removing the last usable superadmin.
- * Without this, disabling one account or reassigning one role can lock every
- * human out of the panel with no recovery path short of a SQL console.
- */
 export async function isLastActiveSuperadmin(adminId: number): Promise<boolean> {
   const [row] = await db
     .select({ count: sql<number>`COUNT(*)` })

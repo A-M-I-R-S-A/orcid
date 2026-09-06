@@ -6,7 +6,6 @@ import { PageHeader } from '@/components/admin/ui'
 import { BlogManager } from '@/components/admin/blog-manager'
 import { requirePermission } from '@/modules/admin/auth'
 
-/** Blog. §55. */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'وبلاگ' }
 

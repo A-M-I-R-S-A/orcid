@@ -2,27 +2,16 @@ import 'server-only'
 
 import { getBool, getNamespace, getSecret } from '@/lib/settings'
 
-/**
- * Payment provider registry. §28 / §32.
- *
- * Both methods implement one interface, so activating Torob Pay later is
- * registering an adapter — not reworking checkout. Checkout branches on the
- * SHAPE the provider returns (instructions vs redirect), never on its name,
- * which is what keeps that promise honest.
- */
-
 export interface PaymentMethodInfo {
   key: string
   label: string
   description: string
-  /** Manual methods await a human decision; automatic ones await a callback. */
   kind: 'manual' | 'gateway'
 }
 
 export type InitiateResult =
   | {
       kind: 'instructions'
-      /** Rendered on the payment page; admin-configured. */
       instructions: {
         bankName: string
         cardNumber: string
@@ -39,8 +28,6 @@ export interface PaymentProvider {
   isConfigured(): Promise<boolean>
   initiate(order: { id: number; orderNumber: string; amount: number }): Promise<InitiateResult>
 }
-
-/* ── Card to card ───────────────────────────────────────────────────────── */
 
 class CardToCardProvider implements PaymentProvider {
   readonly key = 'card_to_card'
@@ -76,17 +63,6 @@ class CardToCardProvider implements PaymentProvider {
   }
 }
 
-/* ── Torob Pay ──────────────────────────────────────────────────────────── */
-
-/**
- * Prepared, disabled by default. §32.
- *
- * `initiate` intentionally throws rather than returning a plausible-looking
- * redirect: the request shape has not been verified against Torob Pay's
- * documentation, and a silent stub that half-works is worse than one that
- * refuses. Enabling this is a deliberate implementation task, and the admin
- * panel reports it as unconfigured until then.
- */
 class TorobPayProvider implements PaymentProvider {
   readonly key = 'torob_pay'
 
@@ -115,8 +91,6 @@ class TorobPayProvider implements PaymentProvider {
   }
 }
 
-/* ── Registry ───────────────────────────────────────────────────────────── */
-
 const PROVIDERS: PaymentProvider[] = [new CardToCardProvider(), new TorobPayProvider()]
 
 export function getProvider(key: string): PaymentProvider | undefined {
@@ -127,14 +101,6 @@ export function allProviders(): PaymentProvider[] {
   return PROVIDERS
 }
 
-/**
- * Methods a customer may actually choose.
- *
- * Requires BOTH enabled and configured — an enabled method with no card number
- * would render a payment page with a blank field, which is worse than not
- * offering it. Checkout validates against this list, so a posted method that is
- * switched off is rejected server-side.
- */
 export async function getEnabledMethods(): Promise<PaymentMethodInfo[]> {
   const results = await Promise.all(
     PROVIDERS.map(async (provider) => {
@@ -149,7 +115,6 @@ export async function getEnabledMethods(): Promise<PaymentMethodInfo[]> {
   return results.filter((info): info is PaymentMethodInfo => info !== null)
 }
 
-/** Configuration status for the admin panel, including disabled providers. */
 export async function providerStatuses() {
   return Promise.all(
     PROVIDERS.map(async (provider) => ({

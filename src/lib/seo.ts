@@ -4,23 +4,8 @@ import type { Metadata } from 'next'
 
 import { getNamespace } from './settings'
 
-/**
- * SEO. §59–§74.
- *
- * Two rules govern everything here:
- *
- *  1. Indexability is decided by ONE function (`shouldIndex`), which both the
- *     page metadata and the sitemap consult. If they each had their own logic
- *     they would eventually disagree, and a sitemap that lists noindex URLs is
- *     worse than no sitemap.
- *
- *  2. Structured data is emitted only when the page actually renders the thing
- *     it claims. §62 forbids fabricating ratings — so AggregateRating appears
- *     only when at least one approved review exists.
- */
-
 export function siteUrl(): string {
-  const raw = process.env.APP_URL ?? 'https://orchid-clothing.ir'
+  const raw = process.env.APP_URL ?? 'https://orchidbra.ir'
   return raw.replace(/\/+$/, '')
 }
 
@@ -29,21 +14,11 @@ export function absoluteUrl(pathname: string): string {
   return siteUrl() + (pathname.startsWith('/') ? pathname : `/${pathname}`)
 }
 
-/* ── Facet indexation policy ────────────────────────────────────────────── */
-
-/**
- * §19 / §70. A handful of filters can mint thousands of thin, near-duplicate
- * URLs. The policy: a SINGLE facet is indexable (people really do search for
- * "سوتین مشکی"); any combination, any sort, and any page-size change is not.
- *
- * Enforced in one place so no page can accidentally opt itself in.
- */
 const INDEXABLE_FACETS = new Set(['color', 'size'])
 
 export function facetsAreIndexable(searchParams: Record<string, string | string[] | undefined>): boolean {
   const active = Object.entries(searchParams).filter(([key, value]) => {
     if (value == null || value === '') return false
-    // Pagination stays indexable; it is not a facet.
     if (key === 'page') return false
     return true
   })
@@ -63,7 +38,6 @@ export interface IndexabilityInput {
   publishedAt?: Date | null
 }
 
-/** The single source of truth for "may a robot index this row". */
 export function shouldIndex(entity: IndexabilityInput): boolean {
   if (entity.isArchived) return false
   if (entity.isActive === false) return false
@@ -72,8 +46,6 @@ export function shouldIndex(entity: IndexabilityInput): boolean {
   if (entity.publishedAt && entity.publishedAt.getTime() > Date.now()) return false
   return true
 }
-
-/* ── Metadata ───────────────────────────────────────────────────────────── */
 
 export interface MetaInput {
   title: string
@@ -86,11 +58,6 @@ export interface MetaInput {
   modifiedTime?: Date | null
 }
 
-/**
- * Builds page metadata with a documented fallback chain:
- *   explicit SEO field → generated from content → site default.
- * No page ships an empty or duplicated title.
- */
 export async function buildMetadata(input: MetaInput): Promise<Metadata> {
   const site = await getNamespace('site')
   const seo = await getNamespace('seo')
@@ -115,19 +82,6 @@ export async function buildMetadata(input: MetaInput): Promise<Metadata> {
     : absoluteUrl(seo.defaultOgImage || '/logo.png')
 
   return {
-    /*
-     * `absolute` bypasses the root layout's title template.
-     *
-     * Without it the site name is appended TWICE — once by the logic above,
-     * which already checks whether the title contains it, and again by the
-     * layout's `%s | ارکید` template. The homepage rendered as
-     * "ارکید — فروشگاه لباس زیر زنانه | ارکید".
-     *
-     * This function owns the whole title, deliberately: it is the only place
-     * that knows whether the page title already carries the brand, which is
-     * what stops the homepage reading "ارکید | ارکید". Pages that do NOT go
-     * through here keep the template and get the brand appended normally.
-     */
     title: { absolute: title },
     description: description.slice(0, 320),
     alternates: { canonical },
@@ -154,9 +108,7 @@ export async function buildMetadata(input: MetaInput): Promise<Metadata> {
   }
 }
 
-/* ── JSON-LD ────────────────────────────────────────────────────────────── */
-
-type Json = Record<string, unknown>
+export type Json = Record<string, unknown>
 
 export async function organizationSchema(): Promise<Json> {
   const site = await getNamespace('site')
@@ -227,19 +179,11 @@ export interface ProductSchemaInput {
   images: string[]
   price: number
   inStock: boolean
-  /** Only supply these when approved reviews actually exist. */
   ratingValue?: number
   ratingCount?: number
   brandName?: string
 }
 
-/**
- * Product + Offer. §63.
- *
- * `priceCurrency` is IRR because that is the ISO code Google expects; the
- * displayed unit is Toman. `price` is converted accordingly — quoting a Toman
- * figure under an IRR code would be a factual error in the markup.
- */
 export function productSchema(input: ProductSchemaInput): Json {
   const schema: Json = {
     '@context': 'https://schema.org',
@@ -262,7 +206,6 @@ export function productSchema(input: ProductSchemaInput): Json {
     },
   }
 
-  // §62: never fabricate ratings. Emitted only when real approved reviews back it.
   if (input.ratingCount && input.ratingCount > 0 && input.ratingValue) {
     schema.aggregateRating = {
       '@type': 'AggregateRating',
@@ -306,11 +249,6 @@ export function articleSchema(input: {
   }
 }
 
-/**
- * Serialises JSON-LD for a <script> tag.
- * `<` is escaped so a product name containing "</script>" cannot break out of
- * the tag — a genuine XSS vector in hand-built structured data.
- */
 export function jsonLd(data: Json | Json[]): string {
   return JSON.stringify(data).replace(/</g, '\\u003c')
 }

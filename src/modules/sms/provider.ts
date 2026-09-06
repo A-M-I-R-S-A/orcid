@@ -2,29 +2,10 @@ import 'server-only'
 
 import { getSecret, getSetting } from '@/lib/settings'
 
-/**
- * SMS provider abstraction.
- *
- * SMS.ir is the first implementation, but every caller goes through this
- * interface. If the provider's payload shape differs from what is coded here,
- * the change costs one file rather than a rewrite.
- *
- * ── A note on the endpoint details ─────────────────────────────────────────
- * The request shapes below follow SMS.ir's documented v1 REST API (an API key
- * in the `x-api-key` header, template sends with named parameters). They MUST
- * be checked against the provider's current documentation before go-live —
- * this is the one place in the codebase where correctness depends on a
- * third-party contract rather than on our own code. `verifyConfiguration`
- * exists so that check is a button in the admin panel, not a guess.
- */
-
 export interface SendResult {
   success: boolean
-  /** Provider-side id, stored for support enquiries. */
   messageId?: string
-  /** Scrubbed of credentials before it is ever persisted or logged. */
   error?: string
-  /** True when retrying could plausibly succeed (timeout, 5xx). */
   retryable?: boolean
 }
 
@@ -36,18 +17,12 @@ export interface SmsProvider {
     templateId: string,
     parameters: Record<string, string>,
   ): Promise<SendResult>
-  /** Remaining credit, when the provider exposes it. Null when unsupported. */
   getCredit(): Promise<number | null>
 }
 
 const SMS_IR_BASE = 'https://api.sms.ir/v1'
 const TIMEOUT_MS = 15_000
 
-/**
- * Strips anything credential-shaped from a provider response before it is
- * stored or logged. §58 — an error string from an upstream API is exactly the
- * kind of value that quietly carries a key into the database.
- */
 function scrub(message: string): string {
   return message
     .replace(/[A-Za-z0-9_-]{25,}/g, '[redacted]')
@@ -103,7 +78,6 @@ class SmsIrProvider implements SmsProvider {
         return {
           success: false,
           error: scrub(`HTTP ${response.status}: ${text}`),
-          // 4xx is our fault and will fail identically on retry; 5xx may not.
           retryable: response.status >= 500 || response.status === 429,
         }
       }
@@ -115,7 +89,6 @@ class SmsIrProvider implements SmsProvider {
         return { success: false, error: scrub(`Malformed response: ${text}`), retryable: true }
       }
 
-      // SMS.ir signals application-level success with status 1.
       if (body.status !== 1) {
         return {
           success: false,
@@ -161,13 +134,6 @@ class SmsIrProvider implements SmsProvider {
   }
 }
 
-/**
- * A provider that records what it would have sent, for development and for the
- * period before real credentials arrive.
- *
- * It deliberately does NOT print the OTP parameters — §24 forbids logging the
- * code, and a development convenience that violates that would eventually ship.
- */
 class NullProvider implements SmsProvider {
   readonly key = 'null'
 
@@ -198,7 +164,6 @@ export async function getProvider(): Promise<SmsProvider> {
   return cached
 }
 
-/** Clears the memoised provider after a credential change. */
 export function resetProvider(): void {
   cached = undefined
 }

@@ -8,29 +8,6 @@ import { formatAmountLatin } from '@/lib/money'
 import { toPersianDigits } from '@/lib/persian'
 import type { SearchParams } from '@/lib/validation'
 
-/**
- * Category filters. §19.
- *
- * Filters are real links that change the URL, not client-side array filtering.
- * That keeps every filtered view server-rendered, shareable and back-button
- * correct — and it is what makes the single-facet indexation policy in
- * lib/seo.ts meaningful, since there is a real URL to decide about.
- *
- * On mobile this becomes a bottom sheet rather than a sidebar: a sidebar on a
- * 375px screen either eats the product grid or hides behind a scroll. §9.
- *
- * ── The desktop bar ───────────────────────────────────────────────────────
- * It used to be one undifferentiated run of pills — every colour, then every
- * size, then a stock toggle, all the same shape at the same weight, with the
- * sort control jammed against them. At laptop widths that is a wall you have
- * to read left to right to understand, and it was the reason this page felt
- * unfinished.
- *
- * Now each facet is a named group separated by a hairline, so the row is
- * scanned rather than read, and sort sits on its own at the far end where it
- * belongs — it is not a filter and should not look like one.
- */
-
 interface Facets {
   colors: { value: string; swatchHex: string | null }[]
   sizes: { value: string }[]
@@ -67,7 +44,6 @@ export function FilterBar({
   return (
     <>
       <div className="flex items-center justify-between gap-4 border-y border-line py-4 lg:items-start">
-        {/* Mobile: one button that opens the sheet. */}
         <button
           type="button"
           onClick={() => setSheetOpen(true)}
@@ -89,7 +65,6 @@ export function FilterBar({
           {activeCount > 0 && <span className="nums">({toPersianDigits(activeCount)})</span>}
         </button>
 
-        {/* Laptop and up: named groups, hairline-separated. */}
         <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-x-5 gap-y-3 lg:flex">
           {facets.colors.length > 0 && (
             <FacetGroup label="رنگ">
@@ -117,7 +92,6 @@ export function FilterBar({
         <SortSelect basePath={basePath} active={active} />
       </div>
 
-      {/* Mobile bottom sheet */}
       <div
         className={`fixed inset-0 z-50 transition-opacity duration-400 ease-[cubic-bezier(0.32,0.72,0,1)] lg:hidden ${
           sheetOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
@@ -209,7 +183,6 @@ export function FilterBar({
   )
 }
 
-/** A named facet with a hairline in front of it, so the row reads as groups. */
 function FacetGroup({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-center gap-3 border-s border-line ps-5 first:border-s-0 first:ps-0">
@@ -219,7 +192,6 @@ function FacetGroup({ label, children }: { label: string; children: React.ReactN
   )
 }
 
-/** Toggling a filter preserves the others and always resets to page 1. */
 function buildHref(
   basePath: string,
   active: SearchParams,
@@ -309,8 +281,6 @@ function SizeChips({
             href={buildHref(basePath, active, { size: on ? undefined : size.value })}
             onClick={onNavigate}
             aria-pressed={on}
-            // Sizes are codes, not words: a fixed minimum keeps "M" and "85C"
-            // the same shape so the row does not look ragged.
             className={`${CHIP_BASE} nums min-w-[3.25rem] justify-center ${on ? CHIP_ON : CHIP_OFF}`}
           >
             {size.value}
@@ -372,8 +342,6 @@ function SortSelect({ basePath, active }: { basePath: string; active: SearchPara
             const query = params.toString()
             router.push(query ? `${basePath}?${query}` : basePath)
           }}
-          // The native arrow lands on the wrong side in RTL on some engines
-          // and cannot be styled, so it is removed and redrawn below.
           className="field w-auto appearance-none bg-transparent py-2 pe-9 ps-3 text-sm"
         >
           {options.map((option) => (

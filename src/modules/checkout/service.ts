@@ -24,23 +24,6 @@ import { enforce } from '@/lib/rate-limit'
 import * as sms from '@/modules/sms/service'
 import { getEnabledMethods } from '@/modules/payments/registry'
 
-/**
- * Checkout. §22 / §35.
- *
- * ── Why this is one transaction ────────────────────────────────────────────
- * Between "the cart page said 5 in stock" and "the order is written", another
- * customer can buy the last one. Reading stock and then writing an order as
- * two separate statements is a race that oversells under exactly the traffic
- * you want.
- *
- * So the whole thing runs inside a transaction that takes a row lock
- * (SELECT ... FOR UPDATE) on every variant before checking or decrementing
- * anything. A second checkout for the same variant blocks until the first
- * commits, then sees the true remaining stock. The CHECK (stock_qty >= 0)
- * constraint is the backstop underneath that: even if this logic were wrong,
- * the database refuses to go negative.
- */
-
 export interface CheckoutInput {
   fullName: string
   phone: string
@@ -58,38 +41,62 @@ export interface CheckoutResult {
   grandTotal: number
 }
 
-/** ORC-1405-000042 — Jalali year plus a zero-padded sequence. */
-async function generateOrderNumber(): Promise<string> {
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0]
+
+async function generateOrderNumber(tx: Transaction): Promise<string> {
   const year = jalaliYear()
   const prefix = `ORC-${year}-`
 
-  const [row] = await db
-    .select({ count: sql<number>`COUNT(*)` })
+  const [row] = await tx
+    .select({
+      highest: sql<number | null>`MAX(SUBSTRING(${orders.orderNumber}, ${prefix.length + 1}) + 0)`,
+    })
     .from(orders)
     .where(sql`${orders.orderNumber} LIKE ${prefix + '%'}`)
 
-  const sequence = Number(row?.count ?? 0) + 1
+  const sequence = Number(row?.highest ?? 0) + 1
   return prefix + String(sequence).padStart(6, '0')
+}
+
+const ORDER_NUMBER_ATTEMPTS = 3
+
+function isDuplicateOrderNumber(error: unknown): boolean {
+  const code = (error as { code?: string; errno?: number } | null)?.code
+  const errno = (error as { errno?: number } | null)?.errno
+  const message = String((error as Error | null)?.message ?? '')
+
+  return (code === 'ER_DUP_ENTRY' || errno === 1062) && message.includes('orders_number_unq')
 }
 
 export async function placeOrder(
   userId: number,
   cartId: number,
   input: CheckoutInput,
-  meta: { ip: string },
 ): Promise<CheckoutResult> {
   await enforce(`user:${userId}`, 'checkout')
 
-  // The chosen method must be one the administrator has actually enabled —
-  // a client can post any string, including a method that is switched off.
   const enabled = await getEnabledMethods()
   if (!enabled.some((m) => m.key === input.paymentMethod)) {
     throw errors.payment(MESSAGES.paymentMethodUnavailable)
   }
 
-  const orderNumber = await generateOrderNumber()
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await placeOrderOnce(userId, cartId, input)
+    } catch (error) {
+      if (attempt >= ORDER_NUMBER_ATTEMPTS || !isDuplicateOrderNumber(error)) throw error
+    }
+  }
+}
 
+async function placeOrderOnce(
+  userId: number,
+  cartId: number,
+  input: CheckoutInput,
+): Promise<CheckoutResult> {
   return db.transaction(async (tx) => {
+    const orderNumber = await generateOrderNumber(tx)
+
     const lines = await tx
       .select({
         itemId: cartItems.id,
@@ -114,10 +121,6 @@ export async function placeOrder(
       throw errors.validation(MESSAGES.cartEmpty)
     }
 
-    // ── Lock every variant, in a deterministic order ────────────────────────
-    // Ordering by id matters: two concurrent checkouts touching the same two
-    // variants in opposite orders would deadlock. Sorting makes the lock
-    // acquisition order identical for everyone.
     const variantIds = [...new Set(lines.map((l) => l.variantId))].sort((a, b) => a - b)
 
     const locked = await tx.execute(
@@ -140,7 +143,6 @@ export async function placeOrder(
       })
     }
 
-    // ── Validate against the LOCKED rows, not the earlier read ──────────────
     let subtotal = 0
     let discountTotal = 0
 
@@ -170,8 +172,6 @@ export async function placeOrder(
         )
       }
 
-      // Price comes from the locked row — never from the cart, never from the
-      // client. A price changed since the cart was rendered is applied here.
       const unitPrice = effectivePrice(live.price, live.discount)
       const lineTotal = unitPrice * line.quantity
 
@@ -192,9 +192,6 @@ export async function placeOrder(
 
     const grandTotal = subtotal - discountTotal
 
-    // ── Decrement stock ────────────────────────────────────────────────────
-    // The WHERE clause repeats the stock check, so even if the logic above
-    // were wrong this UPDATE affects zero rows rather than overselling.
     for (const item of prepared) {
       const result = await tx
         .update(productVariants)
@@ -211,7 +208,6 @@ export async function placeOrder(
       }
     }
 
-    // ── Write the order ────────────────────────────────────────────────────
     const [orderInsert] = await tx.insert(orders).values({
       orderNumber,
       userId,
@@ -233,8 +229,6 @@ export async function placeOrder(
 
     const orderId = (orderInsert as unknown as { insertId: number }).insertId
 
-    // Variant labels and images are snapshotted onto the item, so the order
-    // stays readable after the product is renamed or archived.
     const variantLabels = await tx
       .select({
         variantId: variantOptionValues.variantId,
@@ -296,8 +290,6 @@ export async function placeOrder(
       })),
     )
 
-    // A pending payment row exists from the moment the order does, so the
-    // admin payment queue is complete without a later backfill.
     await tx.insert(payments).values({
       orderId,
       userId,
@@ -306,7 +298,6 @@ export async function placeOrder(
       amount: grandTotal,
     })
 
-    // Bump sales counters for the "popular" sort.
     for (const item of prepared) {
       await tx
         .update(products)
@@ -320,13 +311,6 @@ export async function placeOrder(
   })
 }
 
-/**
- * Queues the confirmation SMS.
- *
- * Called AFTER the transaction commits, deliberately. Enqueuing inside it
- * would mean a rolled-back order could still have queued a message, and an
- * SMS provider outage could roll back a perfectly good order.
- */
 export async function notifyOrderPlaced(orderId: number): Promise<void> {
   const [order] = await db
     .select({
@@ -348,7 +332,6 @@ export async function notifyOrderPlaced(orderId: number): Promise<void> {
   })
 }
 
-/** Prefills checkout from the customer's most recent order. */
 export async function lastUsedAddress(userId: number) {
   const [order] = await db
     .select({

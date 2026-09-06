@@ -1,28 +1,4 @@
 #!/usr/bin/env node
-/**
- * Migration runner.
- *
- * Plain SQL files applied in filename order, tracked in a table, guarded by a
- * lock. Deliberately NOT drizzle-kit push — §79 rules out anything that
- * inspects the live schema and improvises a diff, because that is exactly how
- * production schemas drift from what is in version control.
- *
- * Properties that matter on managed hosting:
- *
- *   - Checksums. An already-applied file that has since been EDITED is a hard
- *     error, not a silent skip. Editing a shipped migration is the most common
- *     way two environments quietly diverge.
- *
- *   - A named lock. Two deploys racing (or a deploy racing a manual run) would
- *     otherwise both try to ALTER the same table.
- *
- *   - Per-statement application with the failing SQL printed. MySQL DDL is not
- *     transactional, so a failure mid-file leaves a partial migration; knowing
- *     exactly which statement failed is the difference between a two-minute
- *     fix and an outage.
- *
- * Usage:  node --env-file=.env scripts/migrate.mjs [--dry-run]
- */
 
 import { createHash } from 'node:crypto'
 import { readFile, readdir } from 'node:fs/promises'
@@ -66,7 +42,6 @@ async function main() {
     const [[versionRow]] = await connection.query('SELECT VERSION() AS version')
     console.log(`→ Connected to ${versionRow.version}`)
 
-    // Named lock: any concurrent runner waits rather than colliding.
     const [[lockRow]] = await connection.query('SELECT GET_LOCK(?, ?) AS acquired', [
       LOCK_NAME,
       LOCK_TIMEOUT_SEC,
@@ -111,8 +86,6 @@ async function main() {
 
         if (previous) {
           if (previous !== sum) {
-            // Hard stop. A shipped migration that has changed means this
-            // database and the repository disagree about what was applied.
             console.error(
               `\n✗ ${filename} has been modified since it was applied.\n` +
                 `  expected checksum ${previous}, file is ${sum}\n\n` +
@@ -135,7 +108,6 @@ async function main() {
         const statements = content
           .split('--> statement-breakpoint')
           .map((s) => s.trim())
-          // Strip comment-only fragments, which MySQL rejects as empty queries.
           .filter((s) => s.length > 0 && !/^(--[^\n]*\n?)+$/.test(s))
 
         for (const [index, statement] of statements.entries()) {

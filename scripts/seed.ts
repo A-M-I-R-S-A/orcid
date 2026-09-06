@@ -1,27 +1,3 @@
-/**
- * Seed.
- *
- * Idempotent — every insert is an upsert or is guarded by an existence check,
- * so running it twice is safe. That matters because it is the tool used both
- * to bootstrap a fresh database and to backfill new permissions after a
- * release that adds one.
- *
- * Imports the permission catalogue from lib/permissions.ts rather than
- * restating it. A seed with its own copy of the list drifts the first time
- * someone adds a permission and forgets, and the symptom is a role that
- * silently cannot be granted a capability that exists in code.
- *
- * Usage:
- *   npm run db:seed              bootstrap: permissions, roles, admin, settings
- *   npm run db:seed -- --demo    also insert demo categories and products
- */
-
-/*
- * Run with `--conditions=react-server` (see the db:seed script). The modules
- * this imports are legitimately server-side and carry the `server-only` guard,
- * which throws under a plain Node process; that condition resolves the package
- * to its shipped no-op without weakening the guard in the application.
- */
 import 'dotenv/config'
 import { randomBytes } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
@@ -35,6 +11,8 @@ import { DEFAULT_TYPOGRAPHY } from '../src/lib/typography'
 import { hashPassword } from '../src/lib/crypto'
 import { normalizePersian } from '../src/lib/persian'
 import { slugify } from '../src/lib/slug'
+
+import { SIZE_GUIDE_SLUG } from '../src/lib/size-guide'
 
 const withDemo = process.argv.includes('--demo')
 
@@ -61,9 +39,6 @@ async function seedPermissions() {
       .onDuplicateKeyUpdate({ set: { groupKey: meta.group, label: meta.label } })
   }
 
-  // Prune permissions that no longer exist in code. Without this, a removed
-  // permission lingers in the table and can still be granted to a role, where
-  // it does nothing — a confusing checkbox that cannot be explained.
   const live = await db.select({ key: schema.permissions.key }).from(schema.permissions)
   const stale = live.filter((row) => !ALL_PERMISSIONS.includes(row.key as never))
 
@@ -102,8 +77,6 @@ async function seedRoles() {
 
     if (!row) continue
 
-    // Superadmin bypasses the permission table entirely, so populating it
-    // would be misleading — the rows would suggest a limit that is not real.
     if (role.key === 'superadmin') {
       console.log(`  ✓ ${role.name} (bypasses permission table)`)
       continue
@@ -142,8 +115,6 @@ async function seedAdminUser() {
 
   if (!role) throw new Error('superadmin role missing — seedRoles must run first')
 
-  // Generated, not hardcoded. A default password in a repository is a default
-  // password in production.
   const password = randomBytes(12).toString('base64url')
 
   await db.insert(schema.adminUsers).values({
@@ -174,8 +145,6 @@ async function seedSettings() {
     isSecret = false,
   ) => {
     for (const [key, value] of Object.entries(values)) {
-      // Only insert — never overwrite. Re-running the seed must not reset a
-      // theme or a bank card number the operator has since configured.
       await db
         .insert(schema.settings)
         .values({ namespace, key, value, isSecret })
@@ -219,8 +188,6 @@ async function seedSettings() {
       'پس از واریز مبلغ سفارش به شماره کارت بالا، کد رهگیری تراکنش را در فرم زیر ثبت کنید. سفارش شما پس از بررسی و تأیید پرداخت، پردازش خواهد شد.',
   })
 
-  // Torob Pay ships disabled: the adapter is a stub until its API contract is
-  // verified, and an enabled-but-broken payment method is worse than none.
   await put('torob', { enabled: '0' })
   await put('sms', { provider: 'sms_ir' })
 
@@ -239,13 +206,13 @@ async function seedSmsTemplates() {
     {
       event: 'otp_login' as const,
       name: 'کد ورود',
-      requiresApproval: false, // a waiting customer cannot be gated
+      requiresApproval: false,
       parameters: ['CODE'],
     },
     {
       event: 'order_created' as const,
       name: 'ثبت سفارش',
-      requiresApproval: true, // §27
+      requiresApproval: true,
       parameters: ['ORDER', 'AMOUNT'],
     },
     {
@@ -269,7 +236,6 @@ async function seedSmsTemplates() {
         event: template.event,
         name: template.name,
         parameters: template.parameters,
-        // Disabled until an operator supplies the SMS.ir template id.
         isEnabled: false,
         requiresApproval: template.requiresApproval,
       })
@@ -317,6 +283,19 @@ async function seedPages() {
     { slug: 'returns', title: 'شرایط بازگشت کالا', showInFooter: true, sortOrder: 4, body: '<p>به دلیل ماهیت بهداشتی این محصولات، امکان بازگشت تنها در صورت وجود ایراد در دوخت یا ارسال اشتباه وجود دارد.</p>' },
     { slug: 'terms', title: 'قوانین و مقررات', showInFooter: true, sortOrder: 5, body: '<p>با ثبت سفارش در ارکید، قوانین زیر را می‌پذیرید.</p>' },
     { slug: 'privacy', title: 'حریم خصوصی', showInFooter: true, sortOrder: 6, body: '<p>اطلاعات شخصی شما تنها برای پردازش سفارش استفاده می‌شود و در اختیار هیچ شخص ثالثی قرار نمی‌گیرد.</p>' },
+    {
+      slug: SIZE_GUIDE_SLUG,
+      title: 'راهنمای سایز',
+      showInFooter: true,
+      sortOrder: 7,
+      body:
+        '<h2>چگونه اندازه بگیریم؟</h2>' +
+        '<p>با یک متر نواری و روی لباس نازک اندازه بگیرید. متر باید صاف بماند و کشیده نشود.</p>' +
+        '<h3>دور سینه</h3><p>متر را از پرترین قسمت سینه و موازی با زمین عبور دهید.</p>' +
+        '<h3>دور زیر سینه</h3><p>بلافاصله زیر سینه، جایی که بند سوتین می‌نشیند.</p>' +
+        '<h3>دور باسن</h3><p>پرترین قسمت باسن، با پاهای جفت.</p>' +
+        '<p>اگر اندازه‌تان بین دو سایز بود، سایز بزرگ‌تر را انتخاب کنید.</p>',
+    },
   ]
 
   for (const page of pages) {
@@ -446,9 +425,6 @@ async function seedDemoCatalog() {
           sku: `ORC-${skuCounter++}`,
           price: def.price,
           discountPrice: def.discount ?? null,
-          // A deliberately uneven spread, including a zero, so the out-of-stock
-          // and low-stock paths are exercised by the demo data rather than
-          // only appearing in production.
           stockQty: (sizeIndex * 3 + colorIndex * 2) % 7,
           isActive: true,
         })

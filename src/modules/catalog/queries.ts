@@ -17,19 +17,7 @@ import { effectivePrice } from '@/lib/money'
 import { escapeLike, tokenizeQuery } from '@/lib/persian'
 import type { SearchParams } from '@/lib/validation'
 
-/**
- * Catalogue reads.
- *
- * The rule that governs this file: NO N+1. A listing page issues a bounded
- * number of queries regardless of how many products it renders — one for the
- * page of products, one for their images, one for their price range. Fetching
- * a variant per card is the difference between a 40 ms and a 4 s category page
- * on shared hosting.
- */
-
 export const PAGE_SIZE = 24
-
-/* ── Shapes ─────────────────────────────────────────────────────────────── */
 
 export interface ProductCard {
   id: number
@@ -89,22 +77,11 @@ export interface ProductDetail {
     stockQty: number
     isActive: boolean
     imageId: number | null
-    /** optionId → optionValueId, for matching a selection to a variant. */
     selection: Record<number, number>
   }[]
   category: { id: number; name: string; slug: string } | null
 }
 
-/* ── Aggregation helpers ────────────────────────────────────────────────── */
-
-/**
- * Price and stock summary per product, computed in SQL.
- *
- * `LEAST(price, COALESCE(discount_price, price))` mirrors `effectivePrice`
- * from lib/money — a discount only counts when it is genuinely lower. Keeping
- * the two in step matters: a mismatch shows one price on the card and another
- * on the product page.
- */
 function variantSummary(productIds: number[]) {
   return db
     .select({
@@ -136,7 +113,6 @@ function primaryImages(productIds: number[]) {
     .orderBy(desc(productImages.isPrimary), asc(productImages.sortOrder))
 }
 
-/** Assembles cards from three bounded queries — never one query per product. */
 async function hydrateCards(
   rows: {
     id: number
@@ -181,14 +157,11 @@ async function hydrateCards(
       inStock: Number(summary?.totalStock ?? 0) > 0,
       isNewArrival: row.isNewArrival,
       isBestseller: row.isBestseller,
-      // §62 — a null rating renders nothing rather than "0 stars".
       ratingValue: row.ratingCount > 0 ? row.ratingSum / row.ratingCount : null,
       ratingCount: row.ratingCount,
     }
   })
 }
-
-/* ── Listing ────────────────────────────────────────────────────────────── */
 
 export interface ListResult {
   items: ProductCard[]
@@ -214,8 +187,6 @@ export async function listProducts(options: ListOptions = {}): Promise<ListResul
   const conditions = [eq(products.isActive, true), eq(products.isArchived, false)]
 
   if (options.categoryId) {
-    // A product may sit in several categories, so match either the primary
-    // assignment or the join table.
     const inCategory = db
       .select({ productId: productCategories.productId })
       .from(productCategories)
@@ -234,9 +205,6 @@ export async function listProducts(options: ListOptions = {}): Promise<ListResul
   if (options.bestsellerOnly) conditions.push(eq(products.isBestseller, true))
   if (options.excludeId) conditions.push(ne(products.id, options.excludeId))
 
-  // Price, size, colour and stock filters constrain the PRODUCT by whether any
-  // of its variants match — a subquery, so the outer page stays one row per
-  // product rather than one per variant.
   const variantConditions = []
   if (options.minPrice != null) {
     variantConditions.push(
@@ -335,19 +303,37 @@ export async function listProducts(options: ListOptions = {}): Promise<ListResul
   }
 }
 
-/* ── Search ─────────────────────────────────────────────────────────────── */
+export async function listProductsByIds(ids: number[]): Promise<ProductCard[]> {
+  if (ids.length === 0) return []
 
-/**
- * Persian product search. §18.
- *
- * Two paths, because InnoDB's FULLTEXT index ignores tokens shorter than
- * `innodb_ft_min_token_size` (default 3) and that variable is usually not
- * tunable on shared hosting. Without the fallback, short Persian queries
- * silently return nothing — the exact failure §18 warns about.
- *
- * Both paths search the SAME normalised column using the SAME normalisation
- * function that built it, so they cannot drift.
- */
+  const rows = await db
+    .select({
+      id: products.id,
+      name: products.name,
+      slug: products.slug,
+      shortDescription: products.shortDescription,
+      isNewArrival: products.isNewArrival,
+      isBestseller: products.isBestseller,
+      ratingSum: products.ratingSum,
+      ratingCount: products.ratingCount,
+    })
+    .from(products)
+    .where(
+      and(
+        inArray(products.id, ids),
+        eq(products.isActive, true),
+        eq(products.isArchived, false),
+      ),
+    )
+
+  const cards = await hydrateCards(rows)
+  const position = new Map(ids.map((id, index) => [id, index]))
+
+  return cards.sort(
+    (a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0),
+  )
+}
+
 export async function searchProducts(
   query: string,
   options: ListOptions = {},
@@ -367,15 +353,12 @@ export async function searchProducts(
   const matchers = []
 
   if (indexTokens.length > 0) {
-    // Boolean mode with a trailing wildcard gives prefix matching, which is
-    // what "partial matching" means for a shopper half-way through typing.
     const booleanQuery = indexTokens.map((t) => `+${t}*`).join(' ')
     matchers.push(
       sql`MATCH(${products.searchText}) AGAINST(${booleanQuery} IN BOOLEAN MODE)`,
     )
   }
 
-  // Short tokens, and the whole phrase, via LIKE against the same column.
   for (const token of shortTokens) {
     matchers.push(sql`${products.searchText} LIKE ${'%' + escapeLike(token) + '%'}`)
   }
@@ -393,8 +376,6 @@ export async function searchProducts(
 
   const where = and(...conditions)
 
-  // Relevance: an exact phrase hit outranks a token hit, which outranks a
-  // substring. Without this, results come back in insertion order.
   const relevance = sql<number>`
     (CASE WHEN ${products.name} = ${normalized} THEN 100 ELSE 0 END) +
     (CASE WHEN ${products.searchText} LIKE ${normalized + '%'} THEN 50 ELSE 0 END) +
@@ -431,8 +412,6 @@ export async function searchProducts(
     pageCount: Math.max(1, Math.ceil(total / limit)),
   }
 }
-
-/* ── Detail ─────────────────────────────────────────────────────────────── */
 
 export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
   const [product] = await db.select().from(products).where(eq(products.slug, slug)).limit(1)
@@ -541,7 +520,6 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
   }
 }
 
-/** Resolves a slug that used to belong to a product. §66 — 308, not 404. */
 export async function findSlugRedirect(
   entityType: 'product' | 'category' | 'blog_post' | 'page',
   oldSlug: string,
@@ -554,8 +532,6 @@ export async function findSlugRedirect(
     .limit(1)
   return row?.newSlug ?? null
 }
-
-/* ── Related ────────────────────────────────────────────────────────────── */
 
 export async function relatedProducts(
   productId: number,
@@ -571,15 +547,11 @@ export async function relatedProducts(
 
   if (result.items.length >= limit) return result.items
 
-  // Thin category — top up from the general catalogue so the section never
-  // renders half-empty.
   const filler = await listProducts({ excludeId: productId, limit, sort: 'popular' })
   const seen = new Set(result.items.map((i) => i.id))
 
   return [...result.items, ...filler.items.filter((i) => !seen.has(i.id))].slice(0, limit)
 }
-
-/* ── Categories ─────────────────────────────────────────────────────────── */
 
 export async function listCategories(onlyVisible = true) {
   const conditions = onlyVisible ? [eq(categories.isVisible, true)] : []
@@ -596,7 +568,6 @@ export async function getCategoryBySlug(slug: string) {
   return category ?? null
 }
 
-/** Ancestor chain for breadcrumbs. Depth-capped so a cycle cannot hang a page. */
 export async function categoryTrail(categoryId: number) {
   const trail: { id: number; name: string; slug: string }[] = []
   let currentId: number | null = categoryId
@@ -621,13 +592,6 @@ export async function categoryTrail(categoryId: number) {
   return trail
 }
 
-/* ── Facets ─────────────────────────────────────────────────────────────── */
-
-/**
- * Filter options for a category, with the price range.
- * Computed from live variant rows so a filter never offers a value that would
- * return zero results.
- */
 export async function categoryFacets(categoryId?: number) {
   const productFilter = categoryId
     ? and(

@@ -10,13 +10,6 @@ import { products } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 import * as reviews from './service'
 
-/**
- * Review submission and editing.
- *
- * The identity comes from `requireUser()`, never from the form. That is the
- * whole of §37's ownership rule at this layer — a client cannot claim to be
- * someone else because it is never asked who it is.
- */
 export async function submitReviewAction(input: {
   productId: number
   rating: number

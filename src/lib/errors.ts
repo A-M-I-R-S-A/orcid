@@ -1,13 +1,5 @@
 import { randomUUID } from 'node:crypto'
 
-/**
- * Error handling.
- *
- * §82: customers see Persian, clear and non-technical. Stack traces, SQL text,
- * internal paths and upstream API bodies never reach the browser — they go to
- * the server log under a correlation id the customer can quote to support.
- */
-
 export type ErrorCode =
   | 'VALIDATION'
   | 'UNAUTHENTICATED'
@@ -20,7 +12,6 @@ export type ErrorCode =
   | 'SMS'
   | 'INTERNAL'
 
-/** An error whose message is safe to show a customer, in Persian. */
 export class AppError extends Error {
   readonly code: ErrorCode
   readonly status: number
@@ -29,7 +20,6 @@ export class AppError extends Error {
 
   constructor(
     code: ErrorCode,
-    /** Persian, customer-facing. */
     message: string,
     options?: { status?: number; fieldErrors?: Record<string, string>; cause?: unknown },
   ) {
@@ -62,8 +52,6 @@ function defaultStatus(code: ErrorCode): number {
   }
 }
 
-/* ── Persian messages ───────────────────────────────────────────────────── */
-
 export const MESSAGES = {
   generic: 'خطایی رخ داد. لطفاً دوباره تلاش کنید.',
   validation: 'اطلاعات وارد شده معتبر نیست.',
@@ -72,37 +60,36 @@ export const MESSAGES = {
   notFound: 'مورد درخواستی یافت نشد.',
   rateLimited: 'تعداد درخواست‌ها بیش از حد مجاز است. کمی بعد دوباره تلاش کنید.',
 
-  // Authentication
   invalidPhone: 'شماره موبایل معتبر نیست.',
   otpInvalid: 'کد وارد شده صحیح نیست یا منقضی شده است.',
   otpTooMany: 'تعداد تلاش‌های ناموفق بیش از حد مجاز است. کد جدیدی درخواست کنید.',
   otpCooldown: 'برای درخواست کد جدید کمی صبر کنید.',
   accountDisabled: 'حساب کاربری شما غیرفعال است. با پشتیبانی تماس بگیرید.',
+  credentialsInvalid: 'شماره موبایل یا رمز عبور صحیح نیست.',
+  phoneUnverified: 'شماره موبایل شما هنوز تأیید نشده است. کد تأیید را وارد کنید.',
+  phoneTaken: 'این شماره قبلاً ثبت شده است. وارد شوید یا رمز عبور را بازیابی کنید.',
+  accountNotFound: 'حسابی با این شماره وجود ندارد. ابتدا ثبت‌نام کنید.',
+  passwordSame: 'رمز عبور جدید نباید با رمز فعلی یکسان باشد.',
+  currentPasswordWrong: 'رمز عبور فعلی صحیح نیست.',
 
-  // Cart & checkout
   productUnavailable: 'این محصول در حال حاضر موجود نیست.',
   variantUnavailable: 'این تنوع از محصول در دسترس نیست.',
   insufficientStock: 'موجودی این محصول کافی نیست.',
   cartEmpty: 'سبد خرید شما خالی است.',
   priceChanged: 'قیمت برخی از اقلام سبد خرید تغییر کرده است. لطفاً سبد خرید را بررسی کنید.',
 
-  // Payment
   paymentMethodUnavailable: 'این روش پرداخت در حال حاضر فعال نیست.',
   referenceRequired: 'کد رهگیری پرداخت را وارد کنید.',
   referenceDuplicate: 'این کد رهگیری قبلاً ثبت شده است.',
   orderNotPayable: 'این سفارش در وضعیت قابل پرداخت نیست.',
 
-  // Reviews
   reviewNotOwned: 'شما اجازه ویرایش این دیدگاه را ندارید.',
   reviewDuplicate: 'شما قبلاً برای این محصول دیدگاه ثبت کرده‌اید.',
 
-  // Uploads
   fileTooLarge: 'حجم فایل بیش از حد مجاز است.',
   fileTypeInvalid: 'فرمت فایل مجاز نیست. تنها تصاویر JPG، PNG و WebP پذیرفته می‌شوند.',
   fileCorrupt: 'فایل تصویر معتبر نیست.',
 } as const
-
-/* ── Constructors ───────────────────────────────────────────────────────── */
 
 export const errors = {
   validation: (message: string = MESSAGES.validation, fieldErrors?: Record<string, string>) =>
@@ -119,14 +106,8 @@ export const errors = {
   internal: (cause?: unknown) => new AppError('INTERNAL', MESSAGES.generic, { cause }),
 }
 
-/* ── Logging ────────────────────────────────────────────────────────────── */
-
 const REDACT_KEYS = /(password|token|secret|apikey|api_key|authorization|otp|code|cookie)/i
 
-/**
- * Removes anything that must never appear in a log line. Applied to every
- * context object before it is written. §58: never log secrets or OTP codes.
- */
 export function redact(value: unknown, depth = 0): unknown {
   if (depth > 4) return '[deep]'
   if (value == null || typeof value !== 'object') return value
@@ -139,22 +120,18 @@ export function redact(value: unknown, depth = 0): unknown {
   return out
 }
 
-/**
- * Logs the technical detail server-side and returns the customer-safe shape.
- * Callers render `message`; `correlationId` is what support asks for.
- */
 export function reportError(
   error: unknown,
   context?: Record<string, unknown>,
 ): { message: string; code: ErrorCode; correlationId: string; fieldErrors?: Record<string, string> } {
   if (error instanceof AppError) {
-    // Expected, customer-facing conditions are noise at error level.
     if (error.code === 'INTERNAL') {
       console.error(
         `[${error.correlationId}] ${error.code}:`,
         error.cause ?? error.message,
         redact(context),
       )
+      writeToFileLog('error', error.correlationId, error.code, error.cause ?? error.message, context)
     }
     return {
       message: error.message,
@@ -166,6 +143,8 @@ export function reportError(
 
   const wrapped = errors.internal(error)
   console.error(`[${wrapped.correlationId}] UNHANDLED:`, error, redact(context))
+  writeToFileLog('error', wrapped.correlationId, 'UNHANDLED', error, context)
+
   return {
     message: wrapped.message,
     code: 'INTERNAL',
@@ -173,7 +152,25 @@ export function reportError(
   }
 }
 
-/* ── Server action results ──────────────────────────────────────────────── */
+function writeToFileLog(
+  level: 'error',
+  correlationId: string,
+  kind: string,
+  detail: unknown,
+  context?: Record<string, unknown>,
+): void {
+  if (typeof window !== 'undefined') return
+
+  void import('./logger')
+    .then(({ logger }) => {
+      logger[level](kind, {
+        correlationId,
+        detail: detail instanceof Error ? (detail.stack ?? detail.message) : String(detail),
+        context: redact(context ?? {}),
+      })
+    })
+    .catch(() => {})
+}
 
 export type ActionResult<T = void> =
   | { ok: true; data: T }

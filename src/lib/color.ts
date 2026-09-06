@@ -1,13 +1,3 @@
-/**
- * Colour tokens and colour maths — pure, no `server-only`.
- *
- * Separated from lib/theme.ts because the admin theme editor is a CLIENT
- * component that computes contrast ratios live as an administrator drags a
- * colour picker. `theme.ts` reads settings from the database and must stay
- * server-side; this half is arithmetic and belongs to both.
- */
-
-/** The Orchid palette from the specification. §6. */
 export const DEFAULT_THEME = {
   background: '#EDE6DC',
   backgroundSecondary: '#D9B896',
@@ -62,7 +52,6 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`
 }
 
-/** Relative luminance, per WCAG. */
 export function luminance(hex: string): number {
   const [r, g, b] = hexToRgb(hex).map((c) => {
     const s = c / 255
@@ -78,11 +67,6 @@ export function contrastRatio(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05)
 }
 
-/**
- * Picks readable foreground text for a given background.
- * Used for button labels, so an administrator choosing a pale accent does not
- * silently produce white-on-cream text nobody can read.
- */
 export function readableOn(background: string, dark: string, light = '#FFFFFF'): string {
   return contrastRatio(background, dark) >= contrastRatio(background, light) ? dark : light
 }
@@ -94,12 +78,6 @@ export function contrastGrade(ratio: number): 'AAA' | 'AA' | 'AA-large' | 'fail'
   return 'fail'
 }
 
-/**
- * Derives the full semantic token set and returns it as CSS custom properties
- * for inlining in <head>. Inline rather than a stylesheet request because
- * these values change per settings-save, not per build — and a blocking
- * round-trip for them would sit on the critical path and hurt LCP.
- */
 export function themeToCss(theme: ThemeTokens): string {
   const {
     background,
@@ -112,7 +90,6 @@ export function themeToCss(theme: ThemeTokens): string {
   } = theme
 
   const tokens: Record<string, string> = {
-    // Author-facing seven
     '--c-bg': background,
     '--c-bg-secondary': backgroundSecondary,
     '--c-accent': accentPrimary,
@@ -121,31 +98,25 @@ export function themeToCss(theme: ThemeTokens): string {
     '--c-text': textDeep,
     '--c-paper': paper,
 
-    // Derived surfaces
     '--c-surface': paper,
     '--c-surface-raised': mix(paper, '#FFFFFF', 0.5),
     '--c-surface-sunken': mix(background, textDeep, 0.04),
 
-    // Derived text
     '--c-text-muted': mix(textDeep, background, 0.35),
     '--c-text-subtle': mix(textDeep, background, 0.55),
     '--c-text-on-accent': readableOn(accentPrimary, textDeep),
     '--c-text-on-accent-2': readableOn(accentSecondary, textDeep),
 
-    // Borders
     '--c-border': mix(accentTertiary, background, 0.45),
     '--c-border-strong': mix(accentTertiary, textDeep, 0.25),
     '--c-border-focus': accentSecondary,
 
-    // Buttons
     '--c-btn-bg': accentPrimary,
     '--c-btn-text': readableOn(accentPrimary, textDeep),
     '--c-btn-hover': mix(accentPrimary, '#000000', 0.15),
     '--c-btn-secondary-bg': 'transparent',
     '--c-btn-secondary-border': accentPrimary,
 
-    // Semantic — deliberately independent of the brand accent, so a theme
-    // change can never make "out of stock" read as "in stock".
     '--c-success': '#4A6B4E',
     '--c-success-bg': '#E4EBE1',
     '--c-warning': '#96671C',
@@ -154,7 +125,6 @@ export function themeToCss(theme: ThemeTokens): string {
     '--c-danger-bg': '#F2E0DF',
     '--c-info': mix(accentSecondary, background, 0.2),
 
-    // Effects
     '--c-shadow': hexToRgba(textDeep, 0.1),
     '--c-shadow-strong': hexToRgba(textDeep, 0.18),
     '--c-overlay': hexToRgba(textDeep, 0.55),

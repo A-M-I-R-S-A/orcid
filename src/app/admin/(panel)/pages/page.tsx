@@ -6,7 +6,6 @@ import { PageHeader } from '@/components/admin/ui'
 import { PageManager } from '@/components/admin/page-manager'
 import { requirePermission } from '@/modules/admin/auth'
 
-/** CMS pages. §53. */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'صفحات' }
 
@@ -33,6 +32,7 @@ export default async function AdminPagesPage() {
           sortOrder: page.sortOrder,
           seoTitle: page.seoTitle,
           seoDescription: page.seoDescription,
+          imagePath: page.imagePath,
         }))}
       />
     </>

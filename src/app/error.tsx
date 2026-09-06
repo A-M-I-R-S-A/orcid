@@ -3,14 +3,6 @@
 import { useEffect } from 'react'
 import Link from 'next/link'
 
-/**
- * Error boundary. §82.
- *
- * The customer sees Persian and nothing technical. `error.digest` is the only
- * identifier shown — Next generates it and logs the real stack server-side, so
- * support can correlate a report to a log line without the stack ever reaching
- * the browser.
- */
 export default function GlobalError({
   error,
   reset,
@@ -19,7 +11,6 @@ export default function GlobalError({
   reset: () => void
 }) {
   useEffect(() => {
-    // Server-side logging already happened; this catches client-side faults.
     console.error('Client error boundary:', error.message, error.digest)
   }, [error])
 

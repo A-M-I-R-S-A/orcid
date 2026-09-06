@@ -14,11 +14,6 @@ import {
 import { productVariants, products } from './catalog'
 import { users } from './identity'
 
-/**
- * Internal state identifiers are stable English enums; the Persian labels the
- * customer sees live in lib/order-status.ts. §34 — renaming a label must never
- * require a data migration.
- */
 export const ORDER_STATUSES = [
   'pending',
   'awaiting_payment',
@@ -39,22 +34,15 @@ export const PAYMENT_STATUSES = [
   'refunded',
 ] as const
 
-/**
- * Carts. A cart item stores ONLY a variant and a quantity — never a price.
- * Every total is recomputed server-side from live variant rows at render and
- * again inside the checkout transaction. §21: never trust the client.
- */
 export const carts = mysqlTable(
   'carts',
   {
     id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
 
-    /** Null for guests; adopted on login by merging into the user's cart. */
     userId: bigint('user_id', { mode: 'number', unsigned: true }).references(() => users.id, {
       onDelete: 'cascade',
     }),
 
-    /** Opaque cookie token for anonymous carts. */
     token: varchar('token', { length: 64 }).notNull(),
 
     createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -91,7 +79,6 @@ export const orders = mysqlTable(
   {
     id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
 
-    /** Human-facing, e.g. ORC-1403-000042. Shown to the customer and in SMS. */
     orderNumber: varchar('order_number', { length: 32 }).notNull(),
 
     userId: bigint('user_id', { mode: 'number', unsigned: true })
@@ -102,7 +89,6 @@ export const orders = mysqlTable(
     paymentStatus: mysqlEnum('payment_status', PAYMENT_STATUSES).notNull().default('pending'),
     paymentMethod: varchar('payment_method', { length: 32 }).notNull(),
 
-    // All amounts Toman, integer. Computed server-side, stored for the record.
     subtotal: bigint('subtotal', { mode: 'number', unsigned: true }).notNull(),
     discountTotal: bigint('discount_total', { mode: 'number', unsigned: true })
       .notNull()
@@ -112,8 +98,6 @@ export const orders = mysqlTable(
       .default(0),
     grandTotal: bigint('grand_total', { mode: 'number', unsigned: true }).notNull(),
 
-    // Address is SNAPSHOTTED, not joined. Editing a saved address later must
-    // not silently rewrite where a past order was shipped.
     shipFullName: varchar('ship_full_name', { length: 120 }).notNull(),
     shipPhone: varchar('ship_phone', { length: 11 }).notNull(),
     shipProvince: varchar('ship_province', { length: 60 }).notNull(),
@@ -122,7 +106,6 @@ export const orders = mysqlTable(
     shipPostalCode: varchar('ship_postal_code', { length: 10 }).notNull(),
     customerNote: text('customer_note'),
 
-    /** Admin-only. Never rendered in the customer account area. §36. */
     internalNote: text('internal_note'),
 
     paidAt: timestamp('paid_at'),
@@ -141,11 +124,6 @@ export const orders = mysqlTable(
   ],
 )
 
-/**
- * Immutable snapshot of what was bought. Product name, variant label and unit
- * price are COPIED at checkout — a later price change or rename cannot rewrite
- * history, and an order stays readable after the product is archived.
- */
 export const orderItems = mysqlTable(
   'order_items',
   {
@@ -154,7 +132,6 @@ export const orderItems = mysqlTable(
       .notNull()
       .references(() => orders.id, { onDelete: 'cascade' }),
 
-    // RESTRICT: an ordered variant can be archived but never deleted.
     variantId: bigint('variant_id', { mode: 'number', unsigned: true })
       .notNull()
       .references(() => productVariants.id, { onDelete: 'restrict' }),
@@ -178,11 +155,6 @@ export const orderItems = mysqlTable(
   ],
 )
 
-/**
- * Payments. For card-to-card the reference code is customer-supplied and
- * cannot be verified programmatically — the unique index catches reuse, and an
- * administrator confirms it against a bank statement. §G.
- */
 export const payments = mysqlTable(
   'payments',
   {
@@ -198,16 +170,13 @@ export const payments = mysqlTable(
     status: mysqlEnum('status', PAYMENT_STATUSES).notNull().default('pending'),
     amount: bigint('amount', { mode: 'number', unsigned: true }).notNull(),
 
-    /** کد رهگیری / شماره پیگیری. Unique — a code cannot be reused. §30. */
     referenceCode: varchar('reference_code', { length: 64 }),
     referenceSubmittedAt: timestamp('reference_submitted_at'),
 
-    /** Which admin decided, and when. Never nullable once status is terminal. */
     reviewedByAdminId: bigint('reviewed_by_admin_id', { mode: 'number', unsigned: true }),
     reviewedAt: timestamp('reviewed_at'),
     adminNote: text('admin_note'),
 
-    /** Gateway payloads for future providers. Scrubbed of credentials. */
     providerData: json('provider_data'),
 
     createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -218,5 +187,23 @@ export const payments = mysqlTable(
     index('payments_order_idx').on(t.orderId),
     index('payments_status_created_idx').on(t.status, t.createdAt),
     index('payments_user_idx').on(t.userId),
+  ],
+)
+
+export const wishlistItems = mysqlTable(
+  'wishlist_items',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    userId: bigint('user_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    productId: bigint('product_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('wishlist_user_product_unq').on(t.userId, t.productId),
+    index('wishlist_user_created_idx').on(t.userId, t.createdAt),
   ],
 )

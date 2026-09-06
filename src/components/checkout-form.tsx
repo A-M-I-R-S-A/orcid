@@ -6,21 +6,26 @@ import { useState, useTransition } from 'react'
 import { placeOrderAction } from '@/modules/checkout/actions'
 import type { PaymentMethodInfo } from '@/modules/payments/registry'
 import { toLatinDigits } from '@/lib/persian'
+import { PROVINCES } from '@/lib/provinces'
 
-/** The 31 provinces, for a select rather than a free-text field. */
-const PROVINCES = [
-  'آذربایجان شرقی', 'آذربایجان غربی', 'اردبیل', 'اصفهان', 'البرز', 'ایلام',
-  'بوشهر', 'تهران', 'چهارمحال و بختیاری', 'خراسان جنوبی', 'خراسان رضوی',
-  'خراسان شمالی', 'خوزستان', 'زنجان', 'سمنان', 'سیستان و بلوچستان', 'فارس',
-  'قزوین', 'قم', 'کردستان', 'کرمان', 'کرمانشاه', 'کهگیلویه و بویراحمد',
-  'گلستان', 'گیلان', 'لرستان', 'مازندران', 'مرکزی', 'هرمزگان', 'همدان', 'یزد',
-]
+export interface SavedAddress {
+  id: number
+  fullName: string
+  phone: string
+  province: string
+  city: string
+  addressLine: string
+  postalCode: string
+  isDefault: boolean
+}
 
 export function CheckoutForm({
   methods,
   defaultValues,
+  savedAddresses = [],
 }: {
   methods: PaymentMethodInfo[]
+  savedAddresses?: SavedAddress[]
   defaultValues: {
     fullName: string
     phone: string
@@ -35,6 +40,13 @@ export function CheckoutForm({
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [method, setMethod] = useState(methods[0]?.key ?? '')
+
+  const [selectedId, setSelectedId] = useState<number | null>(
+    savedAddresses.find((a) => a.isDefault)?.id ?? savedAddresses[0]?.id ?? null,
+  )
+
+  const selected = savedAddresses.find((a) => a.id === selectedId) ?? null
+  const values = selected ?? defaultValues
 
   return (
     <form
@@ -56,9 +68,6 @@ export function CheckoutForm({
           })
 
           if (result.ok) {
-            // Straight to the payment step — an order sitting unpaid because
-            // the customer did not realise there was another step is the most
-            // expensive abandonment there is.
             router.push(`/order/${result.data.orderId}/pay`)
           } else {
             setError(result.error)
@@ -67,14 +76,54 @@ export function CheckoutForm({
         })
       }}
     >
-      <fieldset className="card p-6 space-y-5">
+      {savedAddresses.length > 0 && (
+        <div className="card p-6">
+          <p className="label mb-3">انتخاب از نشانی‌های ذخیره‌شده</p>
+          <div className="flex flex-wrap gap-2">
+            {savedAddresses.map((address) => (
+              <button
+                key={address.id}
+                type="button"
+                onClick={() => setSelectedId(address.id)}
+                aria-pressed={selectedId === address.id}
+                className={`rounded-md border px-4 py-2.5 text-start text-sm transition-colors ${
+                  selectedId === address.id
+                    ? 'border-accent bg-accent text-on-accent'
+                    : 'border-line hover:border-accent-3'
+                }`}
+              >
+                <span className="block font-medium">
+                  {address.province}، {address.city}
+                </span>
+                <span className="block truncate text-xs opacity-80">
+                  {address.addressLine}
+                </span>
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setSelectedId(null)}
+              aria-pressed={selectedId === null}
+              className={`rounded-md border px-4 py-2.5 text-sm transition-colors ${
+                selectedId === null
+                  ? 'border-accent bg-accent text-on-accent'
+                  : 'border-line hover:border-accent-3'
+              }`}
+            >
+              نشانی جدید
+            </button>
+          </div>
+        </div>
+      )}
+
+      <fieldset key={selectedId ?? 'new'} className="card p-6 space-y-5">
         <legend className="text-lg text-ink px-2">اطلاعات گیرنده</legend>
 
         <div className="grid sm:grid-cols-2 gap-5">
           <Field
             name="fullName"
             label="نام و نام خانوادگی"
-            defaultValue={defaultValues.fullName}
+            defaultValue={values.fullName}
             error={fieldErrors.fullName}
             autoComplete="name"
             required
@@ -82,7 +131,7 @@ export function CheckoutForm({
           <Field
             name="phone"
             label="شماره موبایل"
-            defaultValue={defaultValues.phone}
+            defaultValue={values.phone}
             error={fieldErrors.phone}
             type="tel"
             inputMode="numeric"
@@ -101,7 +150,7 @@ export function CheckoutForm({
             <select
               id="province"
               name="province"
-              defaultValue={defaultValues.province}
+              defaultValue={values.province}
               required
               className="field"
               aria-invalid={Boolean(fieldErrors.province)}
@@ -119,7 +168,7 @@ export function CheckoutForm({
           <Field
             name="city"
             label="شهر"
-            defaultValue={defaultValues.city}
+            defaultValue={values.city}
             error={fieldErrors.city}
             autoComplete="address-level2"
             required
@@ -134,7 +183,7 @@ export function CheckoutForm({
             id="addressLine"
             name="addressLine"
             rows={3}
-            defaultValue={defaultValues.addressLine}
+            defaultValue={values.addressLine}
             required
             className="field resize-y"
             placeholder="خیابان، کوچه، پلاک، واحد"
@@ -147,7 +196,7 @@ export function CheckoutForm({
         <Field
           name="postalCode"
           label="کد پستی"
-          defaultValue={defaultValues.postalCode}
+          defaultValue={values.postalCode}
           error={fieldErrors.postalCode}
           inputMode="numeric"
           dir="ltr"
@@ -241,8 +290,6 @@ function Field({
         className={`field ${className ?? ''}`}
         aria-invalid={Boolean(error)}
         aria-describedby={error ? `${name}-error` : hint ? `${name}-hint` : undefined}
-        // Persian digits are folded to Latin as the customer types, so a
-        // Persian keyboard never produces a "not a valid number" rejection.
         onInput={
           props.inputMode === 'numeric'
             ? (event) => {

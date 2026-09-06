@@ -8,14 +8,6 @@ import type { FontDefinition, TypographySettings } from '@/lib/typography'
 import { contrastGrade, contrastRatio, isValidHex } from '@/lib/color'
 import { toPersianDigits } from '@/lib/persian'
 
-/**
- * Theme editor. §48.
- *
- * The contrast warnings are the part that earns its place. An administrator
- * picking a pale accent has no way to know they have just made every button
- * label unreadable — so the editor computes the ratio and says so, live,
- * before they save. It warns rather than blocks: it is their site.
- */
 export function ThemeEditor({
   fields,
   current,
@@ -127,7 +119,6 @@ export function ThemeEditor({
         })}
       </div>
 
-      {/* Contrast */}
       <div className="mt-7 pt-6 border-t border-line">
         <h3 className="text-sm text-ink-muted mb-3">بررسی خوانایی</h3>
         <ul className="grid sm:grid-cols-3 gap-3">
@@ -184,8 +175,6 @@ export function ThemeEditor({
     </section>
   )
 }
-
-/* ── Typography ─────────────────────────────────────────────────────────── */
 
 export function TypographyEditor({
   fonts,
@@ -249,11 +238,6 @@ export function TypographyEditor({
               </option>
             ))}
           </select>
-          {/*
-            §8: display-only faces are absent from this list, not merely
-            discouraged. Lalezar has one weight and no italic — it cannot carry
-            a hierarchy, and at body sizes it is genuinely hard to read.
-          */}
           <p className="hint">فونت‌های تک‌وزن و نمایشی برای متن اصلی در دسترس نیستند.</p>
         </div>
 

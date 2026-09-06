@@ -3,6 +3,8 @@
   "configurations": [
     {
       "//": "Port 3100, not 3000: Windows reserves the TCP range 2947-3046 on this machine (netsh interface ipv4 show excludedportrange protocol=tcp), so binding 3000 fails. 3100 sits outside every excluded range. The -p flag is passed through to `next dev` explicitly rather than relying on PORT propagating.",
+      "//autoPort": "false, and this is a real constraint rather than a preference. APP_URL in .env is http://localhost:3100, and APP_URL is not decoration: it is the origin every canonical URL, sitemap entry and Open Graph tag derives from (planning §F/§H), and it is the signal lib/env-guard.ts uses to decide whether this is a developer machine or a deployment. On a reassigned port the dev server would emit canonicals for an origin nothing is serving. If 3100 is occupied, free it rather than moving the server — it is almost always a previous run of this same server.",
+      "autoPort": false,
       "name": "dev",
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev", "--", "-p", "3100"],

@@ -12,10 +12,6 @@ import {
   varchar,
 } from 'drizzle-orm/mysql-core'
 
-/**
- * Categories. Self-referencing hierarchy, one level of nesting is what the UI
- * exposes but the schema does not forbid more.
- */
 export const categories = mysqlTable(
   'categories',
   {
@@ -23,7 +19,6 @@ export const categories = mysqlTable(
     parentId: bigint('parent_id', { mode: 'number', unsigned: true }),
 
     name: varchar('name', { length: 120 }).notNull(),
-    /** Persian, stored decoded. Emitted percent-encoded. Planning §H. */
     slug: varchar('slug', { length: 190 }).notNull(),
     description: text('description'),
     imagePath: varchar('image_path', { length: 255 }),
@@ -44,10 +39,6 @@ export const categories = mysqlTable(
   ],
 )
 
-/**
- * Products. Deliberately carries NO price and NO stock — both live on the
- * variant, which is the sellable unit. Planning package §D-1.
- */
 export const products = mysqlTable(
   'products',
   {
@@ -60,22 +51,15 @@ export const products = mysqlTable(
 
     primaryCategoryId: bigint('primary_category_id', { mode: 'number', unsigned: true }),
 
-    /**
-     * Persian-normalised haystack: name + short description + tags + category
-     * names, folded through normalizePersian(). FULLTEXT indexed in a manual
-     * migration — drizzle-kit does not emit FULLTEXT. Planning §D-2.
-     */
     searchText: text('search_text'),
 
     isActive: boolean('is_active').notNull().default(true),
-    /** Archived products 410 rather than 404 — they existed once. §74. */
     isArchived: boolean('is_archived').notNull().default(false),
 
     isFeatured: boolean('is_featured').notNull().default(false),
     isNewArrival: boolean('is_new_arrival').notNull().default(false),
     isBestseller: boolean('is_bestseller').notNull().default(false),
 
-    /** Denormalised from approved reviews only. Never fabricated. §62. */
     ratingSum: int('rating_sum').notNull().default(0),
     ratingCount: int('rating_count').notNull().default(0),
 
@@ -99,7 +83,6 @@ export const products = mysqlTable(
   ],
 )
 
-/** Many-to-many: a product may surface in several categories. */
 export const productCategories = mysqlTable(
   'product_categories',
   {
@@ -116,7 +99,6 @@ export const productCategories = mysqlTable(
   ],
 )
 
-/** An option TYPE on one product — سایز, رنگ, مدل. */
 export const productOptions = mysqlTable(
   'product_options',
   {
@@ -126,14 +108,12 @@ export const productOptions = mysqlTable(
       .references(() => products.id, { onDelete: 'cascade' }),
 
     name: varchar('name', { length: 60 }).notNull(),
-    /** Drives UI affordance: a colour renders swatches, a size renders pills. */
     kind: mysqlEnum('kind', ['size', 'color', 'other']).notNull().default('other'),
     sortOrder: int('sort_order').notNull().default(0),
   },
   (t) => [index('product_options_product_idx').on(t.productId)],
 )
 
-/** A concrete VALUE of an option — ۷۵B, مشکی. */
 export const productOptionValues = mysqlTable(
   'product_option_values',
   {
@@ -143,7 +123,6 @@ export const productOptionValues = mysqlTable(
       .references(() => productOptions.id, { onDelete: 'cascade' }),
 
     value: varchar('value', { length: 80 }).notNull(),
-    /** Hex for colour options, so swatches need no lookup table. */
     swatchHex: varchar('swatch_hex', { length: 7 }),
     sortOrder: int('sort_order').notNull().default(0),
   },
@@ -153,13 +132,6 @@ export const productOptionValues = mysqlTable(
   ],
 )
 
-/**
- * The sellable unit. Price, discount and stock live here and nowhere else.
- *
- * `stockQty` carries a CHECK (stock_qty >= 0) constraint added in a manual
- * migration — the database, not application code, has the final word on
- * overselling. §35.
- */
 export const productVariants = mysqlTable(
   'product_variants',
   {
@@ -170,9 +142,7 @@ export const productVariants = mysqlTable(
 
     sku: varchar('sku', { length: 64 }).notNull(),
 
-    /** Toman. Integer minor units, never a float. Planning §D-3. */
     price: bigint('price', { mode: 'number', unsigned: true }).notNull(),
-    /** When set and lower than price, this is what the customer pays. */
     discountPrice: bigint('discount_price', { mode: 'number', unsigned: true }),
 
     stockQty: int('stock_qty').notNull().default(0),
@@ -192,12 +162,6 @@ export const productVariants = mysqlTable(
   ],
 )
 
-/**
- * Pivot resolving a variant to exactly one value per option.
- *
- * This is the table that makes faceted filtering an indexed join instead of a
- * full scan over a JSON column, and it is why §19's filters stay cheap.
- */
 export const variantOptionValues = mysqlTable(
   'variant_option_values',
   {
@@ -207,17 +171,9 @@ export const variantOptionValues = mysqlTable(
     optionId: bigint('option_id', { mode: 'number', unsigned: true })
       .notNull()
       .references(() => productOptions.id, { onDelete: 'cascade' }),
-    /**
-     * The foreign key is declared below with an explicit name rather than
-     * inline. Drizzle's generated name for this one —
-     * `variant_option_values_option_value_id_product_option_values_id_fk` —
-     * is 65 characters, one over MySQL's 64-character identifier limit, and
-     * the migration fails on it. Naming it here keeps it short and stable.
-     */
     optionValueId: bigint('option_value_id', { mode: 'number', unsigned: true }).notNull(),
   },
   (t) => [
-    /** One value per option per variant — enforced, not assumed. */
     uniqueIndex('variant_option_unq').on(t.variantId, t.optionId),
     index('variant_option_value_idx').on(t.optionValueId),
     foreignKey({
@@ -236,10 +192,8 @@ export const productImages = mysqlTable(
       .notNull()
       .references(() => products.id, { onDelete: 'cascade' }),
 
-    /** Relative to UPLOAD_DIR. Never an absolute path, never user-supplied. */
     path: varchar('path', { length: 255 }).notNull(),
 
-    /** Required on the primary image — enforced in the admin form. §72. */
     alt: varchar('alt', { length: 255 }),
 
     width: int('width').notNull(),

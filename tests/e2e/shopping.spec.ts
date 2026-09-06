@@ -1,13 +1,5 @@
 import { expect, test } from '@playwright/test'
 
-/**
- * Customer shopping flows. §101.
- *
- * Runs against desktop, mobile and tablet projects. The mobile run is the one
- * that matters most — §9 makes it the primary shopping surface, and layout
- * regressions there are invisible on a laptop.
- */
-
 async function firstProductPath(request: import('@playwright/test').APIRequestContext) {
   const sitemap = await (await request.get('/sitemap.xml')).text()
   const match = sitemap.match(/<loc>([^<]*\/product\/[^<]+)<\/loc>/)
@@ -26,20 +18,33 @@ test.describe('browsing', () => {
   test('the page is right-to-left', async ({ page }) => {
     await page.goto('/')
 
-    // A Persian store rendered LTR is broken even if every string is translated.
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl')
     await expect(page.locator('html')).toHaveAttribute('lang', 'fa')
   })
 
-  test('the body never scrolls sideways', async ({ page }) => {
-    await page.goto('/')
+  for (const path of ['/', '/products', '/search?q=%D9%84%D8%A8%D8%A7%D8%B3', '/blog']) {
+    test(`the body never scrolls sideways — ${path}`, async ({ page }) => {
+      await page.goto(path)
 
-    // Horizontal overflow is the classic RTL and mobile layout failure.
-    const overflows = await page.evaluate(
-      () => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-    )
-    expect(overflows, 'page must not scroll horizontally').toBe(false)
-  })
+      const overflow = await page.evaluate(() => {
+        const doc = document.documentElement
+        if (doc.scrollWidth <= doc.clientWidth + 1) return null
+
+        let worst = { tag: '', cls: '', width: 0 }
+        for (const el of document.querySelectorAll('body *')) {
+          const { width, right, left } = el.getBoundingClientRect()
+          if (right > doc.clientWidth + 1 || left < -1) {
+            if (width > worst.width) {
+              worst = { tag: el.tagName, cls: String(el.className).slice(0, 80), width }
+            }
+          }
+        }
+        return { scrollWidth: doc.scrollWidth, clientWidth: doc.clientWidth, worst }
+      })
+
+      expect(overflow, `${path} must not scroll horizontally`).toBeNull()
+    })
+  }
 
   test('a product page loads from a category', async ({ page, request }) => {
     const path = await firstProductPath(request)
@@ -54,11 +59,9 @@ test.describe('browsing', () => {
 
 test.describe('search — §18 Persian normalisation', () => {
   test('finds a product typed with Arabic Yeh', async ({ page }) => {
-    // "مشكي" with Arabic Kaf and Yeh must find "مشکی" with Persian ones.
     await page.goto('/search?q=' + encodeURIComponent('مشكي'))
 
     await expect(page.locator('h1')).toContainText('مشكي')
-    // Either results or a clean empty state — never a crash.
     await expect(page.locator('main')).toBeVisible()
   })
 
@@ -87,26 +90,12 @@ test.describe('cart', () => {
     await addButton.click()
     await expect(page.getByText('به سبد خرید اضافه شد')).toBeVisible({ timeout: 10_000 })
 
-    /*
-     * The cart cookie is `Secure` in production, and a browser will not SEND a
-     * Secure cookie over plain http. Chromium makes an exception for
-     * localhost/127.0.0.1; WebKit does not — so on Safari against an http test
-     * server the cart reads back empty no matter what the server did.
-     *
-     * That is a property of the transport, not a bug: over https (how this
-     * actually deploys) it works everywhere, and weakening `secure` to make a
-     * local test pass would trade a real protection for a green tick. The check
-     * below detects exactly that combination and skips, so this assertion runs
-     * for real the moment the suite points at an https server.
-     */
     const cartCookie = (await context.cookies()).find((c) => c.name === 'orchid_cart')
     test.skip(
       Boolean(cartCookie?.secure) && new URL(page.url()).protocol === 'http:',
       'Secure cookie cannot be sent over http on this browser — run the suite against https',
     )
 
-    // The action calls router.refresh(); let it settle so the refresh and this
-    // navigation do not race.
     await page.waitForLoadState('networkidle')
     await page.goto('/cart')
     await expect(page.locator('h1')).toContainText('سبد خرید')
@@ -125,50 +114,311 @@ test.describe('cart', () => {
     await context.clearCookies()
     await page.goto('/checkout')
 
-    // Must not expose the checkout form to an anonymous visitor.
     await expect(page).toHaveURL(/\/login/)
   })
 })
 
+test.describe('hero and the full catalogue', () => {
+  test('the hero call to action goes to every product, not a category', async ({ page }) => {
+    await page.goto('/')
+
+    const cta = page.locator('main section').first().getByRole('link').first()
+    await expect(cta).toBeVisible()
+
+    const href = await cta.getAttribute('href')
+    expect(href).not.toMatch(/\/category\//)
+
+    await cta.click()
+    await expect(page).toHaveURL(/\/products/)
+  })
+
+  test('the hero is one composition, not two columns', async ({ page }) => {
+    await page.goto('/')
+
+    const hero = page.locator('section').first()
+    const image = hero.locator('img').first()
+    const heading = hero.locator('h1')
+
+    const heroBox = await hero.boundingBox()
+    const imageBox = await image.boundingBox()
+    const headingBox = await heading.boundingBox()
+    expect(heroBox && imageBox && headingBox).toBeTruthy()
+
+    expect(imageBox!.height / heroBox!.height).toBeGreaterThan(0.7)
+
+    const overlap =
+      Math.min(imageBox!.x + imageBox!.width, headingBox!.x + headingBox!.width) -
+      Math.max(imageBox!.x, headingBox!.x)
+    expect(overlap).toBeGreaterThan(0)
+  })
+
+  test('every product is reachable without choosing a category', async ({ page, request }) => {
+    const response = await request.get('/products')
+    expect(response.status()).toBe(200)
+
+    const html = await response.text()
+    expect(html).toContain('"@type":"BreadcrumbList"')
+    expect(html).not.toMatch(/<meta name="robots"[^>]*noindex/)
+
+    await page.goto('/products')
+    await expect(page.locator('h1')).toContainText('همه محصولات')
+    await expect(page.locator('article').first()).toBeVisible()
+  })
+})
+
+test.describe('desktop navigation', () => {
+  test.skip(({ viewport }) => (viewport?.width ?? 0) < 1024, 'desktop-only chrome')
+
+  test('the current category is marked, not just hovered', async ({ page, request }) => {
+    const sitemap = await (await request.get('/sitemap.xml')).text()
+    const match = sitemap.match(/<loc>([^<]*\/category\/[^<]+)<\/loc>/)
+    test.skip(!match, 'no categories in sitemap — seed with --demo')
+
+    const path = new URL(match![1]!).pathname
+    await page.goto(path)
+
+    const current = page.locator('.header-nav a[aria-current="page"]')
+    await expect(current).toHaveCount(1)
+
+    await page.goto('/')
+    await expect(page.locator('.header-nav a[aria-current="page"]')).toHaveCount(0)
+  })
+
+  test('the header condenses on scroll and comes back at the top', async ({ page }) => {
+    await page.goto('/')
+
+    const header = page.locator('#site-header')
+    const bar = page.locator('#site-header .header-bar')
+
+    const resting = (await bar.boundingBox())?.height ?? 0
+    expect(resting).toBeGreaterThan(70)
+
+    await page.evaluate(() => {
+      document.documentElement.style.scrollBehavior = 'auto'
+      window.scrollTo({ top: 600, behavior: 'instant' })
+    })
+    await expect(header).toHaveAttribute('data-condensed', 'true')
+
+    await expect
+      .poll(async () => (await bar.boundingBox())?.height ?? 0, {
+        message: 'the header bar must actually shrink, not just flip its flag',
+      })
+      .toBeLessThan(resting)
+
+    await expect(page.locator('.header-nav')).toBeVisible()
+
+    await page.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }))
+    await expect(header).toHaveAttribute('data-condensed', 'false')
+  })
+})
+
+test.describe('size guide', () => {
+
+  test('the desktop menu leads to the guide page', async ({ page, viewport }) => {
+    test.skip((viewport?.width ?? 0) < 1024, 'the nav row is lg and up')
+
+    await page.goto('/')
+
+    const link = page.locator('.header-nav a[href="/p/size-guide"]')
+    await expect(link).toHaveCount(1)
+    await link.click()
+
+    await expect(page).toHaveURL(/\/p\/size-guide$/)
+    await expect(page.locator('h1')).toContainText('راهنمای سایز')
+  })
+
+  test('the drawer leads to the guide page', async ({ page, viewport }) => {
+    test.skip((viewport?.width ?? 0) >= 1024, 'the drawer is below lg')
+
+    await page.goto('/')
+    await page.getByRole('button', { name: 'باز کردن منو' }).click()
+
+    const drawer = page.getByRole('dialog', { name: 'منوی اصلی' })
+    await expect(drawer).toBeVisible()
+
+    await drawer.locator('a[href="/p/size-guide"]').click()
+
+    await expect(page).toHaveURL(/\/p\/size-guide$/)
+    await expect(page.locator('h1')).toContainText('راهنمای سایز')
+  })
+
+  test('the product page opens it over the product, not instead of it', async ({
+    page,
+    request,
+  }) => {
+    const path = await firstProductPath(request)
+    test.skip(!path, 'no products — seed with --demo')
+
+    await page.goto(path!)
+
+    const trigger = page.getByRole('button', { name: 'راهنمای سایز' })
+    test.skip((await trigger.count()) === 0, 'this product has no size option')
+
+    const dialog = page.getByRole('dialog', { name: 'راهنمای سایز' })
+    await expect(dialog).toBeHidden()
+
+    await trigger.click()
+    await expect(dialog).toBeVisible()
+
+    expect(new URL(page.url()).pathname).toBe(path)
+    await expect(page.locator('h1')).toBeVisible()
+
+    await expect(dialog.getByRole('link')).toHaveAttribute('href', '/p/size-guide')
+  })
+
+  test('escape closes it and gives focus back', async ({ page, request }) => {
+    const path = await firstProductPath(request)
+    test.skip(!path, 'no products — seed with --demo')
+
+    await page.goto(path!)
+
+    const trigger = page.getByRole('button', { name: 'راهنمای سایز' })
+    test.skip((await trigger.count()) === 0, 'this product has no size option')
+
+    await trigger.click()
+    await expect(page.getByRole('dialog', { name: 'راهنمای سایز' })).toBeVisible()
+
+    await page.keyboard.press('Escape')
+    await expect(page.getByRole('dialog', { name: 'راهنمای سایز' })).toBeHidden()
+
+    await expect(trigger).toBeFocused()
+
+    await expect
+      .poll(async () => page.evaluate(() => getComputedStyle(document.body).overflow))
+      .not.toBe('hidden')
+  })
+})
+
 test.describe('authentication — §24', () => {
-  test('the login form accepts Persian digits', async ({ page }) => {
+  const phoneField = 'input[name="phone"]'
+
+  test('the sign-in form accepts Persian digits', async ({ page }) => {
     await page.goto('/login')
 
-    const input = page.locator('#phone')
+    const input = page.locator(phoneField)
 
-    // pressSequentially, not fill(): the conversion runs per keystroke in
-    // React's onChange, and fill() is a synthetic bulk value-set that skips it
-    // on WebKit. A real customer types, so this is also the truer interaction.
     await input.pressSequentially('۰۹۱۲۱۲۳۴۵۶۷', { delay: 10 })
 
-    // Converted to Latin as the customer types — the server never sees ۰۹۱۲.
     await expect(input).toHaveValue('09121234567')
+  })
+
+  test('both sign-in methods are offered, password first', async ({ page }) => {
+    await page.goto('/login')
+
+    const tabs = page.getByRole('tab')
+    await expect(tabs).toHaveCount(2)
+
+    await expect(page.getByRole('tab', { name: 'رمز عبور' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
+
+    await page.getByRole('tab', { name: /کد یک‌بار مصرف/ }).click()
+    await expect(page.getByRole('button', { name: /ارسال کد تأیید/ })).toBeVisible()
   })
 
   test('an invalid phone number is rejected in Persian', async ({ page }) => {
     await page.goto('/login')
 
-    await page.locator('#phone').pressSequentially('02112345678', { delay: 10 })
-    await page.getByRole('button', { name: /دریافت کد/ }).click()
+    await page.locator(phoneField).pressSequentially('02112345678', { delay: 10 })
+    await page.locator('input[autocomplete="current-password"]').fill('not-the-password')
+    await page.getByRole('button', { name: 'ورود' }).click()
 
-    await expect(page.locator('form p.field-error')).toBeVisible({ timeout: 10_000 })
+    await expect(page.locator('form [role="alert"]')).toBeVisible({ timeout: 10_000 })
   })
 
-  test('the OTP field is set up for SMS autofill', async ({ page }) => {
+  test('a wrong password does not reveal whether the account exists', async ({ page }) => {
     await page.goto('/login')
 
-    // A phone that cannot autofill the code is a measurable drop-off.
-    await page.locator('#phone').fill('09121234567')
-    // The code step only appears after a successful send, which needs SMS
-    // configured — so assert the phone step's mobile affordances instead.
-    await expect(page.locator('#phone')).toHaveAttribute('inputmode', 'numeric')
-    await expect(page.locator('#phone')).toHaveAttribute('autocomplete', 'tel')
+    await page.locator(phoneField).pressSequentially('09129999999', { delay: 10 })
+    await page.locator('input[autocomplete="current-password"]').fill('definitely-wrong')
+    await page.getByRole('button', { name: 'ورود' }).click()
+
+    await expect(page.locator('form [role="alert"]')).toContainText(
+      'شماره موبایل یا رمز عبور صحیح نیست',
+      { timeout: 10_000 },
+    )
+  })
+
+  test('the phone field is set up for mobile entry', async ({ page }) => {
+    await page.goto('/login')
+
+    const input = page.locator(phoneField)
+    await expect(input).toHaveAttribute('inputmode', 'numeric')
+    await expect(input).toHaveAttribute('autocomplete', 'tel')
+    await expect(input).toHaveAttribute('dir', 'ltr')
+  })
+
+  test('registration collects a name and a password before any code', async ({ page }) => {
+    await page.goto('/register')
+
+    await expect(page.locator('#register-name')).toBeVisible()
+    await expect(page.locator('input[autocomplete="new-password"]')).toBeVisible()
+
+    const submit = page.getByRole('button', { name: 'ادامه' })
+    await expect(submit).toBeDisabled()
+
+    const name = page.locator('#register-name')
+    const phone = page.locator('input[name="phone"]')
+    const password = page.locator('input[autocomplete="new-password"]')
+
+    await name.pressSequentially('شیرین محمدی', { delay: 5 })
+    await phone.pressSequentially('09121234567', { delay: 5 })
+    await password.pressSequentially('short', { delay: 5 })
+    await expect(submit).toBeDisabled()
+
+    await password.pressSequentially('-but-now-long-enough', { delay: 5 })
+    await expect(submit).toBeEnabled()
+  })
+
+  test('a password can be revealed, and starts hidden', async ({ page }) => {
+    await page.goto('/register')
+
+    const password = page.locator('input[autocomplete="new-password"]')
+    await expect(password).toHaveAttribute('type', 'password')
+
+    await page.getByRole('button', { name: 'نمایش رمز عبور' }).click()
+    await expect(password).toHaveAttribute('type', 'text')
+  })
+
+  test('sign-in links to registration and to password recovery', async ({ page }) => {
+    await page.goto('/login')
+
+    await expect(page.getByRole('link', { name: 'ثبت‌نام کنید' })).toBeVisible()
+    await page.getByRole('link', { name: /رمز عبور را فراموش/ }).click()
+
+    await expect(page).toHaveURL(/\/forgot-password/)
+    await expect(page.getByRole('button', { name: /ارسال کد بازیابی/ })).toBeVisible()
   })
 
   test('the account area is not reachable when signed out', async ({ page, context }) => {
     await context.clearCookies()
     await page.goto('/account')
     await expect(page).toHaveURL(/\/login/)
+  })
+
+  test('every account section is protected', async ({ page, context }) => {
+    await context.clearCookies()
+
+    for (const path of [
+      '/account/orders',
+      '/account/wishlist',
+      '/account/addresses',
+      '/account/profile',
+      '/account/reviews',
+    ]) {
+      await page.goto(path)
+      await expect(page).toHaveURL(/\/login/)
+    }
+  })
+
+  test('the wishlist endpoint tells a signed-out visitor nothing', async ({ request }) => {
+    const response = await request.get('/api/wishlist')
+
+    expect(response.status()).toBe(200)
+    expect(await response.json()).toEqual({ ids: [] })
+
+    expect(response.headers()['cache-control']).toContain('no-store')
   })
 })
 
@@ -194,12 +444,8 @@ test.describe('admin is protected', () => {
     await page.locator('#password').fill('definitely-not-the-password')
     await page.getByRole('button', { name: 'ورود' }).click()
 
-    // Scoped to the form's own error, not getByRole('alert') — Next renders a
-    // route announcer with role="alert" on every page, which makes the role
-    // selector ambiguous.
     const alert = page.locator('form p.field-error')
     await expect(alert).toBeVisible({ timeout: 10_000 })
-    // Must not distinguish "no such user" from "wrong password".
     await expect(alert).toContainText('نام کاربری یا رمز عبور اشتباه است')
   })
 })
@@ -237,19 +483,8 @@ test.describe('responsive — §9', () => {
     const drawer = page.getByRole('dialog', { name: 'منوی اصلی' })
     await expect(drawer).toBeVisible()
 
-    /*
-     * Regression. The trigger sits inside <header>, which has `backdrop-blur`;
-     * an element with a backdrop-filter is the CONTAINING BLOCK for its
-     * fixed-position descendants, so a drawer rendered in place resolved
-     * `inset-0` against the header's ~132px box and came out clipped and
-     * pushed off-screen. It still passed `toBeVisible()`, which is why that
-     * assertion alone did not catch it — this one measures.
-     */
     const viewport = page.viewportSize()!
 
-    // expect.poll, not a single boundingBox(): the panel slides in over 500ms
-    // and toBeVisible() is already true at frame zero, when it is still
-    // translated fully off-screen. A one-shot measurement races the animation.
     await expect
       .poll(async () => (await drawer.boundingBox())?.height ?? 0, {
         message: 'drawer must fill the viewport height',
@@ -273,7 +508,6 @@ test.describe('responsive — §9', () => {
 
     await page.goto('/')
 
-    // 44px is the accepted minimum for a reliable touch target.
     const cartLink = page.getByRole('link', { name: /سبد خرید/ }).first()
     const box = await cartLink.boundingBox()
 

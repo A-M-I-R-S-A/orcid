@@ -5,17 +5,11 @@ import { EmptyState, Price } from '@/components/ui'
 import { ResponsiveImage } from '@/components/media'
 import { getCart } from '@/modules/cart/service'
 import { lastUsedAddress } from '@/modules/checkout/service'
+import { listAddresses } from '@/modules/account/service'
 import { getEnabledMethods } from '@/modules/payments/registry'
 import { getCurrentUser } from '@/lib/session'
 import { toPersianDigits } from '@/lib/persian'
 
-/**
- * Checkout. §22 / §70.
- *
- * noindex, dynamic. Everything shown here — line prices, the total, the
- * available payment methods — is computed server-side; the form posts only
- * the address and the chosen method.
- */
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
@@ -41,11 +35,13 @@ export default async function CheckoutPage() {
     )
   }
 
-  // A cart with stock or availability problems must be fixed before an order
-  // can be written — sending it into the transaction would only fail there.
   if (cart.hasIssues) redirect('/cart')
 
-  const [methods, prefill] = await Promise.all([getEnabledMethods(), lastUsedAddress(user.id)])
+  const [methods, prefill, saved] = await Promise.all([
+    getEnabledMethods(),
+    lastUsedAddress(user.id),
+    listAddresses(user.id),
+  ])
 
   if (methods.length === 0) {
     return (
@@ -67,6 +63,16 @@ export default async function CheckoutPage() {
         <div className="lg:col-span-3">
           <CheckoutForm
             methods={methods}
+            savedAddresses={saved.map((a) => ({
+              id: a.id,
+              fullName: a.fullName,
+              phone: a.phone,
+              province: a.province,
+              city: a.city,
+              addressLine: a.addressLine,
+              postalCode: a.postalCode,
+              isDefault: a.isDefault,
+            }))}
             defaultValues={{
               fullName: prefill?.fullName ?? user.fullName ?? '',
               phone: prefill?.phone ?? user.phone,

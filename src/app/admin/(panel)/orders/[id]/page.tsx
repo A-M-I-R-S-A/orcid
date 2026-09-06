@@ -1,10 +1,14 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
-import { Badge, PageHeader, Table, TableWrap, Td, Th } from '@/components/admin/ui'
+import { Badge, PageHeader, Table, Td, Th } from '@/components/admin/ui'
 import { OrderStatusControl, OrderNoteForm } from '@/components/admin/order-controls'
 import { PaymentReviewActions } from '@/components/admin/payment-actions'
-import { getForAdmin } from '@/modules/orders/queries'
+import { OrderTimeline } from '@/components/admin/order-timeline'
+import { CopyField } from '@/components/admin/copy-field'
+import { ResponsiveImage } from '@/components/media'
+import { storedWidth } from '@/lib/media-url'
+import { getForAdmin, timelineForAdmin } from '@/modules/orders/queries'
 import { requirePermission } from '@/modules/admin/auth'
 import { hasPermission } from '@/lib/permissions'
 import {
@@ -43,6 +47,8 @@ export default async function AdminOrderDetailPage({
   const order = await getForAdmin(orderId)
   if (!order) notFound()
 
+  const timeline = await timelineForAdmin(orderId)
+
   const canUpdateStatus = hasPermission(admin, 'orders.update_status')
   const canNote = hasPermission(admin, 'orders.note')
   const canApprove = hasPermission(admin, 'payments.approve')
@@ -61,12 +67,20 @@ export default async function AdminOrderDetailPage({
       <PageHeader
         title={`سفارش ${toPersianDigits(order.orderNumber)}`}
         description={formatJalaliDateTime(order.createdAt)}
-        action={<Badge tone={ORDER_STATUS_TONE[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>}
+        action={
+          <div className="flex items-center gap-3">
+            <CopyField
+              label="شماره سفارش"
+              display={toPersianDigits(order.orderNumber)}
+              copyValue={order.orderNumber}
+            />
+            <Badge tone={ORDER_STATUS_TONE[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
+          </div>
+        }
       />
 
       <div className="grid lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2 space-y-6">
-          {/* Items */}
           <section className="card overflow-hidden">
             <h2 className="text-sm text-ink-muted px-4 py-3 bg-surface-sunken">اقلام سفارش</h2>
             <div className="overflow-x-auto">
@@ -84,19 +98,33 @@ export default async function AdminOrderDetailPage({
                   {order.items.map((item) => (
                     <tr key={item.id}>
                       <Td>
-                        <Link
-                          href={`/product/${encodeURIComponent(item.productSlug)}`}
-                          target="_blank"
-                          rel="noopener"
-                          className="text-accent-2 hover:underline"
-                        >
-                          {item.productName}
-                        </Link>
-                        {item.variantLabel && (
-                          <span className="block text-xs text-ink-subtle mt-0.5">
-                            {item.variantLabel}
-                          </span>
-                        )}
+                        <div className="flex items-center gap-3">
+                          {item.imagePath && (
+                            <ResponsiveImage
+                              path={item.imagePath}
+                              alt=""
+                              width={storedWidth(item.imagePath)}
+                              height={storedWidth(item.imagePath)}
+                              sizes="44px"
+                              className="h-14 w-11 shrink-0 rounded-[3px] object-cover"
+                            />
+                          )}
+                          <div className="min-w-0">
+                            <Link
+                              href={`/product/${encodeURIComponent(item.productSlug)}`}
+                              target="_blank"
+                              rel="noopener"
+                              className="text-accent-2 hover:underline"
+                            >
+                              {item.productName}
+                            </Link>
+                            {item.variantLabel && (
+                              <span className="block text-xs text-ink-subtle mt-0.5">
+                                {item.variantLabel}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </Td>
                       <Td className="text-xs nums" >
                         <span dir="ltr">{item.sku}</span>
@@ -134,7 +162,6 @@ export default async function AdminOrderDetailPage({
             </dl>
           </section>
 
-          {/* Payment */}
           <section className="card p-5">
             <h2 className="text-sm text-ink-muted mb-4">پرداخت</h2>
 
@@ -151,12 +178,18 @@ export default async function AdminOrderDetailPage({
                       {order.payment.method === 'card_to_card' ? 'کارت به کارت' : order.payment.method}
                     </dd>
                   </div>
-                  <div>
-                    <dt className="text-xs text-ink-muted mb-1">کد رهگیری</dt>
-                    <dd className="nums font-medium select-all" dir="ltr">
-                      {order.payment.referenceCode ?? '—'}
-                    </dd>
-                  </div>
+                  {order.payment.referenceCode ? (
+                    <CopyField
+                      label="کد رهگیری"
+                      display={toPersianDigits(order.payment.referenceCode)}
+                      copyValue={order.payment.referenceCode}
+                    />
+                  ) : (
+                    <div>
+                      <dt className="text-xs text-ink-muted mb-1">کد رهگیری</dt>
+                      <dd className="text-ink-subtle">—</dd>
+                    </div>
+                  )}
                   <div>
                     <dt className="text-xs text-ink-muted mb-1">زمان ثبت</dt>
                     <dd className="nums text-xs">
@@ -188,7 +221,6 @@ export default async function AdminOrderDetailPage({
             )}
           </section>
 
-          {/* SMS state — §44 requires the operator to be able to see it. */}
           {order.smsMessages.length > 0 && (
             <section className="card overflow-hidden">
               <h2 className="text-sm text-ink-muted px-4 py-3 bg-surface-sunken">
@@ -236,14 +268,12 @@ export default async function AdminOrderDetailPage({
           )}
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-6">
           {canUpdateStatus && nextStatuses.length > 0 && (
             <section className="card p-5">
               <h2 className="text-sm text-ink-muted mb-3">تغییر وضعیت</h2>
               <OrderStatusControl
                 orderId={order.id}
-                current={order.status}
                 options={nextStatuses.map((s) => ({ value: s, label: ORDER_STATUS_LABELS[s] }))}
               />
             </section>
@@ -274,13 +304,25 @@ export default async function AdminOrderDetailPage({
                 {order.shipProvince}، {order.shipCity}
               </p>
               <p>{order.shipAddressLine}</p>
-              <p className="nums">کد پستی: {toPersianDigits(order.shipPostalCode)}</p>
             </address>
+
+            <dl className="mt-3 pt-3 border-t border-line">
+              <CopyField
+                label="کد پستی"
+                display={toPersianDigits(order.shipPostalCode)}
+                copyValue={order.shipPostalCode}
+              />
+            </dl>
             {order.customerNote && (
               <p className="mt-3 pt-3 border-t border-line text-sm text-ink-muted">
                 یادداشت مشتری: {order.customerNote}
               </p>
             )}
+          </section>
+
+          <section className="card p-5">
+            <h2 className="text-sm text-ink-muted mb-4">تاریخچه سفارش</h2>
+            <OrderTimeline events={timeline} />
           </section>
 
           {canNote && (

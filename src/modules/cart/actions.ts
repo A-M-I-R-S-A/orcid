@@ -7,16 +7,6 @@ import { getCurrentUser } from '@/lib/session'
 import { addToCartSchema, updateCartItemSchema } from '@/lib/validation'
 import * as cart from './service'
 
-/**
- * Cart mutations.
- *
- * Server Actions rather than route handlers: Next validates the request origin
- * for these, which gives CSRF protection without a hand-rolled token (§K).
- *
- * Every action re-derives the user from the session cookie. The client never
- * sends a user id, so it cannot act as anyone else.
- */
-
 export async function addToCartAction(input: {
   variantId: number
   quantity?: number
@@ -32,7 +22,6 @@ export async function addToCartAction(input: {
 
     const count = await cart.cartCount(user?.id ?? null)
 
-    // The header badge lives in the layout, so the whole tree needs to know.
     revalidatePath('/', 'layout')
 
     return ok({ count })

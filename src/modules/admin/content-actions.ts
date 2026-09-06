@@ -8,20 +8,53 @@ import { blogPosts, homepageSections, pages, slugRedirects } from '@/db/schema'
 import * as audit from '@/lib/audit'
 import { CACHE_TAGS, invalidate } from '@/lib/cache'
 import { type ActionResult, errors, fail, ok } from '@/lib/errors'
+import { isBannerKind, parseBannerSettings } from '@/lib/banner'
 import { processUpload } from '@/lib/images'
 import { sanitizeHtml } from '@/lib/sanitize'
 import { slugify, uniqueSlug } from '@/lib/slug'
 import { requirePermission } from './auth'
 
-/**
- * CMS, homepage and blog writes. §53 / §54 / §55.
- *
- * Every body passes through `sanitizeHtml` BEFORE it is stored, not only on
- * render. Sanitising at both ends means a stored value is already safe, so a
- * future render path that forgets to sanitise cannot become stored XSS.
- */
+export async function saveBannerDesignAction(
+  input: { id: number } & Record<string, unknown>,
+): Promise<ActionResult<void>> {
+  try {
+    const admin = await requirePermission('content.homepage')
 
-/* ── Homepage sections ──────────────────────────────────────────────────── */
+    const [section] = await db
+      .select({ id: homepageSections.id, kind: homepageSections.kind, config: homepageSections.config })
+      .from(homepageSections)
+      .where(eq(homepageSections.id, input.id))
+      .limit(1)
+
+    if (!section) throw errors.notFound()
+    if (!isBannerKind(section.kind)) {
+      throw errors.validation('این تنظیمات فقط برای بخش‌های تصویری است.')
+    }
+
+    const existing = (section.config ?? {}) as Record<string, unknown>
+    const settings = parseBannerSettings({ ...existing, ...input })
+
+    await db
+      .update(homepageSections)
+      .set({ config: { ...existing, ...settings } })
+      .where(eq(homepageSections.id, input.id))
+
+    await audit.log({
+      actor: admin,
+      action: 'content.homepage_update',
+      entityType: 'homepage_section',
+      entityId: input.id,
+      metadata: { design: true },
+    })
+
+    invalidate(CACHE_TAGS.homepage)
+    revalidatePath('/')
+    revalidatePath('/admin/homepage')
+    return ok(undefined)
+  } catch (error) {
+    return fail(error, { action: 'saveHeroDesign', id: input.id })
+  }
+}
 
 export async function saveHomepageSectionAction(input: {
   id: number
@@ -54,8 +87,6 @@ export async function saveHomepageSectionAction(input: {
       entityId: input.id,
     })
 
-    // revalidatePath drops the rendered page; invalidate drops the cached
-    // DATA behind it. Both are needed — see lib/cache.ts.
     invalidate(CACHE_TAGS.homepage)
     revalidatePath('/')
     revalidatePath('/admin/homepage')
@@ -88,8 +119,6 @@ export async function uploadHomepageImageAction(formData: FormData): Promise<Act
     return fail(error, { action: 'uploadHomepageImage' })
   }
 }
-
-/* ── CMS pages ──────────────────────────────────────────────────────────── */
 
 export async function savePageAction(input: {
   id?: number
@@ -196,6 +225,38 @@ export async function savePageAction(input: {
   }
 }
 
+export async function uploadPageImageAction(formData: FormData): Promise<ActionResult<void>> {
+  try {
+    await requirePermission('content.pages')
+
+    const pageId = Number(formData.get('pageId'))
+    const file = formData.get('file')
+
+    if (!Number.isInteger(pageId) || pageId <= 0) throw errors.validation('صفحه نامعتبر است.')
+    if (!(file instanceof File)) throw errors.validation('فایلی انتخاب نشده است.')
+
+    const [page] = await db
+      .select({ id: pages.id, slug: pages.slug })
+      .from(pages)
+      .where(eq(pages.id, pageId))
+      .limit(1)
+
+    if (!page) throw errors.notFound()
+
+    const processed = await processUpload(file, { folder: 'pages' })
+
+    await db.update(pages).set({ imagePath: processed.path }).where(eq(pages.id, pageId))
+
+    invalidate(CACHE_TAGS.pages)
+    revalidatePath(`/p/${page.slug}`)
+    revalidatePath('/product/[slug]', 'page')
+    revalidatePath('/admin/pages')
+    return ok(undefined)
+  } catch (error) {
+    return fail(error, { action: 'uploadPageImage' })
+  }
+}
+
 export async function deletePageAction(pageId: number): Promise<ActionResult<void>> {
   try {
     await requirePermission('content.pages')
@@ -207,8 +268,6 @@ export async function deletePageAction(pageId: number): Promise<ActionResult<voi
     return fail(error, { action: 'deletePage', pageId })
   }
 }
-
-/* ── Blog ───────────────────────────────────────────────────────────────── */
 
 export async function saveBlogPostAction(input: {
   id?: number
@@ -264,9 +323,6 @@ export async function saveBlogPostAction(input: {
           body,
           categoryId: input.categoryId ?? null,
           isPublished: input.isPublished,
-          // publishedAt is set on FIRST publish and never moved — §65 wants a
-          // real publication date, and resetting it on every edit would make
-          // every post look brand new to a crawler.
           publishedAt: input.isPublished ? (existing.publishedAt ?? new Date()) : existing.publishedAt,
           seoTitle: input.seoTitle || null,
           seoDescription: input.seoDescription || null,

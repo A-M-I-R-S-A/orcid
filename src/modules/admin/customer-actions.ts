@@ -12,13 +12,6 @@ import { clientIp } from '@/lib/rate-limit'
 import { revokeAllUserSessions } from '@/lib/session'
 import { requirePermission } from './auth'
 
-/**
- * Customer account status. §43.
- *
- * Disabling revokes live sessions immediately rather than waiting for them to
- * expire. Without that, "disabled" would mean "cannot log in again", which is
- * not what an operator disabling a fraudulent account expects.
- */
 export async function setCustomerStatusAction(input: {
   userId: number
   isActive: boolean
@@ -53,8 +46,6 @@ export async function setCustomerStatusAction(input: {
       action: input.isActive ? 'customer.enable' : 'customer.disable',
       entityType: 'user',
       entityId: input.userId,
-      // The phone number identifies the account for an operator reading the
-      // log; it is already visible to anyone with customers.view.
       summary: user.phone,
       metadata: input.reason ? { reason: input.reason } : undefined,
       ip: clientIp(headerList),

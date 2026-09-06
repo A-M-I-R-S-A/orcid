@@ -4,16 +4,6 @@ import { PAGE_SIZE, searchProducts } from '@/modules/catalog/queries'
 import { searchParamsSchema } from '@/lib/validation'
 import { toPersianDigits } from '@/lib/persian'
 
-/**
- * Internal search results. §70.
- *
- * ALWAYS noindex, follow. Search result pages are the classic source of
- * infinite thin URLs — one per query anyone has ever typed — and indexing them
- * dilutes the category pages that should rank instead. `follow` is kept so
- * link equity still flows through to the products.
- *
- * Dynamic rather than cached: results depend entirely on the query.
- */
 export const dynamic = 'force-dynamic'
 
 export const metadata = {

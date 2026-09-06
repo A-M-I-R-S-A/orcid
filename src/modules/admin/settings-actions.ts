@@ -15,23 +15,6 @@ import { AVAILABLE_FONTS, findFont } from '@/lib/typography'
 import { resetProvider } from '@/modules/sms/provider'
 import { requirePermission } from './auth'
 
-/**
- * Settings mutations. §48 / §49 / §51 / §52.
- *
- * Two rules run through all of these:
- *
- *  1. Values are VALIDATED before they are stored. A malformed hex or an
- *     unknown font key would otherwise emit broken CSS into every page — the
- *     theme is inlined into <head>, so bad data there breaks the whole site,
- *     not one screen.
- *
- *  2. Secrets pass `secretKeys` to `setMany`, which encrypts them and treats a
- *     BLANK value as "leave unchanged". The admin form shows a mask, so an
- *     untouched field must not wipe a working credential.
- */
-
-/* ── Theme ──────────────────────────────────────────────────────────────── */
-
 export async function saveThemeAction(
   input: Record<string, string>,
 ): Promise<ActionResult<void>> {
@@ -68,7 +51,6 @@ export async function saveThemeAction(
       ip: clientIp(headerList),
     })
 
-    // The theme is inlined into every page's <head>, so every page is stale.
     revalidatePath('/', 'layout')
 
     return ok(undefined)
@@ -97,8 +79,6 @@ export async function resetThemeAction(): Promise<ActionResult<void>> {
   }
 }
 
-/* ── Typography ─────────────────────────────────────────────────────────── */
-
 export async function saveTypographyAction(input: {
   headingFont: string
   bodyFont: string
@@ -114,8 +94,6 @@ export async function saveTypographyAction(input: {
     if (!heading) throw errors.validation('فونت عنوان انتخاب‌شده معتبر نیست.')
     if (!body) throw errors.validation('فونت متن انتخاب‌شده معتبر نیست.')
 
-    // §8: a display-only face cannot carry body copy. Enforced here as well as
-    // in the UI, so a crafted request cannot make the site unreadable.
     if (!body.bodyEligible) {
       throw errors.validation(
         `فونت «${body.label}» تنها برای عناوین مناسب است و نمی‌تواند فونت متن باشد.`,
@@ -152,8 +130,6 @@ export async function saveTypographyAction(input: {
     return fail(error, { action: 'saveTypography' })
   }
 }
-
-/* ── Generic namespace save ─────────────────────────────────────────────── */
 
 const NAMESPACE_PERMISSIONS = {
   site: 'appearance.brand',
@@ -194,8 +170,6 @@ export async function saveSettingsAction(
     const secretKeys = SECRET_KEYS[namespace] ?? []
     await setMany(namespace, values, secretKeys)
 
-    // Credentials changed — drop the memoised provider so the next send picks
-    // up the new key rather than the old one.
     if (namespace === 'sms') resetProvider()
 
     await audit.log({
@@ -203,7 +177,6 @@ export async function saveSettingsAction(
       action: AUDIT_ACTIONS[namespace] ?? 'settings.change',
       entityType: 'settings',
       entityId: namespace,
-      // Secret VALUES never reach the audit log — only which keys were touched.
       metadata: {
         keys: Object.keys(values).filter((k) => !secretKeys.includes(k)),
         secretsUpdated: Object.keys(values).filter(
@@ -219,8 +192,6 @@ export async function saveSettingsAction(
     return fail(error, { action: 'saveSettings', namespace })
   }
 }
-
-/* ── SMS templates ──────────────────────────────────────────────────────── */
 
 export async function saveSmsTemplateAction(input: {
   id: number

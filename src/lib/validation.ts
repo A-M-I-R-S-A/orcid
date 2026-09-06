@@ -3,19 +3,6 @@ import { z } from 'zod'
 import { MAX_AMOUNT } from './money'
 import { normalizePhone, normalizePostalCode, toLatinDigits } from './persian'
 
-/**
- * Validation.
- *
- * Every schema here produces PERSIAN messages (§82) and every numeric field
- * accepts Persian digits — a customer typing on a Persian keyboard produces
- * ۰۹۱۲…, and rejecting that as invalid would be a self-inflicted wound.
- *
- * These schemas are shared with client forms for hints, but the server always
- * re-validates. A client-side pass is a convenience, never a control.
- */
-
-/* ── Primitives ─────────────────────────────────────────────────────────── */
-
 export const phoneSchema = z
   .string({ required_error: 'شماره موبایل الزامی است.' })
   .trim()
@@ -44,7 +31,11 @@ export const nameSchema = z
   .min(3, { message: 'نام و نام خانوادگی باید حداقل ۳ کاراکتر باشد.' })
   .max(120, { message: 'نام و نام خانوادگی طولانی است.' })
 
-/** Amounts are integers in Toman and may arrive as Persian digits. */
+export const passwordSchema = z
+  .string({ required_error: 'رمز عبور الزامی است.' })
+  .min(8, { message: 'رمز عبور باید حداقل ۸ کاراکتر باشد.' })
+  .max(200, { message: 'رمز عبور طولانی است.' })
+
 export const amountSchema = z
   .union([z.string(), z.number()])
   .transform((v) => Number(toLatinDigits(String(v)).replace(/[,٬\s]/g, '')))
@@ -78,15 +69,38 @@ export const slugSchema = z
   .min(1, { message: 'نشانی صفحه الزامی است.' })
   .max(180, { message: 'نشانی صفحه طولانی است.' })
 
-/* ── Authentication ─────────────────────────────────────────────────────── */
+export const otpPurposeSchema = z.enum(['login', 'register', 'password_reset'])
 
 export const requestOtpSchema = z.object({
   phone: phoneSchema,
+  purpose: otpPurposeSchema.default('login'),
 })
 
 export const verifyOtpSchema = z.object({
   phone: phoneSchema,
   code: otpCodeSchema,
+})
+
+export const registerSchema = z.object({
+  fullName: nameSchema,
+  phone: phoneSchema,
+  password: passwordSchema,
+})
+
+export const passwordLoginSchema = z.object({
+  phone: phoneSchema,
+  password: z.string({ required_error: 'رمز عبور الزامی است.' }).min(1).max(200),
+})
+
+export const resetPasswordSchema = z.object({
+  phone: phoneSchema,
+  code: otpCodeSchema,
+  password: passwordSchema,
+})
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().max(200).optional().or(z.literal('')),
+  password: passwordSchema,
 })
 
 export const adminLoginSchema = z.object({
@@ -100,8 +114,6 @@ export const adminLoginSchema = z.object({
     .min(8, { message: 'رمز عبور باید حداقل ۸ کاراکتر باشد.' })
     .max(200),
 })
-
-/* ── Profile & address ──────────────────────────────────────────────────── */
 
 export const profileSchema = z.object({
   fullName: nameSchema,
@@ -136,8 +148,6 @@ export const addressSchema = z.object({
   notes: z.string().trim().max(500).optional().or(z.literal('')),
 })
 
-/* ── Cart & checkout ────────────────────────────────────────────────────── */
-
 export const addToCartSchema = z.object({
   variantId: idSchema,
   quantity: quantitySchema.default(1),
@@ -164,11 +174,6 @@ export const checkoutSchema = z.object({
   }),
 })
 
-/**
- * Payment reference. Iranian bank tracking codes vary in format between banks,
- * so this validates shape loosely — digits and letters, sane length — rather
- * than pretending to a precision that would reject legitimate codes.
- */
 export const paymentReferenceSchema = z.object({
   orderId: idSchema,
   referenceCode: z
@@ -185,8 +190,6 @@ export const paymentReferenceSchema = z.object({
         }),
     ),
 })
-
-/* ── Reviews ────────────────────────────────────────────────────────────── */
 
 export const reviewSchema = z.object({
   productId: idSchema,
@@ -208,8 +211,6 @@ export const reviewSchema = z.object({
     .max(2000, { message: 'متن دیدگاه طولانی است.' }),
 })
 
-/* ── Search & filters ───────────────────────────────────────────────────── */
-
 export const searchParamsSchema = z.object({
   q: z.string().trim().max(120).optional(),
   page: z.coerce.number().int().min(1).max(500).default(1),
@@ -223,13 +224,6 @@ export const searchParamsSchema = z.object({
 
 export type SearchParams = z.infer<typeof searchParamsSchema>
 
-/* ── Helper ─────────────────────────────────────────────────────────────── */
-
-/**
- * Flattens Zod issues into { field: message } for form rendering.
- * Only the FIRST message per field is kept — showing three errors under one
- * input is noise, not help.
- */
 export function fieldErrors(error: z.ZodError): Record<string, string> {
   const out: Record<string, string> = {}
   for (const issue of error.issues) {
@@ -239,7 +233,6 @@ export function fieldErrors(error: z.ZodError): Record<string, string> {
   return out
 }
 
-/** Parses, or throws an AppError carrying Persian field messages. */
 export async function parseOrThrow<T extends z.ZodTypeAny>(
   schema: T,
   input: unknown,
@@ -252,7 +245,6 @@ export async function parseOrThrow<T extends z.ZodTypeAny>(
   return result.data
 }
 
-/** Converts FormData into a plain object Zod can read. */
 export function formToObject(formData: FormData): Record<string, unknown> {
   const out: Record<string, unknown> = {}
   for (const [key, value] of formData.entries()) {

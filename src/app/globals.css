@@ -1,31 +1,5 @@
 @import 'tailwindcss';
 
-/*
- * Orchid design system.
- *
- * Every colour here resolves to a CSS custom property that the server injects
- * into <head> from the theme settings. No component in this codebase contains
- * a hex value — that is what makes §7's admin theming work without touching
- * source, and it is why these mappings exist rather than literal colours.
- *
- * The --c-* variables are defined in lib/theme.ts (themeToCss) and the
- * font and type-scale ones in lib/typography.ts. The fallbacks below are the
- * specification palette, so the page still renders correctly if settings fail
- * to load for any reason.
- *
- * ── Direction of the visual language ──────────────────────────────────────
- * An atelier catalogue, not a card deck. Three rules carry it:
- *
- *   1. Photography sits in near-square frames. Blobby 18px corners on every
- *      tile is the strongest "template" tell on a shop; a 3px frame reads as
- *      a printed plate.
- *   2. Structure comes from hairlines and margins, not from stacked shadows.
- *      Shadow is reserved for things that genuinely float — drawers, sheets,
- *      the sticky bar.
- *   3. One dark band per page. A cream ground carrying cream cards gives the
- *      eye nothing to anchor on; the accent band gives the page a spine.
- */
-
 @theme {
   --color-bg: var(--c-bg, #ede6dc);
   --color-bg-secondary: var(--c-bg-secondary, #d9b896);
@@ -34,7 +8,7 @@
   --color-surface-sunken: var(--c-surface-sunken, #e6ddd0);
 
   --color-accent: var(--c-accent, #4a171e);
-  --color-accent-2: var(--c-accent-2, #a15530);
+  --color-accent-2: var(--c-accent-2, #9e532f);
   --color-accent-3: var(--c-accent-3, #c4a79a);
 
   --color-ink: var(--c-text, #4e3527);
@@ -55,20 +29,10 @@
   --font-heading: var(--font-lalezar), 'Lalezar', Tahoma, sans-serif;
   --font-body: var(--font-vazirmatn), 'Vazirmatn', Tahoma, sans-serif;
 
-  /*
-   * Two radii for two different jobs. Frames that hold photography are almost
-   * square; surfaces that hold text get a small even corner. The pill is
-   * spent only on buttons and chips, where it is the brand's one soft gesture.
-   */
   --radius-frame: 3px;
   --radius-card: 6px;
   --radius-pill: 999px;
 
-  /*
-   * Layered shadows, tinted with the ink colour rather than pure black.
-   * A neutral-black shadow over a warm cream ground reads as grey dirt; a
-   * shadow carrying a little of the page's own hue reads as depth.
-   */
   --shadow-sm: 0 1px 2px var(--c-shadow, rgba(78, 53, 39, 0.06));
   --shadow-md:
     0 1px 2px var(--c-shadow, rgba(78, 53, 39, 0.05)),
@@ -78,19 +42,11 @@
     0 18px 40px -20px var(--c-shadow-strong, rgba(78, 53, 39, 0.22));
 }
 
-/* ── Base ─────────────────────────────────────────────────────────────── */
-
 @layer base {
   * {
     border-color: var(--color-line);
   }
 
-  /*
-   * Scrollbars are hidden everywhere — page, rails, drawers, admin tables —
-   * while every element stays fully scrollable by wheel, touch and keyboard.
-   * Declared on the universal selector rather than per component, so a new
-   * scroll container cannot reintroduce one by omission.
-   */
   *,
   *::before,
   *::after {
@@ -105,7 +61,6 @@
   }
 
   html {
-    /* Persian body copy sits comfortably a touch larger than Latin. */
     font-size: var(--fs-base, 16px);
     -webkit-text-size-adjust: 100%;
     scroll-behavior: smooth;
@@ -143,13 +98,6 @@
     letter-spacing: 0;
   }
 
-  /*
-   * Lalezar is a single-weight display face with tight vertical metrics, and
-   * it was previously set at 1.45 everywhere — at 48px+ that opens a gap wide
-   * enough that a two-line headline stops reading as one object. Display
-   * sizes get tight leading; small headings keep the looser setting Persian
-   * ascenders genuinely need at text size.
-   */
   h1 {
     line-height: 1.24;
   }
@@ -168,8 +116,6 @@
     text-decoration: none;
   }
 
-  /* Focus must be visible for keyboard users, and must not be the only
-     indicator of state anywhere. */
   :focus-visible {
     outline: 2px solid var(--color-accent-2);
     outline-offset: 2px;
@@ -181,8 +127,6 @@
     color: var(--color-ink);
   }
 
-  /* Persian numerals need tabular alignment wherever they stack in columns —
-     prices, order totals, quantities. */
   .nums {
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum';
@@ -196,7 +140,6 @@
     font-size: inherit;
   }
 
-  /* Number inputs with spinners are a liability on RTL touch layouts. */
   input[type='number']::-webkit-outer-spin-button,
   input[type='number']::-webkit-inner-spin-button {
     appearance: none;
@@ -208,17 +151,6 @@
     height: auto;
   }
 
-  /*
-   * Paper grain.
-   *
-   * A flat cream fill reads as "unstyled beige"; the same colour under a
-   * barely-visible grain reads as paper stock. It is the cheapest way to make
-   * a warm palette feel like a material rather than a hex value.
-   *
-   * FIXED and pointer-events:none, per the performance rule — a noise layer
-   * attached to a scrolling container repaints continuously and destroys
-   * mobile frame rates. Fixed, it is composited once.
-   */
   body::before {
     content: '';
     position: fixed;
@@ -235,8 +167,6 @@
     }
   }
 }
-
-/* ── Components ───────────────────────────────────────────────────────── */
 
 @layer components {
   .container-page {
@@ -257,8 +187,6 @@
       padding-inline: 3rem;
     }
   }
-
-  /* Buttons ---------------------------------------------------------- */
 
   .btn {
     display: inline-flex;
@@ -285,7 +213,10 @@
   }
 
   .btn:disabled {
-    opacity: 0.5;
+    background-color: var(--color-surface-sunken);
+    border-color: var(--color-line);
+    color: var(--color-ink-muted);
+    box-shadow: none;
     cursor: not-allowed;
   }
 
@@ -329,11 +260,6 @@
     width: 100%;
   }
 
-  /*
-   * Text link carrying a rule that grows in on hover. Used for "see all"
-   * affordances: a pill button beside every section heading adds a second
-   * competing weight to every section on the page.
-   */
   .link-rule {
     display: inline-flex;
     align-items: center;
@@ -357,8 +283,6 @@
     background-size: 100% 1px;
   }
 
-  /* Surfaces --------------------------------------------------------- */
-
   .card {
     background-color: var(--color-surface);
     border: 1px solid color-mix(in srgb, var(--color-line) 70%, transparent);
@@ -369,10 +293,6 @@
     box-shadow: var(--shadow-md);
   }
 
-  /*
-   * Photo frame. Near-square, with a sunken ground so a transparent or
-   * still-loading image never shows the page through it.
-   */
   .frame {
     position: relative;
     overflow: hidden;
@@ -380,21 +300,46 @@
     background-color: var(--color-surface-sunken);
   }
 
-  /*
-   * Full-bleed accent band — the page's one dark anchor. Text inside inherits
-   * the on-accent colour.
-   */
   .band {
     background-color: var(--color-accent);
     color: var(--color-on-accent);
+  }
+
+  .on-dark {
+    --color-bg: #1c1512;
+    --color-bg-secondary: #2a1f1a;
+    --color-surface: #241b17;
+    --color-surface-raised: #2c211c;
+    --color-surface-sunken: #17110e;
+
+    --color-accent: #c9a08a;
+    --color-accent-2: #d59b70;
+    --color-accent-3: #8b6b5c;
+    --color-on-accent: #1c1512;
+
+    --color-ink: #f1e9e0;
+    --color-ink-muted: #b4a496;
+    --color-ink-subtle: #9b8d81;
+
+    --color-line: #392b24;
+    --color-line-strong: #574239;
+
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+  }
+
+  .on-dark .site-mark {
+    filter: brightness(0) invert(1);
+  }
+
+  .arch {
+    clip-path: url(#orchid-arch);
   }
 
   .band ::selection {
     background: var(--color-accent-2);
     color: var(--color-on-accent);
   }
-
-  /* Forms ------------------------------------------------------------ */
 
   .field {
     display: block;
@@ -441,8 +386,6 @@
     color: var(--color-ink-muted);
   }
 
-  /* Badges ----------------------------------------------------------- */
-
   .badge {
     display: inline-flex;
     align-items: center;
@@ -476,18 +419,6 @@
     color: var(--c-btn-text, #fff);
   }
 
-  /* Eyebrow label ---------------------------------------------------- */
-
-  /*
-   * NO letter-spacing and NO text-transform here, deliberately.
-   *
-   * Persian is a joined script: tracking pulls the connections apart and the
-   * word visibly falls to pieces. At 0.18em it was the loudest "designed for
-   * Latin, shipped in Persian" tell on the page. `text-transform: uppercase`
-   * is meanwhile a no-op on Persian, so it bought nothing to begin with.
-   * Rank is carried by size, weight and colour instead, with a short rule to
-   * give the label somewhere to sit.
-   */
   .eyebrow {
     display: inline-flex;
     align-items: center;
@@ -510,15 +441,58 @@
     flex: none;
   }
 
-  /* Headings --------------------------------------------------------- */
-
   .section-title {
     font-family: var(--font-heading);
     font-weight: 400;
-    font-size: clamp(1.75rem, 3.2vw, 2.5rem);
-    line-height: 1.3;
+    font-size: clamp(1.9rem, 3.6vw, 3.15rem);
+    line-height: 1.22;
     letter-spacing: 0;
     color: var(--color-ink);
+  }
+
+  .masthead {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.5rem;
+    width: 100%;
+  }
+
+  .masthead > :first-child {
+    min-width: 0;
+  }
+
+  .masthead-rule {
+    display: none;
+  }
+
+  @media (min-width: 640px) {
+    .masthead-rule {
+      display: block;
+      flex: 1 1 auto;
+      min-width: 2rem;
+      height: 1px;
+      background-color: var(--color-line-strong);
+      margin-block-end: 0.85rem;
+    }
+  }
+
+  .movement {
+    padding-block: 4.5rem;
+  }
+
+  .movement-open {
+    padding-block: 7rem;
+  }
+
+  @media (min-width: 768px) {
+    .movement {
+      padding-block: 6.5rem;
+    }
+
+    .movement-open {
+      padding-block: 10.5rem;
+    }
   }
 
   .display-title {
@@ -529,17 +503,6 @@
     letter-spacing: 0;
   }
 
-  /* Horizontal rail -------------------------------------------------- */
-
-  /*
-   * The shelf. Products scroll sideways instead of wrapping, so a section
-   * holding three items and a section holding twelve are the same shape. A
-   * grid does the opposite: it leaves a ragged hole whenever the count does
-   * not divide by the column number, which on a young catalogue is always.
-   *
-   * Snap is `proximity`, not `mandatory`: mandatory fights a fast flick on
-   * touch and makes the rail feel like it is resisting the finger.
-   */
   .rail {
     display: flex;
     gap: 1rem;
@@ -556,37 +519,9 @@
     }
   }
 
-  /*
-   * `flex: 1 0 auto` is what stops a short rail from reproducing the exact
-   * problem it was built to solve. Grow lets three cards spread into a width
-   * meant for four instead of ending in a column-wide void; shrink stays at 0
-   * so a long rail overflows at full card size rather than squeezing twelve
-   * cards onto one screen.
-   */
   .rail > * {
     scroll-snap-align: start;
     flex: 1 0 auto;
-  }
-
-  /*
-   * Whatever the growth cap leaves over is absorbed by auto margins on the
-   * end items, which centres a short rail — and collapses to zero the moment
-   * the content overflows, so the first card still starts at the reading edge
-   * and nothing becomes unreachable. `justify-content: center` would have
-   * made the overflowing start unscrollable in exactly that case.
-   *
-   * Opt-in rather than part of `.rail`, because auto margins on a GRID item
-   * mean something else entirely: they switch the item from stretch to
-   * fit-content and it collapses to the width of its contents. The category
-   * and blog strips are rails on a phone and grids from `md` up, and this
-   * rule silently shrank their first and last tiles.
-   */
-  .rail-center > *:first-child {
-    margin-inline-start: auto;
-  }
-
-  .rail-center > *:last-child {
-    margin-inline-end: auto;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -595,11 +530,6 @@
     }
   }
 
-  /*
-   * The rail bleeds to the viewport edge so the next card is visibly cut off
-   * by it — that overflow IS the affordance now that the scrollbar is gone.
-   * The padding restores the container gutter inside the scroller.
-   */
   .rail-bleed {
     margin-inline: -1.25rem;
     padding-inline: 1.25rem;
@@ -621,8 +551,6 @@
       scroll-padding-inline-start: 3rem;
     }
   }
-
-  /* Prose (CMS and blog bodies) -------------------------------------- */
 
   .prose {
     line-height: 2;
@@ -661,10 +589,7 @@
   }
 }
 
-/* ── Utilities ────────────────────────────────────────────────────────── */
-
 @layer utilities {
-  /* Entry animation. Opacity and transform only — never layout properties. */
   @keyframes rise {
     from {
       opacity: 0;
@@ -680,7 +605,6 @@
     animation: rise 600ms cubic-bezier(0.32, 0.72, 0, 1) both;
   }
 
-  /* Kept for explicit opt-in; scrollbars are already hidden globally. */
   .scrollbar-none {
     scrollbar-width: none;
   }
@@ -688,7 +612,6 @@
     display: none;
   }
 
-  /* Visible to screen readers, not to sighted users. */
   .sr-only {
     position: absolute;
     width: 1px;
@@ -701,13 +624,6 @@
     border-width: 0;
   }
 
-  /*
-   * RTL icon mirroring.
-   *
-   * Applied ONLY to directional glyphs — arrows, chevrons, carets. Never to
-   * the logo, numerals, clocks, checkmarks, media controls or product
-   * photography, all of which read wrong when flipped. §J.
-   */
   [dir='rtl'] .mirror-rtl {
     transform: scaleX(-1);
   }
@@ -727,23 +643,143 @@
   }
 }
 
-/* ── Admin shell ──────────────────────────────────────────────────────── */
+.banner-scrim {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-color: color-mix(in srgb, var(--scrim-color) var(--scrim), transparent);
+}
 
-/*
- * The admin sidebar's open/closed state is expressed HERE rather than with
- * `rtl:translate-x-full lg:translate-x-0` Tailwind variants, and that is a bug
- * fix rather than a style preference.
- *
- * Tailwind emits the direction variants AFTER the breakpoint blocks and both
- * rules land on identical specificity, so `rtl:translate-x-full` won at every
- * width — `lg` included. The permanent desktop sidebar was therefore
- * translated a full width off the inline-start edge on every laptop and
- * desktop screen, and the hamburger that would bring it back is `lg:hidden`.
- * The admin navigation was unreachable above 1024px.
- *
- * Written as one explicit cascade the desktop rule cannot lose: it is last,
- * and it is the only rule inside the media query.
- */
+.banner-veil-dark {
+  --scrim-color: #241710;
+}
+
+.banner-veil-light {
+  --scrim-color: #f4efe7;
+}
+
+.banner-title {
+  font-family: var(--font-heading);
+  font-weight: 400;
+  font-size: clamp(2.5rem, 6.4vw, 5rem);
+  line-height: 1.12;
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+
+.banner-cta {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  border-width: 1px;
+  border-style: solid;
+  transition:
+    color 420ms cubic-bezier(0.32, 0.72, 0, 1),
+    border-color 420ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.banner-cta::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  transform: scaleX(0);
+  transform-origin: right center;
+  transition: transform 560ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+[dir='ltr'] .banner-cta::before {
+  transform-origin: left center;
+}
+
+.banner-cta:hover::before,
+.banner-cta:focus-visible::before {
+  transform: scaleX(1);
+}
+
+.banner-cta-light {
+  color: #fff;
+  border-color: color-mix(in srgb, #fff 55%, transparent);
+}
+.banner-cta-light::before {
+  background-color: #fff;
+}
+.banner-cta-light:hover,
+.banner-cta-light:focus-visible {
+  color: var(--color-ink);
+  border-color: #fff;
+}
+
+.banner-cta-dark {
+  color: var(--color-ink);
+  border-color: color-mix(in srgb, var(--color-ink) 45%, transparent);
+}
+.banner-cta-dark::before {
+  background-color: var(--color-accent);
+}
+.banner-cta-dark:hover,
+.banner-cta-dark:focus-visible {
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+
+.banner-link {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding-bottom: 0.45rem;
+}
+
+.banner-link::after {
+  content: '';
+  position: absolute;
+  inset-inline: 0;
+  bottom: 0;
+  height: 1px;
+  background-color: currentColor;
+  transform: scaleX(0.32);
+  transform-origin: right center;
+  transition: transform 520ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+[dir='ltr'] .banner-link::after {
+  transform-origin: left center;
+}
+
+.banner-link:hover::after,
+.banner-link:focus-visible::after {
+  transform: scaleX(1);
+}
+
+@media (min-width: 768px) {
+  #site-header {
+    --header-bar: 5.25rem;
+    --nav-height: 3.5rem;
+    transition: box-shadow 400ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  #site-header[data-condensed='true'] {
+    --header-bar: 3.75rem;
+    --nav-height: 2.875rem;
+    box-shadow: var(--shadow-md);
+  }
+
+  #site-header .header-bar {
+    height: var(--header-bar);
+    transition: height 400ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  #site-header .header-logo {
+    height: 2.75rem;
+    transition: height 400ms cubic-bezier(0.32, 0.72, 0, 1);
+  }
+
+  #site-header[data-condensed='true'] .header-logo {
+    height: 2.125rem;
+  }
+}
+
 .admin-drawer {
   transform: translateX(-100%);
   transition: transform 380ms cubic-bezier(0.32, 0.72, 0, 1);
@@ -770,5 +806,70 @@
 @media (prefers-reduced-motion: reduce) {
   .admin-drawer {
     transition: none;
+  }
+}
+
+.scroll-edges[data-edge-top='true'] {
+  mask-image: linear-gradient(to bottom, transparent 0, #000 28px);
+}
+
+.scroll-edges[data-edge-bottom='true'] {
+  mask-image: linear-gradient(to top, transparent 0, #000 28px);
+}
+
+.scroll-edges[data-edge-top='true'][data-edge-bottom='true'] {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 28px,
+    #000 calc(100% - 28px),
+    transparent 100%
+  );
+}
+
+body:has(.hero-overlay) #site-header {
+  position: fixed;
+  inset-inline: 0;
+}
+
+body:has(.hero-overlay) #site-header:not([data-condensed='true']) {
+  background-color: transparent;
+  border-color: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+body:has(.hero-overlay) #site-header:not([data-condensed='true']) .header-nav {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+body:has(.hero-overlay[data-banner-tone='light']) #site-header:not([data-condensed='true']) {
+  --color-ink: #ffffff;
+  --color-ink-muted: rgb(255 255 255 / 0.82);
+  --color-ink-subtle: rgb(255 255 255 / 0.7);
+  --color-line: rgb(255 255 255 / 0.3);
+  --color-line-strong: rgb(255 255 255 / 0.45);
+  --color-surface: transparent;
+  --color-surface-raised: rgb(255 255 255 / 0.06);
+  --color-surface-sunken: rgb(255 255 255 / 0.16);
+  color: #ffffff;
+
+  text-shadow: 0 1px 14px rgb(0 0 0 / 0.35);
+}
+
+body:has(.hero-overlay[data-banner-tone='light'])
+  #site-header:not([data-condensed='true'])
+  .header-logo {
+  filter: brightness(0) invert(1) drop-shadow(0 1px 10px rgb(0 0 0 / 0.4));
+}
+
+.hero-overlay[data-banner-position='top'] {
+  padding-top: 11rem;
+}
+
+@media (min-width: 1024px) {
+  .hero-overlay[data-banner-position='top'] {
+    padding-top: 13rem;
   }
 }

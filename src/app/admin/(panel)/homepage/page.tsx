@@ -5,15 +5,8 @@ import { homepageSections } from '@/db/schema'
 import { PageHeader } from '@/components/admin/ui'
 import { HomepageSectionEditor } from '@/components/admin/homepage-editor'
 import { requirePermission } from '@/modules/admin/auth'
+import { isBannerKind, parseBannerSettings } from '@/lib/banner'
 
-/**
- * Homepage composition. §54.
- *
- * A fixed catalogue of section types with per-section content and ordering —
- * not a free-form page builder, which §54 explicitly warns against. The
- * trade-off is deliberate: each type gets a properly designed layout instead of
- * a generic block that has to look acceptable holding anything.
- */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'صفحه اصلی' }
 
@@ -61,10 +54,10 @@ export default async function AdminHomepagePage() {
               imagePath: section.imagePath,
               isVisible: section.isVisible,
               sortOrder: section.sortOrder,
-              // Only these two render an image; offering an upload on the
-              // others would be a control that does nothing.
-              supportsImage: section.kind === 'hero' || section.kind === 'promo_banner',
+              supportsImage: isBannerKind(section.kind),
             }}
+            design={isBannerKind(section.kind) ? parseBannerSettings(section.config) : undefined}
+            canOverlayHeader={section.kind === 'hero'}
           />
         ))}
       </div>

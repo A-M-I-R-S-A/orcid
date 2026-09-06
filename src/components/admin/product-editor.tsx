@@ -21,14 +21,6 @@ import { mediaUrl } from '@/lib/media-url'
 import { formatAmountLatin } from '@/lib/money'
 import { toLatinDigits, toPersianDigits } from '@/lib/persian'
 
-/**
- * Product editor.
- *
- * Split into panels rather than one giant form, because the pieces have
- * genuinely different lifecycles: basics and SEO are one save; a variant is
- * its own row; an image upload is its own request. Forcing them into one
- * submit would mean an image failure discards a description edit.
- */
 export function ProductEditor({
   product,
   categories,
@@ -51,8 +43,6 @@ export function ProductEditor({
     </div>
   )
 }
-
-/* ── Basics ─────────────────────────────────────────────────────────────── */
 
 function BasicsPanel({
   product,
@@ -91,9 +81,6 @@ function BasicsPanel({
           }
 
           startTransition(async () => {
-            // Create and update are handled separately rather than through a
-            // ternary: only create returns a new id to navigate to, and
-            // collapsing them produces a union that has to be narrowed anyway.
             if (product) {
               const result = await updateProductAction(product.id, input)
               if (result.ok) {
@@ -107,8 +94,6 @@ function BasicsPanel({
 
             const result = await createProductAction(input)
             if (result.ok) {
-              // Straight into the full editor — options, variants and images
-              // only exist once the product does.
               router.push(`/admin/products/${result.data.id}`)
             } else {
               setMessage({ tone: 'error', text: result.error })
@@ -141,7 +126,6 @@ function BasicsPanel({
               className="field"
               placeholder="خالی بگذارید تا از نام ساخته شود"
             />
-            {/* §66 — changing this is not free, and the operator should know. */}
             {product && (
               <p className="hint">
                 با تغییر نشانی، آدرس قبلی به‌صورت خودکار به آدرس جدید هدایت می‌شود.
@@ -276,8 +260,6 @@ function Checkbox({
   )
 }
 
-/* ── Options ────────────────────────────────────────────────────────────── */
-
 function OptionsPanel({ product }: { product: ProductDetail }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -392,8 +374,6 @@ function OptionsPanel({ product }: { product: ProductDetail }) {
     </section>
   )
 }
-
-/* ── Variants ───────────────────────────────────────────────────────────── */
 
 function VariantsPanel({ product }: { product: ProductDetail }) {
   const router = useRouter()
@@ -517,8 +497,6 @@ function VariantForm({ product, onDone }: { product: ProductDetail; onDone: () =
       action={(formData) => {
         setError(null)
 
-        // Every option must be chosen — a variant with a missing option is
-        // unreachable from the product page's selection matching.
         const missing = product.options.filter((o) => !selection[o.id])
         if (missing.length > 0) {
           setError(`مقدار ${missing.map((o) => o.name).join(' و ')} را انتخاب کنید.`)
@@ -630,8 +608,6 @@ function VariantForm({ product, onDone }: { product: ProductDetail; onDone: () =
     </form>
   )
 }
-
-/* ── Images ─────────────────────────────────────────────────────────────── */
 
 function ImagesPanel({ product }: { product: ProductDetail }) {
   const router = useRouter()
@@ -751,8 +727,6 @@ function ImagesPanel({ product }: { product: ProductDetail }) {
   )
 }
 
-/* ── Archive ────────────────────────────────────────────────────────────── */
-
 function DangerPanel({ product }: { product: ProductDetail }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -761,10 +735,6 @@ function DangerPanel({ product }: { product: ProductDetail }) {
   return (
     <section className="card p-6 border-danger/25">
       <h2 className="text-lg text-ink mb-1">بایگانی محصول</h2>
-      {/*
-        Archive, not delete. order_items references variants with RESTRICT, so
-        a sold product cannot be deleted without destroying order history.
-      */}
       <p className="text-sm text-ink-muted mb-4">
         محصول بایگانی‌شده از فروشگاه و نقشه سایت حذف می‌شود، اما سفارش‌های ثبت‌شده دست‌نخورده
         باقی می‌مانند.

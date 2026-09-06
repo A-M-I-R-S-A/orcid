@@ -16,19 +16,11 @@ import {
   breadcrumbSchema,
   buildMetadata,
   facetsAreIndexable,
-  jsonLd,
   shouldIndex,
 } from '@/lib/seo'
 import { toPersianDigits } from '@/lib/persian'
+import { JsonLd } from '@/components/json-ld'
 
-/**
- * Category listing. §64.
- *
- * The indexation decision is the interesting part. A handful of filters can
- * mint thousands of thin URLs, so `facetsAreIndexable` allows a single facet
- * (people genuinely search for "سوتین مشکی") and refuses every combination.
- * That policy lives in lib/seo.ts, not here, so no page can opt itself in.
- */
 export const revalidate = 600
 
 interface Props {
@@ -52,9 +44,6 @@ export async function generateMetadata({ params, searchParams }: Props) {
       category.seoTitle ||
       (page > 1 ? `${category.name} — صفحه ${toPersianDigits(page)}` : category.name),
     description: category.seoDescription || category.description,
-    // Filters canonicalise to the bare category; pagination self-canonicalises,
-    // because pointing page 2 at page 1 orphans every product only reachable
-    // from deeper pages. §67.
     path:
       page > 1
         ? `/category/${encodeURIComponent(category.slug)}?page=${page}`
@@ -114,21 +103,13 @@ export default async function CategoryPage({ params, searchParams }: Props) {
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLd(breadcrumbSchema(breadcrumbItems)) }}
-      />
+      <JsonLd data={breadcrumbSchema(breadcrumbItems)} />
 
       <div className="container-page py-5">
         <Breadcrumbs items={breadcrumbItems} />
       </div>
 
       <div className="container-page">
-        {/*
-          The count sits beside the title rather than three lines under it.
-          It answers "is this worth browsing" and belongs where the eye lands
-          first, not below the description it has to read past.
-        */}
         <header className="mb-9 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
           <div className="max-w-3xl">
             <h1 className="section-title">{category.name}</h1>

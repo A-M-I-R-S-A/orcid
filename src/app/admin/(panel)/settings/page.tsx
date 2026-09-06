@@ -6,13 +6,6 @@ import { providerStatuses } from '@/modules/payments/registry'
 import { hasPermission } from '@/lib/permissions'
 import { getNamespace, hasSecret } from '@/lib/settings'
 
-/**
- * Site settings. §29 / §32 / §47 / §51 / §52.
- *
- * Grouped by what an operator is trying to change, not by database namespace.
- * Each section is permission-gated independently — someone who can edit
- * contact details is not thereby able to change payment credentials.
- */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'تنظیمات' }
 

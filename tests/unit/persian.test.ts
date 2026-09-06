@@ -13,7 +13,6 @@ import {
 
 describe('normalizePersian', () => {
   it('folds Arabic Yeh to Persian Yeh', () => {
-    // U+064A (Arabic) vs U+06CC (Persian) — the classic Iranian search bug.
     expect(normalizePersian('مشكي')).toBe(
       normalizePersian('مشکی'),
     )
@@ -34,7 +33,6 @@ describe('normalizePersian', () => {
   })
 
   it('turns ZWNJ into a space so both spellings agree', () => {
-    // "می‌روم" with ZWNJ vs "می روم" with a space must match.
     const withZwnj = 'می‌روم'
     const withSpace = 'می روم'
     expect(normalizePersian(withZwnj)).toBe(normalizePersian(withSpace))

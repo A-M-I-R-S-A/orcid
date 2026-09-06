@@ -1,17 +1,3 @@
-/**
- * Brand ornaments.
- *
- * The orchid from the logo, redrawn as flat line art that can be tinted with
- * `currentColor` and scaled. It exists for one specific reason: a shop whose
- * photography has not arrived yet should look *composed*, not broken. A flat
- * grey box captioned "no image" reads as a bug; a branded botanical panel
- * reads as a deliberate placeholder.
- *
- * Pure inline SVG — no runtime, no request, and it inherits the theme colour
- * so it follows whatever palette the administrator sets.
- */
-
-/** A single orchid bloom. Five petals, a lip, and a throat. */
 export function OrchidBloom({ className, opacity = 1 }: { className?: string; opacity?: number }) {
   return (
     <svg
@@ -25,29 +11,17 @@ export function OrchidBloom({ className, opacity = 1 }: { className?: string; op
       opacity={opacity}
       aria-hidden="true"
     >
-      {/* upper pair */}
       <path d="M50 46c-6-10-4-22 3-27 7-5 15 0 15 9 0 8-9 15-18 18z" />
       <path d="M50 46c6-10 4-22-3-27-7-5-15 0-15 9 0 8 9 15 18 18z" />
-      {/* lateral pair */}
       <path d="M50 50c-12-4-24 1-27 9-3 8 4 14 12 12 8-2 14-12 15-21z" />
       <path d="M50 50c12-4 24 1 27 9 3 8-4 14-12 12-8-2-14-12-15-21z" />
-      {/* lip */}
       <path d="M50 52c-7 3-11 11-9 18 2 7 9 10 14 6 5-4 5-16-5-24z" />
-      {/* throat */}
       <circle cx="50" cy="49" r="3.2" />
     </svg>
   )
 }
 
-/**
- * A branching spray, used as the empty-image panel.
- *
- * Deterministic, not random — the same product always renders the same
- * arrangement, so a page does not reshuffle between loads.
- */
 export function OrchidSpray({ className, seed = 0 }: { className?: string; seed?: number }) {
-  // Three arrangements, picked by seed. Enough variety that a grid of
-  // placeholders does not look like a repeating tile.
   const variant = Math.abs(seed) % 3
 
   const stems = [
@@ -89,7 +63,6 @@ export function OrchidSpray({ className, seed = 0 }: { className?: string; seed?
         strokeLinecap="round"
         opacity="0.55"
       />
-      {/* small buds along the stem */}
       <circle cx="78" cy="18" r="2.4" stroke="currentColor" strokeWidth="1" opacity="0.5" />
       <circle cx="84" cy="26" r="1.8" stroke="currentColor" strokeWidth="1" opacity="0.4" />
 
@@ -102,13 +75,6 @@ export function OrchidSpray({ className, seed = 0 }: { className?: string; seed?
   )
 }
 
-/**
- * Section divider.
- *
- * A hairline interrupted by a small bloom. Used sparingly — it marks a real
- * shift between sections, so it should not appear between every block or it
- * stops meaning anything.
- */
 export function Divider({ className }: { className?: string }) {
   return (
     <div className={`flex items-center gap-4 ${className ?? ''}`} aria-hidden="true">

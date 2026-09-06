@@ -1,6 +1,10 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+
+import { SizeGuideDialog } from '@/components/size-guide-dialog'
+import type { SizeGuide } from '@/lib/size-guide'
+
 import { useRouter } from 'next/navigation'
 
 import type { ProductDetail } from '@/modules/catalog/queries'
@@ -9,34 +13,19 @@ import { formatPrice } from '@/lib/money'
 import { toPersianDigits } from '@/lib/persian'
 import { ResponsiveImage } from './media'
 import { Price } from './ui'
+import { WishlistSaveButton } from './wishlist-save-button'
 
-/**
- * Product gallery, variant picker and add-to-cart.
- *
- * The one genuinely interactive island on the product page. Everything else —
- * name, description, price, reviews, structured data — is server-rendered, so
- * §60's requirement that SEO content exist in the HTML holds regardless of
- * what happens here.
- *
- * Prices shown here are recomputed on the server at every step that matters;
- * these are for display only and are never sent back as authoritative.
- */
-export function ProductPurchasePanel({ product }: { product: ProductDetail }) {
+export function ProductPurchasePanel({
+  product,
+  sizeGuide,
+}: {
+  product: ProductDetail
+  sizeGuide: SizeGuide | null
+}) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
 
-  /**
-   * Sticky mobile buy bar.
-   *
-   * On a phone the buy button sits below the gallery, the variant picker and
-   * the description — scroll past it and the only way to purchase is to scroll
-   * back. §9 makes mobile the primary shopping surface, so the action follows.
-   *
-   * IntersectionObserver, not a scroll listener: a scroll handler fires on
-   * every frame and forces layout, which is exactly the pattern that ruins
-   * mobile scrolling performance.
-   */
   const ctaRef = useRef<HTMLDivElement>(null)
   const [ctaVisible, setCtaVisible] = useState(true)
 
@@ -53,8 +42,6 @@ export function ProductPurchasePanel({ product }: { product: ProductDetail }) {
   }, [])
 
   const [selection, setSelection] = useState<Record<number, number>>(() => {
-    // Preselect the first IN-STOCK variant, so a customer does not land on a
-    // sold-out combination and conclude the product is unavailable.
     const available = product.variants.find((v) => v.isActive && v.stockQty > 0)
     return available?.selection ?? product.variants[0]?.selection ?? {}
   })
@@ -65,12 +52,6 @@ export function ProductPurchasePanel({ product }: { product: ProductDetail }) {
     )
   }, [product.variants, product.options, selection])
 
-  /**
-   * A value is offered only when some in-stock variant carries it alongside
-   * the current selection of the OTHER options. This is what stops a customer
-   * picking size 75B, then a colour, and only then being told the combination
-   * does not exist.
-   */
   const isValueAvailable = (optionId: number, valueId: number) => {
     return product.variants.some((variant) => {
       if (!variant.isActive || variant.stockQty <= 0) return false
@@ -102,12 +83,8 @@ export function ProductPurchasePanel({ product }: { product: ProductDetail }) {
 
   return (
     <div className="space-y-7">
-      {/* Price */}
       <div>
         {activeVariant ? (
-          // Through the shared component, so the struck price sits BEFORE the
-          // live one and the currency word stays subordinate to the amount —
-          // the same treatment as every card and every order line.
           <Price
             amount={activeVariant.effectivePrice}
             original={
@@ -123,18 +100,21 @@ export function ProductPurchasePanel({ product }: { product: ProductDetail }) {
         )}
       </div>
 
-      {/* Options */}
       {product.options.map((option) => (
         <fieldset key={option.id}>
-          <legend className="label mb-3">
-            {option.name}
-            {selection[option.id] != null && (
-              <span className="text-ink-muted font-normal">
-                {' — '}
-                {option.values.find((v) => v.id === selection[option.id])?.value}
-              </span>
-            )}
-          </legend>
+          <div className="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <legend className="label">
+              {option.name}
+              {selection[option.id] != null && (
+                <span className="text-ink-muted font-normal">
+                  {' — '}
+                  {option.values.find((v) => v.id === selection[option.id])?.value}
+                </span>
+              )}
+            </legend>
+
+            {option.kind === 'size' && sizeGuide && <SizeGuideDialog guide={sizeGuide} />}
+          </div>
 
           <div className="flex flex-wrap gap-2.5">
             {option.values.map((value) => {
@@ -147,10 +127,6 @@ export function ProductPurchasePanel({ product }: { product: ProductDetail }) {
                     key={value.id}
                     type="button"
                     onClick={() => setSelection((s) => ({ ...s, [option.id]: value.id }))}
-                    // Unavailable values stay focusable and selectable rather
-                    // than being disabled — a customer needs to be able to pick
-                    // one to discover it is out of stock, and a disabled control
-                    // is invisible to screen readers.
                     aria-pressed={selected}
                     title={value.value}
                     className={`relative w-11 h-11 rounded-full border-2 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${
@@ -187,7 +163,6 @@ export function ProductPurchasePanel({ product }: { product: ProductDetail }) {
         </fieldset>
       ))}
 
-      {/* Stock */}
       <div aria-live="polite" className="min-h-[1.5rem]">
         {outOfStock ? (
           <p className="text-sm text-danger">این ترکیب در حال حاضر موجود نیست.</p>
@@ -200,16 +175,19 @@ export function ProductPurchasePanel({ product }: { product: ProductDetail }) {
         )}
       </div>
 
-      {/* Add to cart */}
       <div className="space-y-3" ref={ctaRef}>
-        <button
-          type="button"
-          onClick={handleAdd}
-          disabled={outOfStock || pending}
-          className="btn btn-primary btn-block py-4 text-base"
-        >
-          {pending ? 'در حال افزودن…' : outOfStock ? 'ناموجود' : 'افزودن به سبد خرید'}
-        </button>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={outOfStock || pending}
+            className="btn btn-primary flex-1 py-4 text-base"
+          >
+            {pending ? 'در حال افزودن…' : outOfStock ? 'ناموجود' : 'افزودن به سبد خرید'}
+          </button>
+
+          <WishlistSaveButton productId={product.id} productName={product.name} />
+        </div>
 
         {message && (
           <p
@@ -229,7 +207,6 @@ export function ProductPurchasePanel({ product }: { product: ProductDetail }) {
         </p>
       )}
 
-      {/* Sticky buy bar — mobile only, and only once the real CTA is off screen. */}
       <div
         className={`fixed inset-x-0 bottom-0 z-30 border-t border-line bg-bg/95 backdrop-blur-md transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] lg:hidden ${
           ctaVisible ? 'translate-y-full' : 'translate-y-0'
@@ -255,8 +232,6 @@ export function ProductPurchasePanel({ product }: { product: ProductDetail }) {
             type="button"
             onClick={handleAdd}
             disabled={outOfStock || pending}
-            // Not focusable while hidden, or a keyboard user tabs into an
-            // off-screen control.
             tabIndex={ctaVisible ? -1 : 0}
             className="btn btn-primary shrink-0 px-6 py-3"
           >
@@ -267,8 +242,6 @@ export function ProductPurchasePanel({ product }: { product: ProductDetail }) {
     </div>
   )
 }
-
-/* ── Gallery ────────────────────────────────────────────────────────────── */
 
 export function ProductGallery({
   images,
@@ -293,7 +266,6 @@ export function ProductGallery({
           width={current.width}
           height={current.height}
           sizes="(min-width: 1024px) 45vw, 100vw"
-          // The main product image is the LCP element on this page.
           priority
           className="w-full h-auto object-cover aspect-[4/5]"
         />

@@ -5,13 +5,6 @@ import { useState, useTransition } from 'react'
 
 import { setCustomerStatusAction } from '@/modules/admin/customer-actions'
 
-/**
- * Enable / disable a customer account. §43.
- *
- * Disabling asks for a reason and warns that live sessions end immediately —
- * an operator should know the customer will be logged out mid-session, not
- * discover it from a support ticket.
- */
 export function CustomerStatusToggle({
   userId,
   isActive,

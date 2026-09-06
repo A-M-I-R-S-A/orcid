@@ -1,14 +1,3 @@
-/**
- * Permission catalogue — the single source of truth.
- *
- * The `permissions` table is seeded FROM this file, not the other way round.
- * A permission that exists in code but not in the database is a seeding bug;
- * one that exists in the database but not here is dead and gets pruned.
- *
- * §57: these are checked in the service layer. The admin UI hides what a user
- * cannot do, but hiding is never the control.
- */
-
 export const PERMISSION_GROUPS = {
   products: 'محصولات',
   categories: 'دسته‌بندی‌ها',
@@ -86,13 +75,6 @@ export type Permission = keyof typeof PERMISSIONS
 
 export const ALL_PERMISSIONS = Object.keys(PERMISSIONS) as Permission[]
 
-/* ── Default roles ──────────────────────────────────────────────────────── */
-
-/**
- * `superadmin` bypasses the permission table entirely (see hasPermission).
- * It cannot be deleted or stripped, because a misconfigured role would
- * otherwise lock every human out of the panel with no recovery path.
- */
 export const DEFAULT_ROLES = [
   {
     key: 'superadmin',
@@ -147,8 +129,6 @@ export const DEFAULT_ROLES = [
     ] as Permission[],
   },
 ] as const
-
-/* ── Checks ─────────────────────────────────────────────────────────────── */
 
 export interface AdminPrincipal {
   id: number

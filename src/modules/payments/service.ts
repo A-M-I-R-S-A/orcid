@@ -11,21 +11,6 @@ import type { AdminPrincipal } from '@/lib/permissions'
 import { enforce } from '@/lib/rate-limit'
 import * as sms from '@/modules/sms/service'
 
-/**
- * Payments. §30 / §31.
- *
- * ── The authorisation boundary ─────────────────────────────────────────────
- * `submitReference` is the ONLY function a customer can reach, and the only
- * status it can produce is `reference_submitted` / `payment_verification`.
- * `approve` and `reject` take an AdminPrincipal, are called only from admin
- * actions, and are the only paths into `paid`.
- *
- * §31's guarantee is therefore structural: there is no code path from a
- * customer request to `paid`, so no missing UI check can create one.
- */
-
-/* ── Customer side ──────────────────────────────────────────────────────── */
-
 export async function submitReference(
   userId: number,
   orderId: number,
@@ -33,7 +18,6 @@ export async function submitReference(
 ): Promise<void> {
   await enforce(`user:${userId}`, 'payment_reference')
 
-  // Ownership. Scoping by userId means a guessed order id belongs to nobody.
   const [order] = await db
     .select({
       id: orders.id,
@@ -56,8 +40,6 @@ export async function submitReference(
 
   if (!payment) throw errors.internal('Order has no payment row')
 
-  // The unique index on reference_code is the real guard against reuse; this
-  // check exists to turn a database error into a Persian message.
   const [duplicate] = await db
     .select({ id: payments.id })
     .from(payments)
@@ -75,7 +57,6 @@ export async function submitReference(
         referenceCode,
         referenceSubmittedAt: new Date(),
         status: 'reference_submitted',
-        // Clear any previous rejection so the admin sees a fresh submission.
         reviewedByAdminId: null,
         reviewedAt: null,
       })
@@ -93,15 +74,6 @@ export async function submitReference(
     .where(eq(orders.id, orderId))
 }
 
-/* ── Admin side ─────────────────────────────────────────────────────────── */
-
-/**
- * Approves a payment. Server-side only, permission-gated by the caller.
- *
- * The status transition is conditional on the payment still being in
- * `reference_submitted`, so two administrators clicking approve at the same
- * moment produce one approval, not two.
- */
 export async function approve(
   admin: AdminPrincipal,
   paymentId: number,
@@ -126,24 +98,36 @@ export async function approve(
     throw errors.conflict('این پرداخت قبلاً تأیید شده است.')
   }
 
-  const result = await db
-    .update(payments)
-    .set({
-      status: 'approved',
-      reviewedByAdminId: admin.id,
-      reviewedAt: new Date(),
-      adminNote: note ?? null,
-    })
-    .where(and(eq(payments.id, paymentId), sql`${payments.status} <> 'approved'`))
+  await db.transaction(async (tx) => {
+    const result = await tx
+      .update(payments)
+      .set({
+        status: 'approved',
+        reviewedByAdminId: admin.id,
+        reviewedAt: new Date(),
+        adminNote: note ?? null,
+      })
+      .where(and(eq(payments.id, paymentId), sql`${payments.status} <> 'approved'`))
 
-  if (affectedRows(result) === 0) {
-    throw errors.conflict('این پرداخت قبلاً بررسی شده است.')
-  }
+    if (affectedRows(result) === 0) {
+      throw errors.conflict('این پرداخت قبلاً بررسی شده است.')
+    }
 
-  await db
-    .update(orders)
-    .set({ status: 'paid', paymentStatus: 'approved', paidAt: new Date() })
-    .where(eq(orders.id, payment.orderId))
+    await tx
+      .update(orders)
+      .set({ status: 'paid', paymentStatus: 'approved', paidAt: new Date() })
+      .where(
+        and(
+          eq(orders.id, payment.orderId),
+          sql`${orders.status} IN ('pending','awaiting_payment','payment_verification','rejected')`,
+        ),
+      )
+
+    await tx
+      .update(orders)
+      .set({ paymentStatus: 'approved', paidAt: sql`COALESCE(${orders.paidAt}, NOW())` })
+      .where(and(eq(orders.id, payment.orderId), sql`${orders.paymentStatus} <> 'approved'`))
+  })
 
   const [order] = await db
     .select({ orderNumber: orders.orderNumber, phone: orders.shipPhone })
@@ -170,10 +154,6 @@ export async function approve(
   })
 }
 
-/**
- * Rejects a payment and returns the order to a payable state, so the customer
- * can correct a mistyped reference rather than being stranded.
- */
 export async function reject(
   admin: AdminPrincipal,
   paymentId: number,
@@ -191,23 +171,32 @@ export async function reject(
     throw errors.conflict('پرداخت تأییدشده را نمی‌توان رد کرد.')
   }
 
-  await db
-    .update(payments)
-    .set({
-      status: 'rejected',
-      reviewedByAdminId: admin.id,
-      reviewedAt: new Date(),
-      adminNote: reason,
-      // Free the code so a corrected resubmission is not blocked by the
-      // unique index on a reference that was never valid.
-      referenceCode: null,
-    })
-    .where(eq(payments.id, paymentId))
+  await db.transaction(async (tx) => {
+    const result = await tx
+      .update(payments)
+      .set({
+        status: 'rejected',
+        reviewedByAdminId: admin.id,
+        reviewedAt: new Date(),
+        adminNote: reason,
+        referenceCode: null,
+      })
+      .where(and(eq(payments.id, paymentId), sql`${payments.status} <> 'approved'`))
 
-  await db
-    .update(orders)
-    .set({ status: 'rejected', paymentStatus: 'rejected' })
-    .where(eq(orders.id, payment.orderId))
+    if (affectedRows(result) === 0) {
+      throw errors.conflict('این پرداخت هم‌زمان توسط کاربر دیگری بررسی شده است.')
+    }
+
+    await tx
+      .update(orders)
+      .set({ status: 'rejected', paymentStatus: 'rejected' })
+      .where(
+        and(
+          eq(orders.id, payment.orderId),
+          sql`${orders.status} IN ('pending','awaiting_payment','payment_verification')`,
+        ),
+      )
+  })
 
   await audit.log({
     actor: admin,
@@ -220,12 +209,6 @@ export async function reject(
   })
 }
 
-/* ── Order status ───────────────────────────────────────────────────────── */
-
-/**
- * Changes an order's status, validating against the admin transition table.
- * Cancelling returns stock, in the same transaction as the status change.
- */
 export async function updateOrderStatus(
   admin: AdminPrincipal,
   orderId: number,
@@ -250,13 +233,17 @@ export async function updateOrderStatus(
     if (nextStatus === 'delivered') timestamps.deliveredAt = new Date()
     if (nextStatus === 'cancelled') timestamps.cancelledAt = new Date()
 
-    await tx
+    const updated = await tx
       .update(orders)
       .set({ status: nextStatus, ...timestamps })
       .where(and(eq(orders.id, orderId), eq(orders.status, order.status)))
 
-    // Cancelling returns stock — otherwise a cancelled order permanently
-    // removes inventory that was never sold.
+    if (affectedRows(updated) === 0) {
+      throw errors.conflict(
+        'وضعیت این سفارش هم‌زمان توسط کاربر دیگری تغییر کرده است. صفحه را تازه کنید و دوباره تلاش کنید.',
+      )
+    }
+
     if (nextStatus === 'cancelled' && shouldRestock(order.status)) {
       const items = await tx
         .select({ variantId: orderItems.variantId, quantity: orderItems.quantity })
@@ -290,8 +277,6 @@ export async function updateOrderStatus(
     ip: meta.ip,
   })
 }
-
-/* ── Queries ────────────────────────────────────────────────────────────── */
 
 export async function pendingPaymentCount(): Promise<number> {
   const [row] = await db

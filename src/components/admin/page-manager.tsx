@@ -2,9 +2,15 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useRef, useState, useTransition } from 'react'
 
-import { deletePageAction, savePageAction } from '@/modules/admin/content-actions'
+import {
+  deletePageAction,
+  savePageAction,
+  uploadPageImageAction,
+} from '@/modules/admin/content-actions'
+import { mediaUrl } from '@/lib/media-url'
+import { SIZE_GUIDE_SLUG } from '@/lib/size-guide'
 
 interface CmsPage {
   id: number
@@ -16,6 +22,7 @@ interface CmsPage {
   sortOrder: number
   seoTitle: string | null
   seoDescription: string | null
+  imagePath: string | null
 }
 
 export function PageManager({ pages }: { pages: CmsPage[] }) {
@@ -83,6 +90,7 @@ function PageForm({ page, onDone }: { page: CmsPage | null; onDone: () => void }
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   return (
     <div className="card p-5 border-accent-3">
@@ -137,10 +145,6 @@ function PageForm({ page, onDone }: { page: CmsPage | null; onDone: () => void }
               className="field resize-y font-mono text-sm"
               dir="auto"
             />
-            {/*
-              HTML is allowed but sanitised on save AND on render. The allowlist
-              is narrow — no <script>, no <style>, no inline event handlers.
-            */}
             <p className="hint">
               می‌توانید از تگ‌های ساده HTML استفاده کنید: پاراگراف، عنوان، فهرست، لینک و تصویر.
               تگ‌های ناامن به‌صورت خودکار حذف می‌شوند.
@@ -193,6 +197,65 @@ function PageForm({ page, onDone }: { page: CmsPage | null; onDone: () => void }
             نمایش در فوتر
           </label>
         </div>
+
+        {page && (
+          <div className="border-t border-line pt-5">
+            <label className="label">
+              تصویر صفحه
+              {page.slug === SIZE_GUIDE_SLUG && (
+                <span className="font-normal text-ink-muted">
+                  {' — '}
+                  همین تصویر در پنجرهٔ راهنمای سایز صفحهٔ محصولات نمایش داده می‌شود
+                </span>
+              )}
+            </label>
+
+            <div className="flex flex-wrap items-end gap-4">
+              {page.imagePath && (
+                <img
+                  src={mediaUrl(page.imagePath)}
+                  alt=""
+                  className="h-24 w-auto rounded-md border border-line bg-surface-sunken object-contain"
+                />
+              )}
+
+              <div className="flex flex-wrap items-end gap-3">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/avif"
+                  className="field py-2 text-sm"
+                />
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    const file = fileRef.current?.files?.[0]
+                    if (!file) return
+                    const data = new FormData()
+                    data.set('pageId', String(page.id))
+                    data.set('file', file)
+                    startTransition(async () => {
+                      const result = await uploadPageImageAction(data)
+                      if (!result.ok) setError(result.error)
+                      else {
+                        setError(null)
+                        if (fileRef.current) fileRef.current.value = ''
+                      }
+                      router.refresh()
+                    })
+                  }}
+                  className="btn btn-secondary btn-sm"
+                >
+                  بارگذاری
+                </button>
+              </div>
+            </div>
+            <p className="hint">
+              تصویر بدون برش نمایش داده می‌شود؛ جدولی که لبه‌هایش عدد دارد کامل دیده می‌شود.
+            </p>
+          </div>
+        )}
 
         {error && <p className="text-sm text-danger">{error}</p>}
 

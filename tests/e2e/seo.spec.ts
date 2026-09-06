@@ -1,14 +1,5 @@
 import { expect, test } from '@playwright/test'
 
-/**
- * Technical SEO. §59–§74.
- *
- * The important tests here fetch RAW HTML with `request` rather than driving a
- * browser. That distinction is the whole point of §60: a crawler sees the
- * server's response, not the post-hydration DOM. Asserting against a rendered
- * page would pass even if every product name arrived via client JavaScript.
- */
-
 test.describe('§60 — content exists in server-rendered HTML', () => {
   test('homepage renders without JavaScript', async ({ request }) => {
     const response = await request.get('/')
@@ -18,7 +9,6 @@ test.describe('§60 — content exists in server-rendered HTML', () => {
 
     expect(html).toContain('<html lang="fa" dir="rtl"')
     expect(html).toMatch(/<title>.+<\/title>/)
-    // Not an empty shell waiting for hydration.
     expect(html.length).toBeGreaterThan(2000)
   })
 
@@ -26,7 +16,6 @@ test.describe('§60 — content exists in server-rendered HTML', () => {
     request,
     page,
   }) => {
-    // Find a real product from the sitemap rather than hardcoding a slug.
     const sitemap = await (await request.get('/sitemap.xml')).text()
     const match = sitemap.match(/<loc>([^<]*\/product\/[^<]+)<\/loc>/)
     test.skip(!match, 'no products in sitemap — seed with --demo')
@@ -37,13 +26,10 @@ test.describe('§60 — content exists in server-rendered HTML', () => {
 
     const html = await response.text()
 
-    // The Product JSON-LD must be in the source, not injected later.
     expect(html).toContain('"@type":"Product"')
     expect(html).toContain('"priceCurrency":"IRR"')
-    // A single H1 carrying the product name.
     expect((html.match(/<h1/g) ?? []).length).toBe(1)
 
-    // And the rendered page must agree with the source.
     await page.goto(url.pathname)
     await expect(page.locator('h1')).toBeVisible()
   })
@@ -77,19 +63,14 @@ test.describe('§61/§67 — metadata and canonicals', () => {
 
       const canonical = html.match(/rel="canonical"\s+href="([^"]+)"/)?.[1]
       expect(canonical, `${path} has no canonical`).toBeTruthy()
-      // Canonicals must be absolute.
       expect(canonical).toMatch(/^https?:\/\//)
 
-      // Duplicate titles across pages dilute both of them.
       expect(titles.has(title!), `duplicate title on ${path}: ${title}`).toBe(false)
       titles.add(title!)
     }
   })
 
   test('the site name appears exactly once in a title', async ({ request }) => {
-    // Regression: buildMetadata appends the brand when the title lacks it, and
-    // the root layout template appended it again — the homepage rendered as
-    // "ارکید — فروشگاه لباس زیر زنانه | ارکید".
     const sitemap = await (await request.get('/sitemap.xml')).text()
     const paths = [
       '/',
@@ -136,7 +117,6 @@ test.describe('§70 — private pages are not indexable', () => {
       const response = await request.get(path)
       const html = await response.text()
 
-      // Either noindex, or a redirect away from it — both keep it out of the index.
       const isRedirect = response.status() >= 300 && response.status() < 400
       const isNoindex = /name="robots"[^>]*content="[^"]*noindex/.test(html)
 
@@ -154,7 +134,6 @@ test.describe('§68/§69 — sitemap and robots', () => {
     const xml = await response.text()
     expect(xml).toContain('<urlset')
 
-    // Nothing private may appear.
     for (const forbidden of ['/admin', '/cart', '/checkout', '/login', '/account', '/api/']) {
       expect(xml, `sitemap must not list ${forbidden}`).not.toContain(`${forbidden}`)
     }
@@ -170,7 +149,6 @@ test.describe('§68/§69 — sitemap and robots', () => {
     expect(text).toContain('Disallow: /admin')
     expect(text).toContain('Disallow: /checkout')
 
-    // §69 explicitly warns against blocking rendering assets.
     expect(text).not.toMatch(/Disallow:\s*\/_next\/static/)
     expect(text).not.toMatch(/Disallow:\s*\/api\/media/)
     expect(text).not.toMatch(/Disallow:\s*\/\s*$/m)
@@ -179,7 +157,6 @@ test.describe('§68/§69 — sitemap and robots', () => {
 
 test.describe('§74 — HTTP status codes', () => {
   test('a missing page returns 404, not 200', async ({ request }) => {
-    // Returning 200 for a missing page is the expensive silent bug this guards.
     const response = await request.get('/product/this-product-does-not-exist-1234567890')
     expect(response.status()).toBe(404)
   })
@@ -219,7 +196,6 @@ test.describe('§62 — structured data is truthful', () => {
       const html = await (await request.get(path)).text()
 
       if (html.includes('"aggregateRating"')) {
-        // If it is claimed, it must carry a real count — never a fabricated one.
         const count = html.match(/"reviewCount":(\d+)/)?.[1]
         expect(Number(count ?? 0), `${path} claims a rating with no reviews`).toBeGreaterThan(0)
       }
@@ -239,7 +215,6 @@ test.describe('§72 — image SEO', () => {
     const count = await images.count()
     test.skip(count === 0, 'product has no images uploaded')
 
-    // The LCP candidate must not be lazy-loaded.
     expect(await images.first().getAttribute('loading')).toBe('eager')
   })
 

@@ -13,13 +13,6 @@ import {
   testDb,
 } from './helpers'
 
-/**
- * Checkout and inventory integrity. §35.
- *
- * These are the tests that cannot be written against a mock. Row locking,
- * CHECK constraints and transaction rollback are database behaviour; verifying
- * them requires the database.
- */
 describe.skipIf(!hasTestDb)('checkout — inventory integrity', () => {
   beforeEach(async () => {
     await resetTables()
@@ -33,7 +26,6 @@ describe.skipIf(!hasTestDb)('checkout — inventory integrity', () => {
     const db = testDb()
     const { variantId } = await createProductWithVariant({ stock: 3 })
 
-    // Bypass the application entirely: this is the database's own guarantee.
     await expect(
       db
         .update(schema.productVariants)
@@ -53,7 +45,6 @@ describe.skipIf(!hasTestDb)('checkout — inventory integrity', () => {
     const db = testDb()
     const { variantId } = await createProductWithVariant({ stock: 2 })
 
-    // This is the exact statement the checkout transaction issues.
     const result = await db
       .update(schema.productVariants)
       .set({ stockQty: sql`${schema.productVariants.stockQty} - 5` })
@@ -61,7 +52,6 @@ describe.skipIf(!hasTestDb)('checkout — inventory integrity', () => {
         sql`${schema.productVariants.id} = ${variantId} AND ${schema.productVariants.stockQty} >= 5`,
       )
 
-    // Zero rows affected — the guard held, no exception needed.
     expect(affectedRows(result)).toBe(0)
   })
 
@@ -69,13 +59,6 @@ describe.skipIf(!hasTestDb)('checkout — inventory integrity', () => {
     const db = testDb()
     const { variantId } = await createProductWithVariant({ stock: 1 })
 
-    /**
-     * Both transactions try to claim the only unit. SELECT ... FOR UPDATE
-     * makes the second wait for the first to commit, at which point it sees
-     * stock 0 and its guarded UPDATE affects no rows.
-     *
-     * Without the lock, both would read stock 1 and both would succeed.
-     */
     const attempt = async () =>
       db.transaction(async (tx) => {
         await tx.execute(
@@ -97,7 +80,6 @@ describe.skipIf(!hasTestDb)('checkout — inventory integrity', () => {
       .filter((r): r is PromiseFulfilledResult<number> => r.status === 'fulfilled')
       .reduce((sum, r) => sum + r.value, 0)
 
-    // Exactly one claim, never two.
     expect(claimed).toBe(1)
 
     const [row] = await db
@@ -136,7 +118,6 @@ describe.skipIf(!hasTestDb)('checkout — inventory integrity', () => {
 
         const orderId = (order as unknown as { insertId: number }).insertId
 
-        // A variant that does not exist — the FK is RESTRICT, so this throws.
         await tx.insert(schema.orderItems).values({
           orderId,
           variantId: 999_999_999,
@@ -151,7 +132,6 @@ describe.skipIf(!hasTestDb)('checkout — inventory integrity', () => {
       }),
     ).rejects.toThrow()
 
-    // Stock must be untouched — the decrement was rolled back with the insert.
     const [variant] = await db
       .select({ stockQty: schema.productVariants.stockQty })
       .from(schema.productVariants)
@@ -195,7 +175,6 @@ describe.skipIf(!hasTestDb)('checkout — inventory integrity', () => {
       lineTotal: 100_000,
     })
 
-    // Rename and archive the product, exactly as an admin would.
     await db
       .update(schema.products)
       .set({ name: 'نام کاملاً جدید', isArchived: true })
@@ -206,7 +185,6 @@ describe.skipIf(!hasTestDb)('checkout — inventory integrity', () => {
       .from(schema.orderItems)
       .where(eq(schema.orderItems.orderId, orderId))
 
-    // The snapshot holds — the order still says what was actually bought.
     expect(item?.productName).toBe('محصول قدیمی')
     expect(item?.unitPrice).toBe(100_000)
   })
@@ -242,7 +220,6 @@ describe.skipIf(!hasTestDb)('checkout — inventory integrity', () => {
       lineTotal: 100_000,
     })
 
-    // ON DELETE RESTRICT — order history must survive catalogue cleanup.
     await expect(
       db.delete(schema.productVariants).where(eq(schema.productVariants.id, variantId)),
     ).rejects.toThrow()
@@ -305,7 +282,6 @@ describe.skipIf(!hasTestDb)('unique constraints', () => {
     const db = testDb()
     const userId = await createUser()
 
-    // NULL is not "equal" to NULL in a unique index, so unpaid orders coexist.
     for (let i = 0; i < 3; i++) {
       const [order] = await db.insert(schema.orders).values({
         orderNumber: `TEST-NULL-${Date.now()}-${i}`,

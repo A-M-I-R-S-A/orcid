@@ -14,15 +14,6 @@ import {
 } from '@/lib/order-status'
 import { ORDER_STATUSES } from '@/db/schema/commerce'
 
-/**
- * The order state machine.
- *
- * These tests exist mainly to protect ONE guarantee: §31's "customers must
- * never be able to mark their own order as paid". That guarantee is structural
- * — the transition simply does not exist — and this suite is what stops a
- * future edit from quietly adding it.
- */
-
 describe('§31 — customers cannot reach a paid state', () => {
   it('has no customer transition into paid', () => {
     for (const from of ORDER_STATUSES) {
@@ -101,7 +92,6 @@ describe('helpers', () => {
   it('restocks on cancel except from states that never held stock', () => {
     expect(shouldRestock('paid')).toBe(true)
     expect(shouldRestock('processing')).toBe(true)
-    // Already cancelled or rejected — restocking again would double-count.
     expect(shouldRestock('cancelled')).toBe(false)
     expect(shouldRestock('rejected')).toBe(false)
   })
@@ -115,7 +105,6 @@ describe('labels', () => {
   it('has a Persian label for every status', () => {
     for (const status of ORDER_STATUSES) {
       expect(ORDER_STATUS_LABELS[status], status).toBeTruthy()
-      // Must contain Persian characters, not be an untranslated English string.
       expect(ORDER_STATUS_LABELS[status]).toMatch(/[؀-ۿ]/)
     }
   })

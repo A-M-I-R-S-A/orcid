@@ -86,8 +86,6 @@ describe('media URLs', () => {
   })
 
   it('only lists renditions the source could fill', () => {
-    // A 900px source never produced a 1280 or 1920 rendition, so advertising
-    // them would point the browser at files that do not exist.
     const srcset = buildSrcSet(primary, 900)
     expect(srcset).toContain('360w')
     expect(srcset).toContain('640w')
@@ -131,8 +129,6 @@ describe('contentTypeFor', () => {
   })
 
   it('returns null for anything else — the handler 404s rather than guessing', () => {
-    // These are the ones that matter: serving an unknown type is how an upload
-    // becomes executable.
     expect(contentTypeFor('x.php')).toBeNull()
     expect(contentTypeFor('x.html')).toBeNull()
     expect(contentTypeFor('x.svg')).toBeNull()
@@ -156,7 +152,6 @@ describe('colour', () => {
   })
 
   it('computes WCAG contrast ratios', () => {
-    // Black on white is the maximum, 21:1.
     expect(contrastRatio('#000000', '#FFFFFF')).toBeCloseTo(21, 1)
     expect(contrastRatio('#FFFFFF', '#FFFFFF')).toBeCloseTo(1, 1)
   })
@@ -169,15 +164,11 @@ describe('colour', () => {
   })
 
   it('picks the readable foreground for a background', () => {
-    // The brand maroon is dark, so button text on it must be white.
     expect(readableOn('#4A171E', '#4E3527')).toBe('#FFFFFF')
-    // A pale background needs the dark ink instead.
     expect(readableOn('#EDE6DC', '#4E3527')).toBe('#4E3527')
   })
 
   it('keeps the default palette readable', () => {
-    // The specification palette must itself pass — if the defaults fail, every
-    // fresh install ships inaccessible text.
     const ratio = contrastRatio(DEFAULT_THEME.textDeep, DEFAULT_THEME.background)
     expect(ratio).toBeGreaterThanOrEqual(4.5)
   })
@@ -201,7 +192,6 @@ describe('colour', () => {
   })
 
   it('keeps semantic colours independent of the brand accent', () => {
-    // Changing the theme must never make "out of stock" read as "in stock".
     const orchid = themeToCss({ ...DEFAULT_THEME })
     const green = themeToCss({ ...DEFAULT_THEME, accentPrimary: '#00FF00' })
 

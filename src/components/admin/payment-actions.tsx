@@ -5,17 +5,6 @@ import { useState, useTransition } from 'react'
 
 import { approvePaymentAction, rejectPaymentAction } from '@/modules/admin/actions'
 
-/**
- * Approve / reject controls.
- *
- * `canApprove` and `canReject` only decide whether the buttons RENDER. The
- * actions themselves call `requirePermission` server-side, so a crafted
- * request from someone without the permission fails there regardless of what
- * this component chose to draw. §57.
- *
- * Approval is confirmed rather than one-click: it moves money-state and sends
- * the customer an SMS, and there is no undo.
- */
 export function PaymentReviewActions({
   paymentId,
   canApprove,

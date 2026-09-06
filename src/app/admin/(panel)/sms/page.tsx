@@ -1,4 +1,4 @@
-import { desc, eq } from 'drizzle-orm'
+import { desc } from 'drizzle-orm'
 
 import { db } from '@/db'
 import { smsMessages, smsTemplates } from '@/db/schema'
@@ -12,13 +12,6 @@ import { hasSecret } from '@/lib/settings'
 import { formatJalaliDateTime } from '@/lib/jalali'
 import { maskPhone, toPersianDigits } from '@/lib/persian'
 
-/**
- * SMS management. §46 / §27.
- *
- * Three things live here: the approval queue (the §27 gate), the provider
- * credentials, and the per-event templates. They are on one screen because an
- * operator investigating "why did this not send" needs all three at once.
- */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'پیامک' }
 
@@ -57,9 +50,6 @@ export default async function AdminSmsPage() {
     hasSecret('sms', 'apiKey'),
   ])
 
-  // Credit is a live provider call, so it may legitimately be null — an
-  // unconfigured provider or a network failure. Rendered as "unknown" rather
-  // than "zero", which would read as an emergency.
   const provider = await getProvider()
   const credit = apiKeySet ? await provider.getCredit() : null
 
@@ -87,12 +77,6 @@ export default async function AdminSmsPage() {
         </div>
       </div>
 
-      {/*
-        Dispatch is manual here on purpose. Whether the host has cron was never
-        verified (planning §A/§N-3), so approving a message must not be the
-        same act as sending it — and if no scheduler exists, this button is the
-        thing that drains the queue.
-      */}
       {canApprove && (
         <div className="card p-5 mb-7">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -107,7 +91,6 @@ export default async function AdminSmsPage() {
         </div>
       )}
 
-      {/* Queue */}
       <section aria-labelledby="queue" className="mb-8">
         <h2 id="queue" className="text-sm text-ink-muted mb-3">
           صف پیامک
@@ -132,8 +115,6 @@ export default async function AdminSmsPage() {
                 {queue.map((message) => (
                   <tr key={message.id} className="hover:bg-surface-sunken/50">
                     <Td className="text-xs">{EVENT_LABELS[message.event] ?? message.event}</Td>
-                    {/* Masked — an operator needs to identify the recipient,
-                        not to read a full customer phone list off a screen. */}
                     <Td className="nums text-xs">{maskPhone(message.phone)}</Td>
                     <Td>
                       <Badge
@@ -167,7 +148,6 @@ export default async function AdminSmsPage() {
         )}
       </section>
 
-      {/* Templates */}
       <section aria-labelledby="templates" className="mb-8">
         <h2 id="templates" className="text-sm text-ink-muted mb-3">
           قالب‌های پیامک
@@ -191,7 +171,6 @@ export default async function AdminSmsPage() {
         </div>
       </section>
 
-      {/* Provider configuration */}
       {canConfigure && (
         <section aria-labelledby="config">
           <h2 id="config" className="text-sm text-ink-muted mb-3">

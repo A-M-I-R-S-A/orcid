@@ -1,62 +1,50 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 
-import { LogoutButton } from '@/components/logout-button'
+import { AccountNav } from '@/components/account/nav'
 import { getCurrentUser } from '@/lib/session'
 import { maskPhone } from '@/lib/persian'
+import { addressCount, wishlistCount } from '@/modules/account/service'
+import { countForUser } from '@/modules/orders/queries'
 
-/**
- * Customer account. §36 / §70.
- *
- * Every page under here is noindex and dynamic — it is personal data, and
- * caching or indexing any of it would be a leak rather than an optimisation.
- */
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
   robots: { index: false, follow: false },
 }
 
-const NAV = [
-  { href: '/account', label: 'پیشخوان' },
-  { href: '/account/orders', label: 'سفارش‌های من' },
-  { href: '/account/reviews', label: 'دیدگاه‌های من' },
-]
-
 export default async function AccountLayout({ children }: { children: React.ReactNode }) {
   const user = await getCurrentUser()
   if (!user) redirect('/login?next=/account')
 
+  const [orders, wishlist, addresses] = await Promise.all([
+    countForUser(user.id),
+    wishlistCount(user.id),
+    addressCount(user.id),
+  ])
+
   return (
-    <div className="container-page py-10 md:py-16">
-      <div className="grid lg:grid-cols-4 gap-8 lg:gap-12 items-start">
-        <aside className="lg:sticky lg:top-28">
-          <div className="card p-5 mb-4">
-            <p className="text-sm text-ink-muted">حساب کاربری</p>
-            <p className="font-medium text-ink mt-1">{user.fullName || 'کاربر ارکید'}</p>
-            <p className="text-sm text-ink-subtle nums mt-0.5">{maskPhone(user.phone)}</p>
+    <div className="container-page py-8 md:py-14">
+      <div className="grid items-start gap-8 lg:grid-cols-4 lg:gap-12">
+        <aside className="min-w-0 lg:sticky lg:top-32">
+          <div className="mb-4 flex items-center gap-3.5">
+            <span
+              aria-hidden="true"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent text-lg text-on-accent"
+            >
+              {(user.fullName ?? 'ا').trim().charAt(0)}
+            </span>
+            <div className="min-w-0">
+              <p className="truncate font-medium text-ink">{user.fullName || 'کاربر ارکید'}</p>
+              <p className="nums truncate text-sm text-ink-subtle" dir="ltr">
+                {maskPhone(user.phone)}
+              </p>
+            </div>
           </div>
 
-          <nav aria-label="ناوبری حساب کاربری" className="card p-2">
-            <ul>
-              {NAV.map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className="block px-4 py-3 rounded-lg hover:bg-surface-sunken transition-colors text-[15px]"
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-              <li className="border-t border-line mt-2 pt-2">
-                <LogoutButton />
-              </li>
-            </ul>
-          </nav>
+          <AccountNav counts={{ orders, wishlist, addresses }} />
         </aside>
 
-        <div className="lg:col-span-3">{children}</div>
+        <div className="min-w-0 lg:col-span-3">{children}</div>
       </div>
     </div>
   )

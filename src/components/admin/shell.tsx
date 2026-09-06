@@ -2,37 +2,17 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { adminLogoutAction } from '@/modules/admin/actions'
 import type { Permission } from '@/lib/permissions'
 import { toPersianDigits } from '@/lib/persian'
-
-/**
- * Admin navigation shell.
- *
- * Items are filtered by the permissions passed from the server. To be explicit
- * about what this is and is not: hiding a link is an ERGONOMIC choice so an
- * operator is not shown doors they cannot open. It is not access control —
- * that lives in `requirePermission` in every service call (§57).
- *
- * ── The drawer transform ──────────────────────────────────────────────────
- * Open/closed is `data-open` plus the `.admin-drawer` rules in globals.css,
- * NOT `rtl:translate-x-full lg:translate-x-0`. Those two Tailwind utilities
- * compile to the same specificity, and the direction variants are emitted
- * after the breakpoint blocks — so the RTL rule won at `lg` too and pushed
- * the permanent desktop sidebar a full width off the inline-start edge. The
- * only control that brings it back is the hamburger, which is `lg:hidden`.
- * The result was an admin panel with no reachable navigation on any laptop.
- * See the note beside those rules for why one explicit cascade fixes it.
- */
 
 interface NavItem {
   href: string
   label: string
   permission: Permission | null
   badge?: 'payments' | 'reviews' | 'sms'
-  /** Single path, 24×24, stroked. Drawn inline — no icon dependency. */
   icon: string
 }
 
@@ -166,8 +146,6 @@ export function AdminShell({
   const [menuOpen, setMenuOpen] = useState(false)
   const [pending, setPending] = useState(false)
 
-  // The drawer is modal below lg. Leaving the page scrollable behind it means
-  // a swipe moves the wrong layer, which on a phone reads as a broken panel.
   useEffect(() => {
     if (!menuOpen) return
     const previous = document.body.style.overflow
@@ -183,6 +161,38 @@ export function AdminShell({
       document.body.style.overflow = previous
     }
   }, [menuOpen])
+
+  const navRef = useRef<HTMLElement | null>(null)
+  const [edges, setEdges] = useState({ top: false, bottom: false })
+
+  const measureEdges = useCallback(() => {
+    const el = navRef.current
+    if (!el) return
+
+    const top = Math.abs(el.scrollTop)
+    const room = el.scrollHeight - el.clientHeight
+    const next = { top: top > 4, bottom: room - top > 4 }
+
+    setEdges((previous) =>
+      previous.top === next.top && previous.bottom === next.bottom ? previous : next,
+    )
+  }, [])
+
+  useEffect(() => {
+    const el = navRef.current
+    if (!el) return
+
+    measureEdges()
+    el.addEventListener('scroll', measureEdges, { passive: true })
+
+    const observer = new ResizeObserver(measureEdges)
+    observer.observe(el)
+
+    return () => {
+      el.removeEventListener('scroll', measureEdges)
+      observer.disconnect()
+    }
+  }, [measureEdges])
 
   const granted = new Set(admin.permissions)
   const isSuper = admin.roleKey === 'superadmin'
@@ -213,7 +223,6 @@ export function AdminShell({
 
   return (
     <div className="flex min-h-[100dvh] bg-bg">
-      {/* Sidebar — a drawer below lg, permanent above it. */}
       <aside
         data-open={menuOpen}
         className="admin-drawer fixed inset-y-0 start-0 z-40 flex h-[100dvh] w-[17rem] flex-col border-e border-line bg-surface lg:sticky lg:top-0"
@@ -247,7 +256,13 @@ export function AdminShell({
           </button>
         </div>
 
-        <nav className="flex-1 overflow-y-auto p-3" aria-label="ناوبری مدیریت">
+        <nav
+          ref={navRef}
+          data-edge-top={edges.top}
+          data-edge-bottom={edges.bottom}
+          className="scroll-edges flex-1 overflow-y-auto p-3"
+          aria-label="ناوبری مدیریت"
+        >
           {visibleGroups.map((group) => (
             <div key={group.title} className="mb-5">
               <p className="px-3 pb-2 text-[11px] font-semibold text-ink-subtle">{group.title}</p>

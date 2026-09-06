@@ -3,14 +3,6 @@ import Link from 'next/link'
 import { formatPrice } from '@/lib/money'
 import { toPersianDigits } from '@/lib/persian'
 
-/**
- * Admin primitives.
- *
- * The panel is scanned and operated rather than read, so the craft here is
- * information design: state is encoded in shape as well as number, and the
- * thing needing attention reads at a glance.
- */
-
 export function PageHeader({
   title,
   description,
@@ -31,13 +23,6 @@ export function PageHeader({
   )
 }
 
-/**
- * Dashboard tile.
- *
- * `tone` is semantic and independent of the brand accent — a pending queue
- * must read as "needs attention" regardless of what colours the storefront
- * theme is currently set to.
- */
 export function StatTile({
   label,
   value,
@@ -91,12 +76,6 @@ export function MoneyTile({ label, amount, hint }: { label: string; amount: numb
   )
 }
 
-/* ── Tables ─────────────────────────────────────────────────────────────── */
-
-/**
- * Wide tables scroll inside their own container so the page body never scrolls
- * sideways — on a phone an admin table is always wider than the viewport.
- */
 export function TableWrap({ children }: { children: React.ReactNode }) {
   return (
     <div className="card overflow-hidden">
@@ -127,7 +106,6 @@ export function Td({
 }: {
   children?: React.ReactNode
   className?: string
-  /** Native tooltip, for cells whose content is visually truncated. */
   title?: string
   colSpan?: number
 }) {
@@ -141,8 +119,6 @@ export function Td({
     </td>
   )
 }
-
-/* ── Feedback ───────────────────────────────────────────────────────────── */
 
 export function AdminEmpty({ title, description }: { title: string; description?: string }) {
   return (
@@ -162,8 +138,6 @@ export function Badge({
 }) {
   return <span className={`badge badge-${tone}`}>{children}</span>
 }
-
-/* ── Filter tabs ────────────────────────────────────────────────────────── */
 
 export function FilterTabs({
   basePath,
@@ -197,8 +171,6 @@ export function FilterTabs({
     </div>
   )
 }
-
-/* ── Pagination ─────────────────────────────────────────────────────────── */
 
 export function AdminPagination({
   page,

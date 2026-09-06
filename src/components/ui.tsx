@@ -5,16 +5,6 @@ import { toPersianDigits as faDigits } from '@/lib/persian'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TONE, type OrderStatus } from '@/lib/order-status'
 import { OrchidBloom } from './ornament'
 
-/* ── Price ──────────────────────────────────────────────────────────────── */
-
-/**
- * Prices always render through here, so the currency label, Persian numerals
- * and the discount presentation stay identical everywhere they appear.
- *
- * The unit is set smaller and muted, and never wraps away from its number.
- * "۴۴۹٬۰۰۰ تومان" at one weight makes the amount and the word compete; the
- * amount is what a shopper compares, so it gets the weight on its own.
- */
 export function Price({
   amount,
   original,
@@ -37,7 +27,7 @@ export function Price({
   return (
     <span className={`nums inline-flex items-baseline gap-2 whitespace-nowrap ${className ?? ''}`}>
       {discounted && (
-        <s className="text-sm text-ink-subtle" aria-label="قیمت پیشین">
+        <s className="text-sm text-ink-muted" aria-label="قیمت پیشین">
           {formatPrice(original, false)}
         </s>
       )}
@@ -72,12 +62,6 @@ export function DiscountBadge({ percent }: { percent: number }) {
   )
 }
 
-/* ── Rating ─────────────────────────────────────────────────────────────── */
-
-/**
- * §62: `value` of null renders nothing at all rather than an empty five-star
- * row. A product with no reviews must not look like a product rated zero.
- */
 export function StarRating({
   value,
   count,
@@ -114,26 +98,17 @@ export function StarRating({
         ))}
       </span>
       {count != null && count > 0 && (
-        <span className="text-xs text-ink-subtle nums">({faDigits(count)})</span>
+        <span className="text-xs text-ink-muted nums">({faDigits(count)})</span>
       )}
     </span>
   )
 }
-
-/* ── Status ─────────────────────────────────────────────────────────────── */
 
 export function OrderStatusBadge({ status }: { status: OrderStatus }) {
   const tone = ORDER_STATUS_TONE[status]
   return <span className={`badge badge-${tone}`}>{ORDER_STATUS_LABELS[status]}</span>
 }
 
-/* ── Breadcrumbs ────────────────────────────────────────────────────────── */
-
-/**
- * Breadcrumbs reinforce the hierarchy for both readers and crawlers (§71).
- * The matching BreadcrumbList JSON-LD is emitted by the page, from the same
- * array — so the visible trail and the structured data cannot disagree.
- */
 export function Breadcrumbs({ items }: { items: { name: string; path: string }[] }) {
   return (
     <nav aria-label="مسیر صفحه" className="text-sm text-ink-muted">
@@ -164,13 +139,6 @@ export function Breadcrumbs({ items }: { items: { name: string; path: string }[]
   )
 }
 
-/* ── Pagination ─────────────────────────────────────────────────────────── */
-
-/**
- * Real <a> links, not buttons — paginated pages must be crawlable and
- * shareable. §67: page 2+ self-canonicalises and stays indexable, so these
- * links carry real SEO weight.
- */
 export function Pagination({
   page,
   pageCount,
@@ -194,7 +162,6 @@ export function Pagination({
     return query ? `${basePath}?${query}` : basePath
   }
 
-  // A window around the current page, so 200 pages do not render 200 links.
   const pages: number[] = []
   const from = Math.max(1, page - 2)
   const to = Math.min(pageCount, page + 2)
@@ -252,36 +219,23 @@ export function Pagination({
   )
 }
 
-/* ── Section heading ────────────────────────────────────────────────────── */
-
-/**
- * The text half of a section heading, on its own so a rail can hand it to the
- * client component that owns the scroll controls without dragging the copy
- * across the server/client boundary.
- */
 export function SectionTitleBlock({
-  eyebrow,
   title,
   subtitle,
 }: {
-  eyebrow?: string
   title: string
   subtitle?: string | null
 }) {
   return (
     <div className="max-w-2xl">
-      {eyebrow && <p className="eyebrow mb-3">{eyebrow}</p>}
       <h2 className="section-title">{title}</h2>
-      {subtitle && <p className="mt-3 leading-relaxed text-ink-muted">{subtitle}</p>}
+      {subtitle && (
+        <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-ink-muted">{subtitle}</p>
+      )}
     </div>
   )
 }
 
-/**
- * "See all" and its relatives. A text link with a rule rather than a button:
- * a pill beside every section heading puts a second competing weight into
- * every section on the page, and there are five of them on the homepage.
- */
 export function SectionLink({ href, label }: { href: string; label: string }) {
   return (
     <Link href={href} className="link-rule shrink-0">
@@ -294,34 +248,38 @@ export function SectionLink({ href, label }: { href: string; label: string }) {
 }
 
 export function SectionHeading({
-  eyebrow,
   title,
   subtitle,
   action,
+  children,
 }: {
-  eyebrow?: string
   title: string
   subtitle?: string | null
   action?: { label: string; href: string }
+  children?: React.ReactNode
 }) {
+  const tail = children || action
+
   return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-x-6 gap-y-4 md:mb-10">
-      <SectionTitleBlock eyebrow={eyebrow} title={title} subtitle={subtitle} />
-      {action && <SectionLink href={action.href} label={action.label} />}
+    <div className="mb-9 md:mb-12">
+      <div className="masthead">
+        <h2 className="section-title">{title}</h2>
+        <span aria-hidden="true" className="masthead-rule" />
+        {tail && (
+          <div className="flex items-center gap-5 pb-1">
+            {children}
+            {action && <SectionLink href={action.href} label={action.label} />}
+          </div>
+        )}
+      </div>
+
+      {subtitle && (
+        <p className="mt-4 max-w-lg text-[15px] leading-relaxed text-ink-muted">{subtitle}</p>
+      )}
     </div>
   )
 }
 
-/* ── Empty state ────────────────────────────────────────────────────────── */
-
-/**
- * Empty state.
- *
- * An empty screen is an invitation to act, so the action is the point and the
- * panel is only there to hold it. Bounded rather than full-bleed: a 1300px
- * band of blank surface with one small sentence in the middle of it reads as
- * a page that failed to load.
- */
 export function EmptyState({
   title,
   description,
@@ -346,8 +304,6 @@ export function EmptyState({
     </div>
   )
 }
-
-/* ── Alert ──────────────────────────────────────────────────────────────── */
 
 export function Alert({
   tone = 'neutral',

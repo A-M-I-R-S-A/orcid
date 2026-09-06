@@ -10,11 +10,6 @@ import {
   varchar,
 } from 'drizzle-orm/mysql-core'
 
-/**
- * Administrators. Separate table, separate session cookie, separate signing
- * secret from customers — a compromised storefront session can never be
- * replayed against the admin panel.
- */
 export const adminUsers = mysqlTable(
   'admin_users',
   {
@@ -23,7 +18,6 @@ export const adminUsers = mysqlTable(
     fullName: varchar('full_name', { length: 120 }).notNull(),
     email: varchar('email', { length: 190 }),
 
-    /** scrypt, encoded as "scrypt:N:r:p:salt:hash". See lib/password.ts. */
     passwordHash: varchar('password_hash', { length: 255 }).notNull(),
 
     roleId: bigint('role_id', { mode: 'number', unsigned: true }).notNull(),
@@ -50,11 +44,6 @@ export const roles = mysqlTable(
     name: varchar('name', { length: 120 }).notNull(),
     description: varchar('description', { length: 255 }),
 
-    /**
-     * Superadmin bypasses the permission table entirely and cannot be deleted
-     * or stripped of access — otherwise a misconfigured role can lock every
-     * human out of the panel with no recovery path.
-     */
     isSystem: boolean('is_system').notNull().default(false),
 
     createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -63,11 +52,6 @@ export const roles = mysqlTable(
   (t) => [uniqueIndex('roles_key_unq').on(t.key)],
 )
 
-/**
- * Permission catalogue. Rows are seeded from lib/permissions.ts, which is the
- * single source of truth — the table exists so roles can reference them and so
- * the admin UI can render groups without hardcoding a list.
- */
 export const permissions = mysqlTable(
   'permissions',
   {
@@ -118,17 +102,11 @@ export const adminSessions = mysqlTable(
   ],
 )
 
-/**
- * §58. Append-only in practice — nothing in the application updates or deletes
- * these rows. Never contains secrets or OTP codes; `metadata` is scrubbed by
- * the audit service before it is written.
- */
 export const auditLogs = mysqlTable(
   'audit_logs',
   {
     id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
 
-    /** Null for system-originated actions (cron dispatch, automatic retries). */
     actorId: bigint('actor_id', { mode: 'number', unsigned: true }),
     actorName: varchar('actor_name', { length: 120 }).notNull(),
 

@@ -10,9 +10,6 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
-      // `server-only` throws outside a React Server Component context. The
-      // modules under test are genuinely server-side; stubbing the guard lets
-      // them be unit-tested without weakening it in the application.
       'server-only': fileURLToPath(new URL('./tests/stubs/server-only.ts', import.meta.url)),
     },
   },

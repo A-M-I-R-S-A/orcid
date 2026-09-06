@@ -6,26 +6,6 @@ import { db } from '@/db'
 import { settings, settingsVersion } from '@/db/schema'
 import { decryptSecret, encryptSecret, isEncrypted } from './crypto'
 
-/**
- * Settings — typed key/value, namespaced, cached.
- *
- * Theme, typography, SEO defaults, Enamad, SMS credentials and Torob Pay all
- * live in one table, so there is one mechanism, one cache and one audit trail
- * rather than eight near-identical single-row tables.
- *
- * ── Cache coherence without Redis ──────────────────────────────────────────
- * These rows are read on essentially every request, so they cannot hit the
- * database each time. But managed hosting runs several Node workers, and an
- * in-process cache in worker 1 does not know that an admin just saved a new
- * colour through worker 3.
- *
- * Resolution: cache per process behind a short TTL, and have every write bump
- * `settings_version`. The writing worker clears its own cache immediately;
- * other workers converge within the TTL. A colour change taking up to 30
- * seconds to reach every visitor is an acceptable trade — which is exactly why
- * prices and stock are NEVER cached this way. Planning package §C.
- */
-
 const CACHE_TTL_MS = 30_000
 
 export const NAMESPACES = [
@@ -52,7 +32,6 @@ interface CacheEntry {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __orchidSettingsCache: CacheEntry | undefined
 }
 
@@ -72,25 +51,6 @@ async function loadAll(): Promise<Record<string, SettingsMap>> {
       })
       .from(settings)
   } catch (error) {
-    /*
-     * Settings — and ONLY settings — degrade to defaults when the database is
-     * unreachable. Two reasons, both deliberate:
-     *
-     *  1. Graceful degradation. These rows are presentation config: colours,
-     *     fonts, the site name, SEO defaults. A database blip should not turn
-     *     the entire storefront into a 500; it should render in the
-     *     specification palette while the database recovers.
-     *
-     *  2. A build with no database. The root layout reads the theme, so
-     *     without this fallback NOTHING can be prerendered — not even the 404
-     *     page — and `next build` requires a reachable MariaDB. The deployment
-     *     plan builds off-host, where the production database is bound to
-     *     localhost and unreachable. See lib/cache.ts.
-     *
-     * This must NEVER be extended to business data. Prices, stock, orders and
-     * payments fail loudly by design — silently serving a default price would
-     * be far worse than an error page.
-     */
     console.error('Settings unavailable, falling back to defaults:', (error as Error).message)
     return {}
   }
@@ -98,8 +58,6 @@ async function loadAll(): Promise<Record<string, SettingsMap>> {
   const out: Record<string, SettingsMap> = {}
   for (const row of rows) {
     const ns = (out[row.namespace] ??= {})
-    // Secrets stay encrypted in the cache. Only getSecret() decrypts, and only
-    // on the server — an accidental serialisation of this object leaks nothing.
     ns[row.key] = row.value
   }
   return out
@@ -116,12 +74,9 @@ async function getCache(): Promise<Record<string, SettingsMap>> {
   return data
 }
 
-/** Drops this worker's cache. Called after any write in this process. */
 export function invalidateSettingsCache(): void {
   globalThis.__orchidSettingsCache = undefined
 }
-
-/* ── Reads ──────────────────────────────────────────────────────────────── */
 
 export async function getNamespace(namespace: Namespace): Promise<SettingsMap> {
   const cache = await getCache()
@@ -167,17 +122,12 @@ export async function getJson<T>(namespace: Namespace, key: string, fallback: T)
   }
 }
 
-/**
- * Decrypts a stored credential. SERVER ONLY — never call this from anything
- * whose return value reaches a client component.
- */
 export async function getSecret(namespace: Namespace, key: string): Promise<string> {
   const ns = await getNamespace(namespace)
   const raw = ns[key]
   if (!raw) return ''
 
   if (!isEncrypted(raw)) {
-    // Tolerated so a value seeded by hand still works, but it should not persist.
     console.warn(`Setting ${namespace}.${key} is marked secret but stored in plaintext`)
     return raw
   }
@@ -190,13 +140,10 @@ export async function getSecret(namespace: Namespace, key: string): Promise<stri
   }
 }
 
-/** True when a credential is present, without decrypting or revealing it. */
 export async function hasSecret(namespace: Namespace, key: string): Promise<boolean> {
   const ns = await getNamespace(namespace)
   return Boolean(ns[key])
 }
-
-/* ── Writes ─────────────────────────────────────────────────────────────── */
 
 export async function setSetting(
   namespace: Namespace,
@@ -226,8 +173,6 @@ export async function setMany(
   for (const [key, value] of Object.entries(values)) {
     const isSecret = secrets.has(key)
 
-    // An empty value for a secret means "leave the existing credential alone" —
-    // the admin form shows a mask, so a blank field is "unchanged", not "clear".
     if (isSecret && !value) continue
 
     const stored = isSecret && value ? encryptSecret(value) : value
@@ -241,7 +186,6 @@ export async function setMany(
   invalidateSettingsCache()
 }
 
-/** Explicitly clears a credential. Distinct from "left the field blank". */
 export async function clearSecret(namespace: Namespace, key: string): Promise<void> {
   await db
     .update(settings)

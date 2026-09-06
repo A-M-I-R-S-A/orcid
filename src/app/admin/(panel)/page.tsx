@@ -11,13 +11,6 @@ import { formatJalali } from '@/lib/jalali'
 import { toPersianDigits } from '@/lib/persian'
 import { formatPrice } from '@/lib/money'
 
-/**
- * Dashboard. §40.
- *
- * Ordered by what an operator must ACT on, not by what is easiest to count.
- * The queues come first; the vanity totals come after. Every number that
- * represents work links to the screen where that work gets cleared.
- */
 export const metadata = { title: 'پیشخوان' }
 
 export default async function AdminDashboard() {
@@ -36,7 +29,6 @@ export default async function AdminDashboard() {
     <>
       <PageHeader title="پیشخوان" description="وضعیت کلی فروشگاه و کارهای در انتظار" />
 
-      {/* Action queues — first, because these are what someone signed in to do. */}
       <section aria-labelledby="queues" className="mb-8">
         <h2 id="queues" className="text-sm text-ink-muted mb-3">
           در انتظار اقدام
@@ -72,11 +64,6 @@ export default async function AdminDashboard() {
         </div>
       </section>
 
-      {/*
-        The SMS queue is the one place a missing cron becomes invisible: an
-        approved message simply never sends. Surfacing the backlog turns a
-        silent failure into a visible one. Planning §N-3.
-      */}
       {(smsStalled > 0 || smsFailed > 0) && (
         <div className="card p-5 mb-8 bg-warning-bg border-warning/40">
           <p className="font-medium text-warning mb-1">صف پیامک نیازمند بررسی است</p>
@@ -90,7 +77,6 @@ export default async function AdminDashboard() {
         </div>
       )}
 
-      {/* Business totals */}
       <section aria-labelledby="totals" className="mb-8">
         <h2 id="totals" className="text-sm text-ink-muted mb-3">
           آمار کلی
@@ -108,7 +94,6 @@ export default async function AdminDashboard() {
       </section>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Recent orders */}
         <section aria-labelledby="recent-orders">
           <div className="flex items-center justify-between mb-3">
             <h2 id="recent-orders" className="text-sm text-ink-muted">
@@ -158,7 +143,6 @@ export default async function AdminDashboard() {
           )}
         </section>
 
-        {/* Low stock */}
         <section aria-labelledby="low-stock">
           <div className="flex items-center justify-between mb-3">
             <h2 id="low-stock" className="text-sm text-ink-muted">
@@ -211,7 +195,6 @@ export default async function AdminDashboard() {
         </section>
       </div>
 
-      {/* Recent reviews */}
       {stats.recentReviews.length > 0 && (
         <section aria-labelledby="recent-reviews" className="mt-6">
           <div className="flex items-center justify-between mb-3">

@@ -6,20 +6,11 @@ import { useState, useTransition } from 'react'
 import { addOrderNoteAction, updateOrderStatusAction } from '@/modules/admin/actions'
 import type { OrderStatus } from '@/lib/order-status'
 
-/**
- * Status control.
- *
- * The options come from `ADMIN_TRANSITIONS` on the server, so the dropdown can
- * only ever offer legal transitions — and the service re-validates against the
- * same table, so a hand-crafted request cannot skip a state either.
- */
 export function OrderStatusControl({
   orderId,
-  current,
   options,
 }: {
   orderId: number
-  current: OrderStatus
   options: { value: OrderStatus; label: string }[]
 }) {
   const router = useRouter()
@@ -61,8 +52,6 @@ export function OrderStatusControl({
         ))}
       </select>
 
-      {/* Cancelling returns stock to inventory — worth saying before the click,
-          not after. */}
       {selected === 'cancelled' && (
         <p className="text-xs text-warning bg-warning-bg rounded-lg p-2.5">
           با لغو سفارش، موجودی اقلام به انبار بازگردانده می‌شود.

@@ -1,5 +1,5 @@
 import { notFound, permanentRedirect } from 'next/navigation'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 
 import { db } from '@/db'
 import { adminUsers, blogCategories, blogPosts } from '@/db/schema'
@@ -7,11 +7,11 @@ import { ResponsiveImage } from '@/components/media'
 import { Breadcrumbs } from '@/components/ui'
 import { findSlugRedirect } from '@/modules/catalog/queries'
 import { getNamespace } from '@/lib/settings'
-import { articleSchema, breadcrumbSchema, buildMetadata, jsonLd, shouldIndex } from '@/lib/seo'
+import { articleSchema, breadcrumbSchema, buildMetadata, shouldIndex } from '@/lib/seo'
 import { formatJalali } from '@/lib/jalali'
 import { sanitizeHtml } from '@/lib/sanitize'
+import { JsonLd } from '@/components/json-ld'
 
-/** Blog post. §65. */
 export const revalidate = 900
 
 interface Props {
@@ -93,10 +93,7 @@ export default async function BlogPostPage({ params }: Props) {
 
   return (
     <>
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: jsonLd(schemas) }}
-      />
+      <JsonLd data={schemas} />
 
       <div className="container-page py-6">
         <Breadcrumbs items={breadcrumbItems} />
@@ -142,11 +139,6 @@ export default async function BlogPostPage({ params }: Props) {
         {post.post.body && (
           <div
             className="prose mx-auto text-ink-muted"
-            /*
-             * CMS content, sanitised server-side with an allowlist before it
-             * ever reaches the DOM. The admin who wrote it is trusted, but a
-             * compromised admin session must not become stored XSS. §K.
-             */
             dangerouslySetInnerHTML={{ __html: sanitizeHtml(post.post.body) }}
           />
         )}

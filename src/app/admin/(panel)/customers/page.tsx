@@ -1,8 +1,8 @@
 import Link from 'next/link'
-import { and, desc, eq, sql } from 'drizzle-orm'
+import { desc, sql } from 'drizzle-orm'
 
 import { db } from '@/db'
-import { orders, reviews, users } from '@/db/schema'
+import { users } from '@/db/schema'
 import { AdminEmpty, AdminPagination, Badge, PageHeader, Table, TableWrap, Td, Th } from '@/components/admin/ui'
 import { CustomerStatusToggle } from '@/components/admin/customer-toggle'
 import { requirePermission } from '@/modules/admin/auth'
@@ -12,13 +12,6 @@ import { formatPrice } from '@/lib/money'
 import { formatJalali } from '@/lib/jalali'
 import { toPersianDigits } from '@/lib/persian'
 
-/**
- * Customer management. §43.
- *
- * Note the absence: there is no column, tooltip or debug view anywhere here
- * that shows an OTP code. They are stored only as a peppered HMAC and are
- * unreadable by construction, so this is not a policy — it is not possible.
- */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'مشتریان' }
 

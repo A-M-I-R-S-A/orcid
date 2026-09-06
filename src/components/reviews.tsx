@@ -9,13 +9,6 @@ import { submitReviewAction } from '@/modules/reviews/actions'
 import { formatJalali } from '@/lib/jalali'
 import { toPersianDigits } from '@/lib/persian'
 
-/**
- * Reviews. §37 / §38.
- *
- * The list itself is passed in from the server, so approved reviews are in the
- * server-rendered HTML and count as page content for §63. Only the submission
- * form is interactive.
- */
 export function ReviewSection({
   productId,
   reviews,
@@ -102,9 +95,6 @@ export function ReviewSection({
               {review.title && <p className="font-medium text-ink mb-1.5">{review.title}</p>}
               <p className="text-ink-muted leading-relaxed whitespace-pre-line">{review.body}</p>
 
-              {/* §38: an admin reply must be visually distinguishable from a
-                  customer review — different ground, an inline-start rule, and
-                  an explicit label, not just a smaller font. */}
               {review.reply && (
                 <div className="mt-4 ms-4 ps-4 border-s-2 border-accent-3 bg-surface-sunken/60 rounded-e-xl p-4">
                   <p className="text-xs font-semibold text-accent-2 mb-1.5">

@@ -10,12 +10,6 @@ import { formatPrice } from '@/lib/money'
 import { formatJalaliDateTime } from '@/lib/jalali'
 import { toPersianDigits } from '@/lib/persian'
 
-/**
- * Payment management. §45.
- *
- * Pending reviews are the default view because they are the only rows that
- * represent work. Everything else is history.
- */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'پرداخت‌ها' }
 
@@ -63,8 +57,6 @@ export default async function AdminPaymentsPage({
         ]}
       />
 
-      {/* Reference-code search is the single most-used tool here: an operator
-          holds a bank statement and needs to find the matching order. */}
       <form method="get" action="/admin/payments" className="flex gap-2 mb-5">
         <input type="hidden" name="status" value={status} />
         <input

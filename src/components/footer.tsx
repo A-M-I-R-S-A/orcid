@@ -9,14 +9,6 @@ import { toPersianDigits } from '@/lib/persian'
 import { jalaliYear } from '@/lib/jalali'
 import { sanitizeEnamad } from '@/lib/sanitize'
 
-/**
- * Footer. §13.
- *
- * Every link group is database-driven: categories from the catalogue,
- * informational links from the CMS pages marked `showInFooter`, contact
- * details and social links from settings. Nothing here is hardcoded content an
- * administrator would have to call a developer to change.
- */
 export async function Footer() {
   const [categories, site, contact, social, enamad, footerPages] = await Promise.all([
     listCategories(),
@@ -40,8 +32,12 @@ export async function Footer() {
     { key: 'whatsapp' as const, label: 'واتس‌اپ', url: social.whatsapp },
   ].filter((s) => Boolean(s.url))
 
+  const hasContactColumn = Boolean(
+    contact.phone || contact.email || contact.address || contact.workingHours || enamad.embedCode,
+  )
+
   return (
-    <footer className="mt-24 bg-surface border-t border-line">
+    <footer className="on-dark mt-24 border-t border-line">
       <div className="container-page py-16">
         <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
           <div className="lg:col-span-1">
@@ -51,7 +47,7 @@ export async function Footer() {
               width={138}
               height={44}
               loading="lazy"
-              className="h-11 w-auto object-contain object-center mb-4"
+              className="site-mark h-11 w-auto object-contain object-center mb-4"
             />
             {site.tagline && (
               <p className="text-sm text-ink-muted leading-relaxed max-w-xs">{site.tagline}</p>
@@ -64,8 +60,6 @@ export async function Footer() {
                     <a
                       href={link.url!}
                       target="_blank"
-                      // noopener is a security requirement, not a nicety: without
-                      // it the opened page can reach back via window.opener.
                       rel="noopener noreferrer nofollow"
                       className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-line transition-colors hover:border-accent-2 hover:text-accent-2"
                       aria-label={link.label}
@@ -119,6 +113,7 @@ export async function Footer() {
             </ul>
           </nav>
 
+          {hasContactColumn ? (
           <div>
             <h2 className="mb-4 font-[family-name:var(--font-body)] text-sm font-semibold text-ink">تماس با ما</h2>
             <ul className="space-y-2.5 text-sm text-ink-muted">
@@ -140,25 +135,17 @@ export async function Footer() {
               {contact.workingHours && <li>{contact.workingHours}</li>}
             </ul>
 
-            {/* Enamad. §51 — the badge markup is admin-supplied and stored in
-                settings; nothing about it is hardcoded here. */}
             {enamad.embedCode ? (
               <div className="mt-6">
                 <p className="eyebrow mb-3">نماد اعتماد</p>
                 <div
                   className="inline-block bg-white rounded-lg p-2 [&_img]:max-w-[110px] [&_img]:h-auto"
-                  /*
-                   * Third-party snippet pasted by an administrator. Sanitised
-                   * on render with a badge-specific allowlist — the general
-                   * one would strip the attributes Enamad's verification
-                   * depends on, while a raw insert would be stored XSS if an
-                   * admin session were ever compromised. §K.
-                   */
                   dangerouslySetInnerHTML={{ __html: sanitizeEnamad(enamad.embedCode) }}
                 />
               </div>
             ) : null}
           </div>
+          ) : null}
         </div>
 
         <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-line pt-8 text-sm text-ink-subtle sm:flex-row">
@@ -172,14 +159,6 @@ export async function Footer() {
   )
 }
 
-/**
- * Social marks.
- *
- * These were the first letter of the Persian network name inside a circle —
- * "ا" for Instagram, "ت" for Telegram — which is not a recognisable mark in
- * any script and reads as a missing icon. Drawn glyphs, one path set each, no
- * icon dependency.
- */
 function SocialIcon({ name }: { name: 'instagram' | 'telegram' | 'whatsapp' }) {
   const common = {
     width: 18,

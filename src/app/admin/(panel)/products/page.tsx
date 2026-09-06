@@ -9,7 +9,6 @@ import { formatPrice } from '@/lib/money'
 import { mediaUrl } from '@/lib/images'
 import { toPersianDigits } from '@/lib/persian'
 
-/** Product list. §41. */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'محصولات' }
 

@@ -5,34 +5,24 @@ import { db } from '@/db'
 import { blogPosts, homepageSections } from '@/db/schema'
 import { ProductRail } from '@/components/product-card'
 import { ImagePlaceholder, ResponsiveImage } from '@/components/media'
-import { Divider, OrchidSpray } from '@/components/ornament'
-import { SectionHeading, SectionLink, SectionTitleBlock } from '@/components/ui'
+import { storedWidth } from '@/lib/media-url'
+import { OrchidSpray } from '@/components/ornament'
+import { SectionHeading } from '@/components/ui'
 import { listCategories, listProducts } from '@/modules/catalog/queries'
 import { CACHE_TAGS, cached } from '@/lib/cache'
 import { getNamespace } from '@/lib/settings'
 import { buildMetadata } from '@/lib/seo'
 import { formatJalali } from '@/lib/jalali'
+import {
+  BANNER_ALIGN_CLASS,
+  BANNER_HEIGHT_CLASS,
+  BANNER_POSITION_CLASS,
+  BANNER_VEIL_CLASS,
+  type BannerSettings,
+  bannerImageStyle,
+  parseBannerSettings,
+} from '@/lib/banner'
 
-/**
- * Homepage. §11 / §54.
- *
- * Sections, their order and their visibility come from the `homepage_sections`
- * table, so an administrator rearranges the page without a deploy. The section
- * TYPES are a fixed catalogue rather than a free-form page builder — §54 warns
- * against the latter, and a fixed set is what lets each type be designed
- * properly instead of generically.
- *
- * ── Why the product sections are rails ────────────────────────────────────
- * They were grids. A grid section is hostage to its item count: four columns
- * holding three products leaves a column-wide hole, and this catalogue
- * produces that shape constantly. A rail is the same shape at any count, and
- * on a phone it turns a 2×4 wall of thumbnails into one row you flick.
- *
- * Rendered dynamically with cached DATA rather than statically prerendered.
- * This is the most-hit page on the site, so the queries must be cached (§73) —
- * but prerendering it would force `next build` to reach the database, which
- * the off-host build cannot do. See lib/cache.ts.
- */
 export const dynamic = 'force-dynamic'
 
 const loadSections = cached(
@@ -86,18 +76,13 @@ async function HomeSection({ section }: { section: Section }) {
       const { items } = await listProducts({ featuredOnly: true, limit })
       if (items.length === 0) return null
       return (
-        <Shelf>
+        <Shelf tone="dark">
           <ProductRail
             products={items}
             label="محصولات منتخب"
-            heading={
-              <SectionTitleBlock
-                eyebrow="منتخب ارکید"
-                title={section.title || 'محصولات منتخب'}
-                subtitle={section.subtitle}
-              />
-            }
-            aside={<SectionLink href="/category" label="مشاهده همه" />}
+            title={section.title || 'محصولات منتخب'}
+            subtitle={section.subtitle}
+            action={{ label: 'مشاهده همه', href: '/products' }}
           />
         </Shelf>
       )
@@ -111,13 +96,9 @@ async function HomeSection({ section }: { section: Section }) {
           <ProductRail
             products={items}
             label="جدیدترین‌ها"
-            heading={
-              <SectionTitleBlock
-                eyebrow="تازه رسیده"
-                title={section.title || 'جدیدترین‌ها'}
-                subtitle={section.subtitle}
-              />
-            }
+            title={section.title || 'جدیدترین‌ها'}
+            subtitle={section.subtitle}
+            action={{ label: 'همه محصولات', href: '/products?sort=newest' }}
           />
         </Shelf>
       )
@@ -131,13 +112,9 @@ async function HomeSection({ section }: { section: Section }) {
           <ProductRail
             products={items}
             label="پرفروش‌ترین‌ها"
-            heading={
-              <SectionTitleBlock
-                eyebrow="پرفروش‌ترین‌ها"
-                title={section.title || 'انتخاب مشتریان'}
-                subtitle={section.subtitle}
-              />
-            }
+            title={section.title || 'انتخاب مشتریان'}
+            subtitle={section.subtitle}
+            action={{ label: 'همه محصولات', href: '/products?sort=popular' }}
           />
         </Shelf>
       )
@@ -157,149 +134,252 @@ async function HomeSection({ section }: { section: Section }) {
   }
 }
 
-/**
- * A product shelf's outer frame.
- *
- * `raised` swaps the ground to the surface tone and adds hairlines top and
- * bottom, which is how consecutive shelves stay distinguishable without
- * needing a second dark band. One dark band per page is the whole point of it.
- */
-function Shelf({ children, tone = 'plain' }: { children: React.ReactNode; tone?: 'plain' | 'raised' }) {
+function Shelf({
+  children,
+  tone = 'plain',
+}: {
+  children: React.ReactNode
+  tone?: 'plain' | 'raised' | 'dark'
+}) {
+  const ground =
+    tone === 'dark'
+      ? 'on-dark movement-open'
+      : tone === 'raised'
+        ? 'movement border-y border-line bg-surface'
+        : 'movement'
+
   return (
-    <section
-      className={
-        tone === 'raised'
-          ? 'border-y border-line bg-surface py-14 md:py-20'
-          : 'py-14 md:py-20'
-      }
-    >
+    <section className={ground}>
       <div className="container-page">{children}</div>
     </section>
   )
 }
 
-/* ── Section implementations ────────────────────────────────────────────── */
+interface BannerProps {
+  section: Section
+  design: BannerSettings
+  heading: 'h1' | 'h2'
+  priority?: boolean
+  defaults: { title: string; href: string; label: string }
+  canOverlayHeader?: boolean
+}
 
-/**
- * Hero.
- *
- * Two layouts, because a hero with a photograph and a hero without one are
- * different design problems. With an image it is a full-bleed split — copy on
- * a paper ground, the photograph running to the viewport edge, one hairline
- * between them. Without, it becomes a tinted band with the botanical mark
- * bleeding off the end edge and the type set to the inline start.
- *
- * Neither is a rounded rectangle floating on the page background, which is
- * what it was: a card in a hero slot reads as a widget rather than a front
- * door, and it is the single loudest template tell on a shop homepage.
- */
-function Hero({ section }: { section: Section }) {
-  const hasImage = Boolean(section.imagePath)
+function BannerFrame(props: BannerProps) {
+  const { section, design, priority = false, canOverlayHeader = false } = props
 
-  if (hasImage) {
-    return (
-      <section className="border-b border-line bg-surface">
-        <div className="grid lg:grid-cols-2">
-          <div className="order-2 flex items-center lg:order-1">
-            <div className="container-page py-14 md:py-20 lg:py-28 lg:max-w-[720px]">
-              <HeroCopy section={section} />
-            </div>
-          </div>
-          <div className="order-1 min-h-[340px] border-b border-line lg:order-2 lg:min-h-[620px] lg:border-b-0 lg:border-s">
-            <ResponsiveImage
-              path={section.imagePath}
-              alt={section.title || 'مجموعه ارکید'}
-              width={1200}
-              height={1400}
-              sizes="(min-width: 1024px) 50vw, 100vw"
-              // The hero is the LCP element. §72: never lazy-load the thing
-              // the metric is measuring.
-              priority
-              className="h-full w-full object-cover"
-            />
-          </div>
-        </div>
-      </section>
-    )
-  }
+  const overlay = canOverlayHeader && design.header === 'overlay' ? 'hero-overlay' : ''
 
   return (
-    <section className="relative overflow-hidden border-b border-line bg-bg-secondary">
-      <OrchidSpray
-        seed={1}
-        className="pointer-events-none absolute -bottom-24 -end-24 h-[26rem] w-[26rem] text-accent/[0.10] sm:h-[34rem] sm:w-[34rem]"
-      />
-      <OrchidSpray
-        seed={2}
-        className="pointer-events-none absolute -start-24 -top-28 hidden h-80 w-80 rotate-180 text-accent/[0.07] lg:block"
+    <section
+      className={`relative isolate flex w-full flex-col overflow-hidden ${overlay} ${BANNER_VEIL_CLASS[design.veil]} ${BANNER_HEIGHT_CLASS[design.height]} ${BANNER_POSITION_CLASS[design.position]}`}
+      data-banner-tone={design.tone}
+      data-banner-position={design.position}
+      style={{ '--scrim': `${design.overlay}%` } as React.CSSProperties}
+    >
+      <ResponsiveImage
+        path={section.imagePath}
+        alt={section.title || props.defaults.title}
+        width={storedWidth(section.imagePath ?? '')}
+        height={storedWidth(section.imagePath ?? '')}
+        sizes="100vw"
+        priority={priority}
+        className="absolute inset-0 -z-10 h-full w-full object-cover"
+        style={bannerImageStyle(design)}
       />
 
-      <div className="container-page relative py-20 md:py-28 lg:py-36">
-        <div className="max-w-2xl">
-          <HeroCopy section={section} />
+      <div aria-hidden="true" className="banner-scrim -z-10" />
+
+      <div className="container-page relative flex w-full flex-col">
+        <div className={`flex w-full flex-col ${BANNER_ALIGN_CLASS[design.align]}`}>
+          <div className="max-w-2xl">
+            <BannerCopy {...props} />
+          </div>
         </div>
       </div>
     </section>
   )
 }
 
-function HeroCopy({ section }: { section: Section }) {
+function Hero({ section }: { section: Section }) {
+  const design = parseBannerSettings(section.config)
+
+  const defaults = {
+    title: 'ظرافت، در هر جزئیات',
+    href: '/products',
+    label: 'مشاهده همه محصولات',
+  }
+
+  if (!section.imagePath) {
+    return <HeroPlain section={section} design={design} defaults={defaults} />
+  }
+
+  return (
+    <BannerFrame
+      section={section}
+      design={design}
+      heading="h1"
+      priority
+      canOverlayHeader
+      defaults={defaults}
+    />
+  )
+}
+
+function HeroPlain({
+  section,
+  design,
+  defaults,
+}: {
+  section: Section
+  design: BannerSettings
+  defaults: BannerProps['defaults']
+}) {
+  return (
+    <section
+      className={`relative flex flex-col overflow-hidden border-b border-line bg-bg-secondary ${
+        design.header === 'overlay' ? 'hero-overlay' : ''
+      } ${BANNER_HEIGHT_CLASS[design.height]} ${BANNER_POSITION_CLASS[design.position]}`}
+      data-banner-tone="dark"
+      data-banner-position={design.position}
+    >
+      <OrchidSpray
+        seed={1}
+        aria-hidden="true"
+        className="pointer-events-none absolute -bottom-24 -end-24 h-[26rem] w-[26rem] text-accent/[0.10] sm:h-[34rem] sm:w-[34rem]"
+      />
+      <OrchidSpray
+        seed={2}
+        aria-hidden="true"
+        className="pointer-events-none absolute -start-24 -top-28 hidden h-80 w-80 rotate-180 text-accent/[0.07] lg:block"
+      />
+
+      <div className="container-page relative flex w-full flex-col">
+        <div className={`flex w-full flex-col ${BANNER_ALIGN_CLASS[design.align]}`}>
+          <div className="max-w-2xl">
+            <BannerCopy
+              section={section}
+              design={{ ...design, tone: 'dark' }}
+              heading="h1"
+              defaults={defaults}
+            />
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function BannerCopy({ section, design, heading, defaults }: BannerProps) {
+  const light = design.tone === 'light'
+  const Heading = heading
+
+  const href = section.linkUrl && section.linkUrl !== '/' ? section.linkUrl : defaults.href
+  const label = section.linkLabel || defaults.label
+
+  const alignSelf =
+    design.align === 'center' ? 'justify-center' : design.align === 'end' ? 'justify-end' : ''
+  const blockAlign = design.align === 'center' ? 'mx-auto' : design.align === 'end' ? 'ms-auto' : ''
+
   return (
     <>
-      <p className="eyebrow animate-rise">مجموعه ارکید</p>
+      {design.eyebrow && (
+        <p className={`eyebrow animate-rise ${light ? 'text-white/80' : ''} ${alignSelf}`}>
+          {design.eyebrow}
+        </p>
+      )}
 
-      <h1 className="display-title mt-6 animate-rise text-ink [animation-delay:80ms]">
-        {section.title || 'ظرافت، در هر جزئیات'}
-      </h1>
+      <Heading
+        className={`banner-title mt-5 animate-rise [animation-delay:80ms] ${
+          light ? 'text-white' : 'text-ink'
+        }`}
+        style={light ? { textShadow: '0 1px 28px rgba(0,0,0,0.30)' } : undefined}
+      >
+        {section.title || defaults.title}
+      </Heading>
 
       {section.subtitle && (
-        <p className="mt-6 max-w-lg animate-rise text-base leading-loose text-ink-muted [animation-delay:160ms] md:text-lg">
+        <p
+          className={`mt-5 max-w-lg animate-rise text-base leading-relaxed [animation-delay:160ms] md:text-lg ${
+            light ? 'text-white/85' : 'text-ink-muted'
+          } ${blockAlign}`}
+        >
           {section.subtitle}
         </p>
       )}
 
-      {section.linkUrl && (
-        <div className="mt-10 animate-rise [animation-delay:240ms]">
-          <Link href={section.linkUrl} className="btn btn-primary group/cta py-2 pe-2 ps-6">
-            <span className="ps-1">{section.linkLabel || 'مشاهده مجموعه'}</span>
-            {/*
-              The arrow lives in its own disc flush with the button's inner
-              padding, and drifts on hover. A naked glyph beside the label is
-              the default that makes a CTA look untouched.
-            */}
-            <span
-              aria-hidden="true"
-              className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover/cta:-translate-x-1"
-            >
-              <span className="mirror-rtl">→</span>
-            </span>
-          </Link>
-        </div>
-      )}
+      <div className={`mt-9 flex animate-rise [animation-delay:240ms] ${alignSelf}`}>
+        <BannerCta href={href} label={label} ctaStyle={design.ctaStyle} light={light} />
+      </div>
     </>
   )
 }
 
-/**
- * Category strip.
- *
- * The column count is derived from the number of categories rather than fixed
- * at three, so the row always comes out full. The old layout gave the first
- * tile a 2-column span and a 2.2:1 crop while its neighbours were 3:4 — at
- * laptop widths that left a hole beside it and a second hole in the next row,
- * and read as a broken grid rather than an asymmetric one.
- *
- * Below `md` it is a scrolling strip: on a phone, five tiles in a 2-column
- * grid is a wall, and the last row is a lone tile with a gap next to it.
- */
+function BannerCta({
+  href,
+  label,
+  ctaStyle,
+  light,
+}: {
+  href: string
+  label: string
+  ctaStyle: BannerSettings['ctaStyle']
+  light: boolean
+}) {
+  const arrow = (
+    <span aria-hidden="true" className="mirror-rtl text-[1.05em] leading-none">
+      →
+    </span>
+  )
+
+  if (ctaStyle === 'link') {
+    return (
+      <Link
+        href={href}
+        className={`banner-link text-[15px] font-medium ${light ? 'text-white' : 'text-ink'}`}
+      >
+        {label}
+        {arrow}
+      </Link>
+    )
+  }
+
+  if (ctaStyle === 'solid') {
+    return (
+      <Link href={href} className="btn btn-primary px-8 py-3.5">
+        {label}
+        {arrow}
+      </Link>
+    )
+  }
+
+  return (
+    <Link
+      href={href}
+      className={`banner-cta inline-flex items-center gap-3 rounded-full px-8 py-3.5 text-[15px] font-medium ${
+        light ? 'banner-cta-light' : 'banner-cta-dark'
+      }`}
+    >
+      {label}
+      {arrow}
+    </Link>
+  )
+}
+
 async function Categories({ section }: { section: Section }) {
   const categories = (await listCategories()).filter((c) => c.parentId === null).slice(0, 6)
   if (categories.length === 0) return null
 
   return (
-    <section className="container-page py-14 md:py-20">
+    <section className="movement container-page">
+      <svg width="0" height="0" aria-hidden="true" className="absolute">
+        <defs>
+          <clipPath id="orchid-arch" clipPathUnits="objectBoundingBox">
+            <path d="M0,1 L0,0.58 C0.01,0.34 0.16,0.1 0.5,0 C0.84,0.1 0.99,0.34 1,0.58 L1,1 Z" />
+          </clipPath>
+        </defs>
+      </svg>
+
       <SectionHeading
-        eyebrow="دسته‌بندی‌ها"
         title={section.title || 'خرید بر اساس دسته'}
         subtitle={section.subtitle}
       />
@@ -312,39 +392,36 @@ async function Categories({ section }: { section: Section }) {
           <Link
             key={category.id}
             href={`/category/${encodeURIComponent(category.slug)}`}
-            className="group/cat w-[52vw] sm:w-[34vw] md:w-auto"
+            className="group/cat w-[52vw] text-center sm:w-[34vw] md:w-auto"
           >
-            <div className="frame aspect-[4/5]">
+            <div className="arch relative aspect-[3/4] overflow-hidden bg-surface-sunken">
               {category.imagePath ? (
                 <ResponsiveImage
                   path={category.imagePath}
                   alt={category.name}
                   width={600}
-                  height={750}
+                  height={800}
                   sizes="(min-width: 768px) 20vw, 52vw"
                   className="h-full w-full object-cover transition-transform duration-[900ms] ease-[cubic-bezier(0.32,0.72,0,1)] group-hover/cat:scale-[1.05]"
                 />
               ) : (
                 <ImagePlaceholder
                   width={600}
-                  height={750}
+                  height={800}
                   seed={category.id}
                   className="h-full w-full transition-transform duration-[900ms] ease-[cubic-bezier(0.32,0.72,0,1)] group-hover/cat:scale-[1.05]"
                 />
               )}
             </div>
 
-            {/*
-              The label sits under the plate, in ink. It used to be white type
-              on a scrim over the image — which disappeared entirely on the
-              pale botanical placeholder every category currently uses. No
-              chevron: the tile is plainly a link, and an arrow pushed to the
-              far edge of a 280px tile just leaves a hole between two things
-              that belong together.
-            */}
-            <h3 className="mt-3 font-[family-name:var(--font-body)] text-[15px] font-medium text-ink transition-colors duration-300 group-hover/cat:text-accent-2">
+            <h3 className="mt-4 font-[family-name:var(--font-body)] text-[15px] font-medium text-ink transition-colors duration-300 group-hover/cat:text-accent-2">
               {category.name}
             </h3>
+
+            <span
+              aria-hidden="true"
+              className="mx-auto mt-2 block h-px w-4 bg-line-strong transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover/cat:w-12 group-hover/cat:bg-accent-2"
+            />
           </Link>
         ))}
       </div>
@@ -352,51 +429,54 @@ async function Categories({ section }: { section: Section }) {
   )
 }
 
-/**
- * Promo banner — the page's one dark band.
- *
- * Full-bleed and square-cornered rather than an inset rounded panel: a cream
- * page carrying cream sections needs one hard anchor, and a maroon block that
- * runs edge to edge is it. Two of these would cancel each other out, which is
- * why nothing else on the page uses the band.
- */
 function PromoBanner({ section }: { section: Section }) {
+  const design = parseBannerSettings(section.config)
+
+  const defaults = {
+    title: 'ارسال محرمانه به سراسر ایران',
+    href: '/products',
+    label: 'مشاهده',
+  }
+
+  if (section.imagePath) {
+    return (
+      <BannerFrame section={section} design={design} heading="h2" defaults={defaults} />
+    )
+  }
+
+  const alignSelf =
+    design.align === 'center' ? 'justify-center' : design.align === 'end' ? 'justify-end' : ''
+  const blockAlign = design.align === 'center' ? 'mx-auto' : design.align === 'end' ? 'ms-auto' : ''
+
   return (
     <section className="band">
-      <div className="grid items-stretch md:grid-cols-5">
-        <div className="flex items-center md:col-span-3">
-          <div className="container-page py-16 md:py-24 md:pe-4">
-            <div className="max-w-xl">
-              {section.title && (
-                <h2 className="text-3xl leading-snug md:text-[2.75rem]">{section.title}</h2>
-              )}
-              {section.subtitle && (
-                <p className="mt-5 max-w-lg leading-loose opacity-85">{section.subtitle}</p>
-              )}
-              {section.linkUrl && (
-                <Link
-                  href={section.linkUrl}
-                  className="btn mt-9 border-current bg-transparent text-on-accent hover:bg-on-accent hover:text-accent"
-                >
-                  {section.linkLabel || 'مشاهده'}
-                </Link>
-              )}
+      <div className="movement container-page">
+        <div className={`flex flex-col ${BANNER_ALIGN_CLASS[design.align]}`}>
+          <div className="max-w-xl">
+            {design.eyebrow && (
+              <p className={`eyebrow mb-4 text-on-accent/70 ${alignSelf}`}>{design.eyebrow}</p>
+            )}
+
+            <h2 className="font-[family-name:var(--font-heading)] text-3xl leading-tight md:text-[3rem]">
+              {section.title || defaults.title}
+            </h2>
+
+            {section.subtitle && (
+              <p className={`mt-5 max-w-md leading-loose text-on-accent/80 ${blockAlign}`}>
+                {section.subtitle}
+              </p>
+            )}
+
+            <div className={`mt-9 flex ${alignSelf}`}>
+              <BannerCta
+                href={section.linkUrl || defaults.href}
+                label={section.linkLabel || defaults.label}
+                ctaStyle={design.ctaStyle === 'solid' ? 'outline' : design.ctaStyle}
+                light
+              />
             </div>
           </div>
         </div>
-
-        {section.imagePath && (
-          <div className="min-h-[240px] md:col-span-2">
-            <ResponsiveImage
-              path={section.imagePath}
-              alt={section.title || ''}
-              width={800}
-              height={800}
-              sizes="(min-width: 768px) 40vw, 100vw"
-              className="h-full w-full object-cover"
-            />
-          </div>
-        )}
       </div>
     </section>
   )
@@ -404,21 +484,26 @@ function PromoBanner({ section }: { section: Section }) {
 
 function BrandStory({ section }: { section: Section }) {
   return (
-    <section className="container-page py-16 md:py-28">
-      <div className="mx-auto max-w-3xl text-center">
-        <Divider className="mx-auto mb-12 max-w-xs" />
-        <p className="eyebrow mb-6 justify-center">{section.linkLabel || 'درباره ارکید'}</p>
-        {section.title && (
-          <h2 className="text-3xl leading-snug text-ink md:text-[2.75rem]">{section.title}</h2>
-        )}
-        {section.subtitle && (
-          <p className="mt-7 text-lg leading-loose text-ink-muted">{section.subtitle}</p>
-        )}
-        {section.linkUrl && (
-          <Link href={section.linkUrl} className="btn btn-secondary mt-10">
-            بیشتر بخوانید
-          </Link>
-        )}
+    <section className="movement-open container-page">
+      <div className="grid gap-10 md:grid-cols-12 md:gap-8">
+        <div className="md:col-span-5">
+          <span aria-hidden="true" className="mb-9 block h-px w-14 bg-accent-2" />
+          {section.title && <h2 className="display-title text-ink">{section.title}</h2>}
+        </div>
+
+        <div className="md:col-span-6 md:col-start-7 md:pt-4">
+          {section.subtitle && (
+            <p className="text-lg leading-loose text-ink-muted">{section.subtitle}</p>
+          )}
+          {section.linkUrl && (
+            <Link href={section.linkUrl} className="link-rule mt-9">
+              {section.linkLabel || 'بیشتر بخوانید'}
+              <span aria-hidden="true" className="mirror-rtl">
+                →
+              </span>
+            </Link>
+          )}
+        </div>
       </div>
     </section>
   )
@@ -443,9 +528,8 @@ async function BlogTeaser({ section, limit }: { section: Section; limit: number 
   if (posts.length === 0) return null
 
   return (
-    <section className="container-page py-14 md:py-20">
+    <section className="movement container-page">
       <SectionHeading
-        eyebrow="مجله ارکید"
         title={section.title || 'خواندنی‌ها'}
         subtitle={section.subtitle}
         action={{ label: 'همه نوشته‌ها', href: '/blog' }}
@@ -472,7 +556,7 @@ async function BlogTeaser({ section, limit }: { section: Section; limit: number 
             {post.publishedAt && (
               <time
                 dateTime={post.publishedAt.toISOString()}
-                className="nums mt-4 block text-xs text-ink-subtle"
+                className="nums mt-4 block text-xs text-ink-muted"
               >
                 {formatJalali(post.publishedAt)}
               </time>

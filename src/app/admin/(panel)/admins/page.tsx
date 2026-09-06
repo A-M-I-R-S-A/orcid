@@ -7,7 +7,6 @@ import { AdminUserManager, RolePermissionManager } from '@/components/admin/admi
 import { listAdmins, listRoles, requirePermission } from '@/modules/admin/auth'
 import { PERMISSION_GROUPS, groupedPermissions } from '@/lib/permissions'
 
-/** Admin users and roles. §56 / §57. */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'مدیران' }
 

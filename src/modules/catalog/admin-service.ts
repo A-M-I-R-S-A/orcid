@@ -20,27 +20,6 @@ import { normalizePersian } from '@/lib/persian'
 import type { AdminPrincipal } from '@/lib/permissions'
 import { slugify, uniqueSlug } from '@/lib/slug'
 
-/**
- * Catalogue writes.
- *
- * Two invariants this module is responsible for:
- *
- *  1. `search_text` is rebuilt on EVERY write that touches a searchable field.
- *     If it drifts, products silently stop appearing in search — a failure
- *     nobody notices until a customer complains. §D-2.
- *
- *  2. A slug change writes a redirect row. §66 — a renamed product must not
- *     lose the links pointing at it.
- */
-
-/* ── Search text ────────────────────────────────────────────────────────── */
-
-/**
- * Rebuilds the normalised search haystack for one product.
- *
- * Uses the SAME `normalizePersian` the query path uses, which is the whole
- * point — one function, so the index and the query cannot disagree.
- */
 export async function rebuildSearchText(productId: number): Promise<void> {
   const [row] = await db
     .select({
@@ -65,8 +44,6 @@ export async function rebuildSearchText(productId: number): Promise<void> {
   const parts = [
     row.name,
     row.shortDescription ?? '',
-    // Only the first 500 characters of the body — beyond that it is prose that
-    // dilutes relevance rather than improving recall.
     (row.description ?? '').slice(0, 500),
     row.categoryName ?? '',
     ...optionValues.map((v) => v.value),
@@ -76,8 +53,6 @@ export async function rebuildSearchText(productId: number): Promise<void> {
 
   await db.update(products).set({ searchText }).where(eq(products.id, productId))
 }
-
-/* ── Products ───────────────────────────────────────────────────────────── */
 
 export interface ProductInput {
   name: string
@@ -155,7 +130,6 @@ export async function updateProduct(
       return Boolean(conflict)
     })
 
-    // §66 — the old URL must 308 rather than 404.
     await db
       .insert(slugRedirects)
       .values({ entityType: 'product', oldSlug: existing.slug, newSlug: slug })
@@ -196,13 +170,6 @@ export async function updateProduct(
   })
 }
 
-/**
- * Archives rather than deletes.
- *
- * `order_items` references variants with ON DELETE RESTRICT, so a sold product
- * genuinely cannot be deleted without destroying order history. Archiving is
- * not a soft-delete convenience here — it is the only correct operation.
- */
 export async function archiveProduct(admin: AdminPrincipal, productId: number): Promise<void> {
   await db
     .update(products)
@@ -229,8 +196,6 @@ export async function restoreProduct(admin: AdminPrincipal, productId: number): 
   })
 }
 
-/* ── Variants ───────────────────────────────────────────────────────────── */
-
 export interface VariantInput {
   id?: number
   sku: string
@@ -239,7 +204,6 @@ export interface VariantInput {
   stockQty: number
   lowStockThreshold?: number
   isActive: boolean
-  /** optionId → optionValueId */
   selection: Record<number, number>
 }
 
@@ -305,8 +269,6 @@ export async function saveVariant(
       await tx.insert(variantOptionValues).values(rows)
     }
 
-    // Price and stock changes are audited separately from a generic update —
-    // §58 calls both out by name because they are the ones that get disputed.
     if (previous) {
       if (previous.price !== input.price || previous.discountPrice !== input.discountPrice) {
         await audit.log({
@@ -336,8 +298,6 @@ export async function saveVariant(
 }
 
 export async function deleteVariant(admin: AdminPrincipal, variantId: number): Promise<void> {
-  // A variant that appears on an order cannot be deleted — the FK is RESTRICT
-  // and order history must survive. Deactivating is the correct action.
   const [used] = await db.execute(
     sql`SELECT COUNT(*) AS c FROM order_items WHERE variant_id = ${variantId}`,
   ) as unknown as [{ c: number }[], unknown]
@@ -359,8 +319,6 @@ export async function deleteVariant(admin: AdminPrincipal, variantId: number): P
     summary: 'حذف تنوع محصول',
   })
 }
-
-/* ── Options ────────────────────────────────────────────────────────────── */
 
 export async function saveOption(
   productId: number,
@@ -406,8 +364,6 @@ export async function saveOptionValue(
   return (inserted as unknown as { insertId: number }).insertId
 }
 
-/* ── Images ─────────────────────────────────────────────────────────────── */
-
 export async function addProductImage(
   productId: number,
   file: File,
@@ -428,8 +384,6 @@ export async function addProductImage(
     alt: alt || null,
     width: processed.width,
     height: processed.height,
-    // The first image becomes the primary automatically — a product with a
-    // gallery and no primary renders no card image at all.
     isPrimary: isFirst,
     sortOrder: Number(countRow?.count ?? 0),
   })
@@ -449,8 +403,6 @@ export async function deleteProductImage(imageId: number): Promise<void> {
   await db.delete(productImages).where(eq(productImages.id, imageId))
   await deleteImageSet(image.path)
 
-  // Deleting the primary promotes the next image, so the product never ends up
-  // with a gallery but no card image.
   if (image.isPrimary) {
     const [next] = await db
       .select({ id: productImages.id })
@@ -479,8 +431,6 @@ export async function setPrimaryImage(productId: number, imageId: number): Promi
 export async function updateImageAlt(imageId: number, alt: string): Promise<void> {
   await db.update(productImages).set({ alt: alt || null }).where(eq(productImages.id, imageId))
 }
-
-/* ── Admin listing ──────────────────────────────────────────────────────── */
 
 export async function listProductsForAdmin(options: {
   search?: string

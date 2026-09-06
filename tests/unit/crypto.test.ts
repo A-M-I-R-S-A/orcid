@@ -2,13 +2,6 @@ import { describe, expect, it } from 'vitest'
 
 import * as crypto from '@/lib/crypto'
 
-/**
- * Crypto.
- *
- * Secrets come from tests/setup.ts, which generates a fresh set per run — a
- * hardcoded pepper in a test file has a habit of becoming a real one.
- */
-
 describe('generateOtp', () => {
   it('produces a six-digit string', () => {
     for (let i = 0; i < 200; i++) {
@@ -17,16 +10,12 @@ describe('generateOtp', () => {
   })
 
   it('pads leading zeros rather than shortening the code', () => {
-    // A code like 000042 must stay six characters — trimming it would halve
-    // the keyspace for a meaningful slice of generated codes.
     const codes = Array.from({ length: 500 }, () => crypto.generateOtp())
     expect(codes.every((c) => c.length === 6)).toBe(true)
   })
 
   it('does not repeat trivially', () => {
     const codes = new Set(Array.from({ length: 200 }, () => crypto.generateOtp()))
-    // 200 draws from 10^6 — collisions are possible but a tiny set means the
-    // generator is broken.
     expect(codes.size).toBeGreaterThan(150)
   })
 })
@@ -46,7 +35,6 @@ describe('OTP hashing', () => {
   })
 
   it('binds the hash to the phone number', () => {
-    // Without binding, a code issued for one number would verify for another.
     const hash = crypto.hashOtp('123456', phone)
     expect(crypto.verifyOtpHash('123456', '09121234568', hash)).toBe(false)
   })
@@ -112,7 +100,6 @@ describe('secret encryption', () => {
 
   it('detects tampering — GCM authenticates', () => {
     const encrypted = crypto.encryptSecret('sensitive')
-    // Flip a character in the ciphertext body.
     const parts = encrypted.split(':')
     const body = parts[parts.length - 1]!
     const tampered = [...parts.slice(0, -1), body.slice(0, -2) + (body.endsWith('A') ? 'B' : 'A') + '='].join(':')

@@ -5,15 +5,6 @@ import { auditLogs } from '@/db/schema'
 import { redact } from './errors'
 import type { AdminPrincipal } from './permissions'
 
-/**
- * Audit log. §58.
- *
- * Append-only in practice — nothing in this application updates or deletes
- * these rows. Every metadata object passes through `redact` before it is
- * written, so a careless caller cannot leak a credential or an OTP into a log
- * that administrators can read.
- */
-
 export const AUDIT_ACTIONS = {
   'product.create': 'ایجاد محصول',
   'product.update': 'ویرایش محصول',
@@ -74,11 +65,6 @@ export interface AuditEntry {
   ip?: string
 }
 
-/**
- * Writes an audit row. Deliberately never throws — a failure to log must not
- * roll back the business operation that succeeded. The failure is reported to
- * the server log instead.
- */
 export async function log(entry: AuditEntry): Promise<void> {
   try {
     await db.insert(auditLogs).values({
@@ -96,11 +82,6 @@ export async function log(entry: AuditEntry): Promise<void> {
   }
 }
 
-/**
- * Builds a metadata diff for an update, recording only the fields that changed.
- * Logging an entire unchanged record makes the audit trail unreadable — which
- * in practice means unread.
- */
 export function diff<T extends Record<string, unknown>>(
   before: T,
   after: Partial<T>,

@@ -15,14 +15,6 @@ import { clientIp } from '@/lib/rate-limit'
 import { revokeAllAdminSessions } from '@/lib/session'
 import { isLastActiveSuperadmin, requirePermission } from './auth'
 
-/**
- * Admin accounts and roles. §56 / §57.
- *
- * The lockout guard is the important part. Without it, disabling the last
- * superadmin or stripping their role locks every human out of the panel, and
- * the only recovery is a SQL console — which on managed hosting may not exist.
- */
-
 const MIN_PASSWORD_LENGTH = 10
 
 export async function saveAdminUserAction(input: {
@@ -53,8 +45,6 @@ export async function saveAdminUserAction(input: {
 
       if (!existing) throw errors.notFound()
 
-      // Guard: do not allow the last active superadmin to be demoted or
-      // disabled. Losing every superadmin has no in-app recovery path.
       const [currentRole] = await db
         .select({ key: roles.key })
         .from(roles)
@@ -83,8 +73,6 @@ export async function saveAdminUserAction(input: {
           throw errors.validation(`رمز عبور باید حداقل ${toPersianDigits(MIN_PASSWORD_LENGTH)} کاراکتر باشد.`)
         }
         updates.passwordHash = await hashPassword(input.password)
-        // A password change ends existing sessions — that is the point of
-        // changing it after a suspected compromise.
         updates.failedAttempts = 0
         updates.lockedUntil = null
       }
@@ -101,7 +89,6 @@ export async function saveAdminUserAction(input: {
         entityType: 'admin_user',
         entityId: input.id,
         summary: input.username,
-        // Never the password, obviously — but also never a hash.
         metadata: { role: role.key, passwordChanged: Boolean(input.password) },
         ip: clientIp(headerList),
       })
@@ -145,13 +132,6 @@ export async function saveAdminUserAction(input: {
   }
 }
 
-/**
- * Replaces a role's permission set.
- *
- * Superadmin is refused outright: it bypasses the permission table by design
- * (see `hasPermission`), so editing its rows would be a no-op that looks like
- * it worked — worse than an error.
- */
 export async function saveRolePermissionsAction(input: {
   roleId: number
   permissions: string[]

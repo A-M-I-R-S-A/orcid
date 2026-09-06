@@ -3,27 +3,8 @@ import { drizzle } from 'drizzle-orm/mysql2'
 
 import * as schema from '@/db/schema'
 
-/**
- * Integration test harness.
- *
- * These tests need a real MariaDB, because the things they verify — row locks,
- * CHECK constraints, unique indexes, transaction rollback — do not exist in a
- * mock. A mocked "database" that always agrees with the code under test would
- * pass while production oversells.
- *
- * They SKIP rather than fail when no database is configured, so `npm test`
- * stays useful on a machine without one. Set TEST_DB_NAME to enable them.
- *
- *   TEST_DB_NAME=orchid_test npm test
- *
- * The target database is wiped between tests, so it must never be the
- * development or production database — the guard below refuses to run against
- * anything not named like a test database.
- */
-
 export const TEST_DB = process.env.TEST_DB_NAME
 
-/** True when integration tests should run. */
 export const hasTestDb = Boolean(TEST_DB)
 
 if (TEST_DB && !/test/i.test(TEST_DB)) {
@@ -54,7 +35,6 @@ export async function closeTestDb() {
   pool = undefined
 }
 
-/** Order matters — children before parents, or the foreign keys refuse. */
 const TRUNCATION_ORDER = [
   'variant_option_values',
   'cart_items',
@@ -83,16 +63,12 @@ const TRUNCATION_ORDER = [
 export async function resetTables() {
   const db = testDb()
 
-  // FK checks are disabled only for the duration of the wipe — leaving them
-  // off would let a test insert an orphan and pass on data the schema forbids.
   await db.execute(`SET FOREIGN_KEY_CHECKS = 0` as never)
   for (const table of TRUNCATION_ORDER) {
     await db.execute(`TRUNCATE TABLE \`${table}\`` as never)
   }
   await db.execute(`SET FOREIGN_KEY_CHECKS = 1` as never)
 }
-
-/* ── Fixtures ───────────────────────────────────────────────────────────── */
 
 export async function createUser(phone = '09121234567') {
   const db = testDb()

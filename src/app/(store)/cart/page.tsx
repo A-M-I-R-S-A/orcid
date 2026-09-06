@@ -6,12 +6,6 @@ import { getCart } from '@/modules/cart/service'
 import { getCurrentUser } from '@/lib/session'
 import { toPersianDigits } from '@/lib/persian'
 
-/**
- * Cart. §21 / §70.
- *
- * noindex — a cart is per-visitor and has no business in an index. Dynamic,
- * because it is entirely personal and caching it would be a data leak.
- */
 export const dynamic = 'force-dynamic'
 
 export const metadata = {
@@ -53,8 +47,6 @@ export default async function CartPage() {
           <CartLines lines={cart.lines} />
         </div>
 
-        {/* Summary sticks on desktop so the total stays visible while
-            scrolling a long cart; on mobile it simply follows the list. */}
         <aside className="card p-6 lg:sticky lg:top-28">
           <h2 className="text-lg text-ink mb-5">خلاصه سفارش</h2>
 

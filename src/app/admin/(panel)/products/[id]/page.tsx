@@ -9,7 +9,6 @@ import { db } from '@/db'
 import { products } from '@/db/schema'
 import { eq } from 'drizzle-orm'
 
-/** Product editor. §41. */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'ویرایش محصول' }
 
@@ -56,9 +55,6 @@ export default async function AdminProductEditPage({
 
   if (!row) notFound()
 
-  // Reuses the storefront query so the editor sees exactly the shape the
-  // product page sees — a divergence here is how "it looked fine in admin"
-  // bugs happen.
   const product = await getProductBySlug(row.slug)
   if (!product) notFound()
 

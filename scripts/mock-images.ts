@@ -1,30 +1,3 @@
-/**
- * Mock product imagery.
- *
- * Generates placeholder art for the demo catalogue and pushes it through the
- * REAL upload pipeline (`addProductImage` → `processUpload`), so sharp
- * validation, the AVIF/WebP/JPEG derivatives, the `product_images` rows and
- * the primary-image flag are all exercised exactly as an admin upload would
- * be. Nothing here writes image rows to the database by hand.
- *
- * ── What it draws, and why not garments ────────────────────────────────────
- * The first version of this script drew garment outlines. They were bad — a
- * bra rendered as a pair of spectacles — because recognisable figure drawing
- * in hand-authored path data is genuinely hard, and a clumsy outline looks
- * worse than no image at all.
- *
- * So these are DRAPE STUDIES instead: soft-focus folds of fabric in the brand
- * colourways, built from blurred organic forms, a directional sheen and a fine
- * weave. That is achievable well, it reads as premium editorial texture rather
- * than as clip art, and it is unmistakably not a photograph of a product —
- * which matters, because a shopper must never be shown a fabricated "photo" of
- * something they are buying. The shop's own photography replaces these.
- *
- * Usage:
- *   npm run mock:images            skip products that already have images
- *   npm run mock:images -- --force replace existing images
- */
-
 import 'dotenv/config'
 
 import { eq } from 'drizzle-orm'
@@ -40,7 +13,6 @@ const force = process.argv.includes('--force')
 const WIDTH = 1200
 const HEIGHT = 1500
 
-/** Colourways drawn from the brand palette, matching the seeded variants. */
 const COLOURWAYS = [
   {
     key: 'مشکی',
@@ -67,10 +39,6 @@ const COLOURWAYS = [
 
 type Colourway = (typeof COLOURWAYS)[number]
 
-/**
- * Deterministic pseudo-random, so a given product always produces the same
- * artwork. Re-running must not reshuffle the catalogue's appearance.
- */
 function rng(seed: number) {
   let s = seed * 9301 + 49297
   return () => {
@@ -79,11 +47,6 @@ function rng(seed: number) {
   }
 }
 
-/**
- * One fold of fabric: a broad, soft-edged sweep. Several of these layered at
- * different scales and opacities is what reads as drape — a single crisp shape
- * reads as a blob, which is why every one is heavily blurred.
- */
 function fold(
   rand: () => number,
   colour: string,
@@ -112,8 +75,6 @@ function composeSvg(colourway: Colourway, seed: number): string {
   const rand = rng(seed)
   const { deep, mid, light, sheen } = colourway
 
-  // Layered back to front: broad dark masses, then mid tones, then the
-  // highlights that catch the light.
   const layers = [
     fold(rand, deep, 0.55, 90),
     fold(rand, deep, 0.4, 90),
@@ -172,8 +133,6 @@ function composeSvg(colourway: Colourway, seed: number): string {
 </svg>`
 }
 
-/* ── Run ────────────────────────────────────────────────────────────────── */
-
 async function main() {
   console.log('\nOrchid — mock product imagery (drape studies)\n')
 
@@ -211,12 +170,6 @@ async function main() {
     for (const [index, colourway] of COLOURWAYS.entries()) {
       const svg = composeSvg(colourway, product.id * 17 + index * 101)
 
-      /*
-       * Rasterise before handing over. processUpload validates by DECODING the
-       * file and accepts jpeg/png/webp/avif — not SVG, deliberately, since SVG
-       * can carry script. Producing a PNG means the mock passes through
-       * exactly the same validation as a real upload rather than around it.
-       */
       const png = await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toBuffer()
 
       const file = new File([new Uint8Array(png)], `drape-${index}.png`, { type: 'image/png' })
@@ -224,8 +177,6 @@ async function main() {
       await addProductImage(
         product.id,
         file,
-        // Descriptive alt, as §72 requires — an empty alt on a product image
-        // is an accessibility failure, not a neutral choice.
         `${product.name} — نمای پارچه، رنگ ${colourway.key}`,
       )
 

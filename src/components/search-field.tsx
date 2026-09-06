@@ -3,13 +3,6 @@
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 
-/**
- * Search field.
- *
- * A real <form> with a GET action, so it works before hydration and produces a
- * shareable, crawlable /search?q=… URL. The router push is a progressive
- * enhancement over that, not a replacement for it.
- */
 export function SearchField() {
   const router = useRouter()
   const params = useSearchParams()

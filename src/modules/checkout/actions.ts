@@ -1,23 +1,13 @@
 'use server'
 
-import { headers } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 
-import { type ActionResult, MESSAGES, errors, fail, ok } from '@/lib/errors'
-import { clientIp } from '@/lib/rate-limit'
+import { type ActionResult, MESSAGES, errors, fail, ok, reportError } from '@/lib/errors'
 import { requireUser } from '@/lib/session'
 import { checkoutSchema, parseOrThrow, paymentReferenceSchema } from '@/lib/validation'
 import { resolveCart } from '@/modules/cart/service'
 import * as payments from '@/modules/payments/service'
 import * as checkout from './service'
-
-/**
- * Checkout and payment submission.
- *
- * Both actions derive the customer from the session. Neither accepts a user
- * id, a price, or an order total from the client — those are computed
- * server-side inside the checkout transaction (§21, §81).
- */
 
 export async function placeOrderAction(input: {
   fullName: string
@@ -32,7 +22,6 @@ export async function placeOrderAction(input: {
   try {
     const user = await requireUser()
     const parsed = await parseOrThrow(checkoutSchema, input)
-    const headerList = await headers()
 
     const cart = await resolveCart(user.id)
     if (!cart) throw errors.validation(MESSAGES.cartEmpty)
@@ -50,13 +39,13 @@ export async function placeOrderAction(input: {
         customerNote: parsed.customerNote || undefined,
         paymentMethod: parsed.paymentMethod,
       },
-      { ip: clientIp(headerList) },
     )
 
-    // Queued AFTER the transaction commits — a rolled-back order must not
-    // leave a queued SMS behind, and a provider outage must not roll back a
-    // perfectly good order.
-    await checkout.notifyOrderPlaced(result.orderId)
+    try {
+      await checkout.notifyOrderPlaced(result.orderId)
+    } catch (error) {
+      reportError(error, { action: 'notifyOrderPlaced', orderId: result.orderId })
+    }
 
     revalidatePath('/', 'layout')
     revalidatePath('/account/orders')

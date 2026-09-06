@@ -8,6 +8,8 @@ import {
   uploadHomepageImageAction,
 } from '@/modules/admin/content-actions'
 import { mediaUrl } from '@/lib/media-url'
+import type { BannerSettings } from '@/lib/banner'
+import { BannerDesignPanel } from './banner-design'
 
 interface Section {
   id: number
@@ -24,14 +26,21 @@ interface Section {
   supportsImage: boolean
 }
 
-export function HomepageSectionEditor({ section }: { section: Section }) {
+export function HomepageSectionEditor({
+  section,
+  design,
+  canOverlayHeader = false,
+}: {
+  section: Section
+  design?: BannerSettings
+  canOverlayHeader?: boolean
+}) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [open, setOpen] = useState(false)
   const [visible, setVisible] = useState(section.isVisible)
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
 
-  /** Visibility toggles immediately — it is the most-used control here. */
   const toggleVisible = (next: boolean) => {
     setVisible(next)
     startTransition(async () => {
@@ -193,6 +202,14 @@ export function HomepageSectionEditor({ section }: { section: Section }) {
                 بارگذاری
               </button>
             </form>
+          )}
+
+          {design && (
+            <BannerDesignPanel
+              sectionId={section.id}
+              settings={design}
+              canOverlayHeader={canOverlayHeader}
+            />
           )}
         </div>
       )}

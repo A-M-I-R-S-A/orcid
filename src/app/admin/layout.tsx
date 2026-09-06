@@ -1,18 +1,5 @@
 import '../globals.css'
 
-/**
- * Admin root layout.
- *
- * Separate from the storefront layout: no header, no footer, and `noindex,
- * nofollow` on every page. robots.txt also disallows /admin, but a robots
- * directive is a request and a meta tag is another layer — neither is a
- * substitute for the authentication that actually protects it.
- *
- * The admin panel is Persian and RTL like the storefront (§3), but does NOT
- * inherit the customer-editable theme: an administrator experimenting with a
- * pale accent must not be able to make the panel unreadable and lock
- * themselves out of the screen where they would fix it.
- */
 export const metadata = {
   title: { default: 'مدیریت ارکید', template: '%s | مدیریت ارکید' },
   robots: { index: false, follow: false, nocache: true },
@@ -25,8 +12,6 @@ export default function AdminRootLayout({ children }: { children: React.ReactNod
       className="min-h-[100dvh]"
       style={
         {
-          // A fixed, deliberately quiet palette, independent of the storefront
-          // theme tokens. Warm neutrals so it still feels like Orchid.
           '--c-bg': '#F6F3EF',
           '--c-surface': '#FFFFFF',
           '--c-surface-raised': '#FFFFFF',

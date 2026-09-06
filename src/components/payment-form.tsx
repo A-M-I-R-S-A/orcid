@@ -48,7 +48,6 @@ export function PaymentReferenceForm({ orderId }: { orderId: number }) {
           minLength={4}
           maxLength={64}
           value={value}
-          // Bank apps present these as Persian digits as often as Latin ones.
           onChange={(event) => setValue(toLatinDigits(event.target.value))}
           className="field text-center nums tracking-wider text-lg"
           placeholder="۱۲۳۴۵۶۷۸"

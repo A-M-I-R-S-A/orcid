@@ -7,8 +7,6 @@ import { approveSmsAction, dispatchSmsAction } from '@/modules/admin/actions'
 import { saveSettingsAction, saveSmsTemplateAction } from '@/modules/admin/settings-actions'
 import { toPersianDigits } from '@/lib/persian'
 
-/* ── Queue actions ──────────────────────────────────────────────────────── */
-
 export function SmsQueueActions({
   pendingIds,
   canApprove,
@@ -59,8 +57,6 @@ export function SmsQueueActions({
   )
 }
 
-/* ── Template row ───────────────────────────────────────────────────────── */
-
 export function SmsTemplateRow({
   template,
   canEdit,
@@ -82,9 +78,6 @@ export function SmsTemplateRow({
   const [approval, setApproval] = useState(template.requiresApproval)
   const [saved, setSaved] = useState(false)
 
-  // OTP is sent synchronously to a waiting customer; queueing and gating it
-  // would mean nobody could ever log in. The control is disabled rather than
-  // hidden so the reason is visible.
   const isOtp = template.event === 'otp_login'
 
   const save = () =>
@@ -168,8 +161,6 @@ export function SmsTemplateRow({
   )
 }
 
-/* ── Provider configuration ─────────────────────────────────────────────── */
-
 export function SmsConfigForm({
   apiKeySet,
   credit,
@@ -214,12 +205,6 @@ export function SmsConfigForm({
           className="field"
           placeholder={apiKeySet ? '•••••••• (برای تغییر، مقدار جدید را وارد کنید)' : 'کلید API را وارد کنید'}
         />
-        {/*
-          §47: the stored credential is never rendered back, even to a
-          superadmin. A blank field means "leave unchanged", which is why the
-          placeholder says so explicitly — otherwise saving another field on
-          this form would silently clear the key.
-        */}
         <p className="hint">
           {apiKeySet
             ? 'کلید ذخیره شده است. برای حفظ آن، این فیلد را خالی بگذارید.'

@@ -3,7 +3,7 @@
 Persian, RTL, database-driven storefront for a women's lingerie brand.
 Next.js 15 · MariaDB · Drizzle ORM · Tailwind v4.
 
-Domain: `orchid-clothing.ir`
+Domain: `orchidbra.ir`
 
 ---
 
@@ -25,7 +25,9 @@ Chromium, WebKit and tablet viewports.
 
 ## Quick start (local)
 
-Requires Node 20 or 22 and a MariaDB 10.6+ instance.
+Requires Node 22 or 24 (Node 20 is end-of-life) and a MariaDB 10.6+ instance.
+`.nvmrc` pins 22, the version this project is verified against; 24 is also
+verified and is what `engines` permits.
 
 ```bash
 cp .env.example .env
@@ -42,12 +44,29 @@ Generate each secret separately:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
-`SESSION_SECRET`, `AUTH_SECRET`, `OTP_PEPPER`, `ENCRYPTION_KEY` and
-`CRON_SECRET` all need their own value. `ENCRYPTION_KEY` must be exactly 64
-hex characters.
+`SESSION_SECRET`, `OTP_PEPPER`, `ENCRYPTION_KEY` and `CRON_SECRET` all need
+their own value. `ENCRYPTION_KEY` must be exactly 64 hex characters.
+
+`AUTH_SECRET` is gone. It was listed here as signing admin session tokens and
+was never read by any code: both session tables hold opaque random tokens,
+stored hashed and revocable server-side, which is why no signing key appears
+in either path.
 
 The seed prints a generated administrator password **once**. Store it in a
-password manager; there is no way to recover it afterwards.
+password manager; there is no way to recover it afterwards — a default password
+in a repository is a default password in production, so the seed will not
+invent one you could look up later.
+
+The seed creates **no customer accounts**. A customer is a phone number that
+has passed an OTP, and seeding verified phone numbers would fake the one fact
+registration exists to establish. Make one to develop against:
+
+```bash
+npm run dev:account -- customer 09121112233 'a-password' 'شیرین محمدی'
+npm run dev:account -- admin admin 'a-password'      # lost the seed output
+```
+
+Both refuse to run unless `APP_URL` points at localhost.
 
 Storefront: `http://localhost:3100` · Admin: `http://localhost:3100/admin`
 
@@ -64,12 +83,14 @@ See `.claude/launch.json`.)
 | `npm run build` | Production build (needs no database) |
 | `npm start` | Run the built standalone server |
 | `npm run typecheck` | TypeScript, no emit |
-| `npm test` | 185 unit tests + 11 integration tests |
+| `npm test` | 197 unit tests + 11 integration tests |
 | `npm run test:e2e` | 144 Playwright checks × desktop/mobile/tablet |
 | `npm run db:generate` | Generate a migration from schema changes |
 | `npm run db:migrate` | Apply pending migrations |
 | `npm run db:seed` | Bootstrap permissions, roles, admin, settings |
 | `npm run db:seed -- --demo` | …plus demo categories and products |
+| `npm run dev:otp -- <phone>` | Recover the current OTP locally (§24 keeps it out of the logs) |
+| `npm run dev:account -- ...` | Set a known password on a local admin or customer |
 
 Integration tests need a scratch database and are skipped without one:
 
@@ -145,6 +166,11 @@ re-entering every integration credential.
 
 ## Deployment
 
+> **Full step-by-step guide: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).**
+> The summary below is the shape of it; that document is what to follow when
+> actually deploying, including TLS, the release layout, cron, smoke tests,
+> rollback and troubleshooting.
+
 The build does **not** require a database. Build off-host, upload the artifact.
 
 ```
@@ -192,7 +218,7 @@ script in §A of the planning package and fill in that step before deploying.
 windows and abandoned carts. It is idempotent, so a missed run catches up.
 
 ```bash
-curl -H "Authorization: Bearer $CRON_SECRET" https://orchid-clothing.ir/api/cron
+curl -H "Authorization: Bearer $CRON_SECRET" https://orchidbra.ir/api/cron
 ```
 
 If the host has no cron, the admin SMS screen has a manual dispatch button and

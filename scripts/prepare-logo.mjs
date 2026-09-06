@@ -1,20 +1,4 @@
 #!/usr/bin/env node
-/**
- * Logo preparation.
- *
- * The supplied `logo.png` is a 2000×2000 square whose artwork occupies only a
- * 1246×398 band in the middle — the rest is transparent padding. Rendered at
- * `h-11` the mark would be about 9px tall: a smudge.
- *
- * This trims the padding and writes `public/logo.png`. It is the SAME artwork,
- * not a redesign (§50) — only the empty margin is removed, which is what makes
- * the aspect ratio usable in a header.
- *
- * The untouched original stays at the repository root. Re-run after replacing
- * it:
- *
- *   node scripts/prepare-logo.mjs
- */
 
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -33,8 +17,6 @@ async function main() {
 
   const original = await sharp(source).metadata()
 
-  // A low threshold so anti-aliased edges of the script wordmark survive the
-  // trim — too aggressive and the thin strokes lose their tips.
   const trimmed = await sharp(source)
     .trim({ threshold: 10 })
     .png({ compressionLevel: 9 })
@@ -42,18 +24,11 @@ async function main() {
 
   await writeFile(OUTPUT, trimmed.data)
 
-  /**
-   * Favicon: a square crop of the orchid bloom rather than the whole wordmark.
-   * The full 3:1 lockup squeezed into 32×32 is illegible — at that size only
-   * the flower reads.
-   */
   const { width, height } = trimmed.info
   const blossomSize = Math.min(height, Math.round(width * 0.32))
 
   await sharp(trimmed.data)
     .extract({
-      // The bloom sits at the end of the wordmark, which in this artwork is
-      // the right-hand side.
       left: Math.max(0, width - blossomSize),
       top: 0,
       width: blossomSize,

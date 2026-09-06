@@ -4,7 +4,6 @@ import { EmptyState } from '@/components/ui'
 import { listOwnReviews } from '@/modules/reviews/service'
 import { requireUser } from '@/lib/session'
 import { formatJalali } from '@/lib/jalali'
-import { toPersianDigits } from '@/lib/persian'
 
 export const metadata = { title: 'دیدگاه‌های من' }
 
@@ -61,9 +60,6 @@ export default async function MyReviewsPage() {
                   >
                     {formatJalali(review.createdAt)}
                   </time>
-                  {/* Editing happens on the product page, where the form and
-                      the product context already live — a second editing
-                      surface would be a second thing to keep correct. */}
                   <Link
                     href={`/product/${encodeURIComponent(review.productSlug)}#reviews`}
                     className="text-xs text-accent-2 hover:underline"

@@ -14,19 +14,9 @@ import {
 } from '@/db/schema'
 import * as audit from '@/lib/audit'
 import { MESSAGES, errors } from '@/lib/errors'
-import { countsAsPurchase } from '@/lib/order-status'
+import { PURCHASE_STATUSES } from '@/lib/order-status'
 import type { AdminPrincipal } from '@/lib/permissions'
 import { enforce } from '@/lib/rate-limit'
-
-/**
- * Reviews. §37 / §38.
- *
- * ── Ownership ──────────────────────────────────────────────────────────────
- * Every customer-facing mutation is scoped by `userId` in the WHERE clause,
- * not checked after a fetch. "Update where id = X AND user_id = me" cannot
- * touch someone else's row even if the id is guessed, whereas a fetch-then-
- * compare has a window and a forgettable branch.
- */
 
 export interface PublicReview {
   id: number
@@ -40,9 +30,6 @@ export interface PublicReview {
   reply: { body: string; authorName: string; createdAt: Date } | null
 }
 
-/* ── Public reads ───────────────────────────────────────────────────────── */
-
-/** Approved reviews only — pending and rejected are never publicly visible. */
 export async function listForProduct(productId: number, limit = 20): Promise<PublicReview[]> {
   const rows = await db
     .select({
@@ -87,8 +74,6 @@ export async function listForProduct(productId: number, limit = 20): Promise<Pub
     rating: row.rating,
     title: row.title,
     body: row.body,
-    // Never expose a full phone number publicly. A missing name degrades to a
-    // masked handle rather than leaking the identifier customers log in with.
     authorName: row.authorName?.trim() || `کاربر ${row.authorPhone.slice(-4)}`,
     isVerifiedPurchase: row.isVerifiedPurchase,
     createdAt: row.createdAt,
@@ -103,7 +88,6 @@ export async function listForProduct(productId: number, limit = 20): Promise<Pub
   }))
 }
 
-/** The current customer's own review, including one still awaiting approval. */
 export async function getOwnReview(userId: number, productId: number) {
   const [row] = await db
     .select()
@@ -133,9 +117,6 @@ export async function listOwnReviews(userId: number) {
     .orderBy(desc(reviews.createdAt))
 }
 
-/* ── Customer mutations ─────────────────────────────────────────────────── */
-
-/** True when the customer has a DELIVERED order containing this product. */
 async function hasPurchased(userId: number, productId: number): Promise<boolean> {
   const [row] = await db
     .select({ count: sql<number>`COUNT(*)` })
@@ -145,7 +126,7 @@ async function hasPurchased(userId: number, productId: number): Promise<boolean>
       and(
         eq(orders.userId, userId),
         eq(orderItems.productId, productId),
-        eq(orders.status, 'delivered'),
+        inArray(orders.status, [...PURCHASE_STATUSES]),
       ),
     )
 
@@ -170,15 +151,12 @@ export async function submit(
   const verified = await hasPurchased(userId, input.productId)
 
   if (existing) {
-    // Editing own review — scoped by userId, so this cannot touch another's.
     await db
       .update(reviews)
       .set({
         rating: input.rating,
         title: input.title || null,
         body: input.body,
-        // An edited review returns to moderation; otherwise an approved review
-        // could be rewritten into anything after the fact.
         status: 'pending',
         isVerifiedPurchase: verified,
         moderatedByAdminId: null,
@@ -202,8 +180,6 @@ export async function submit(
 
   return { id: (inserted as unknown as { insertId: number }).insertId, isUpdate: false }
 }
-
-/* ── Moderation ─────────────────────────────────────────────────────────── */
 
 export async function moderate(
   admin: AdminPrincipal,
@@ -250,7 +226,6 @@ export async function reply(
 
   if (!review) throw errors.notFound()
 
-  // One reply per review, enforced by a unique index — editing replaces.
   await db
     .insert(reviewReplies)
     .values({ reviewId, adminUserId: admin.id, body })
@@ -290,15 +265,6 @@ export async function remove(
   })
 }
 
-/* ── Rating aggregate ───────────────────────────────────────────────────── */
-
-/**
- * Recomputes the denormalised rating from APPROVED reviews only.
- *
- * Called after every moderation and edit. This is what backs the
- * AggregateRating in structured data, so counting anything unapproved here
- * would put a fabricated rating into the markup — exactly what §62 forbids.
- */
 export async function recalculateRating(productId: number): Promise<void> {
   const [row] = await db
     .select({
@@ -313,8 +279,6 @@ export async function recalculateRating(productId: number): Promise<void> {
     .set({ ratingSum: Number(row?.sum ?? 0), ratingCount: Number(row?.count ?? 0) })
     .where(eq(products.id, productId))
 }
-
-/* ── Admin queries ──────────────────────────────────────────────────────── */
 
 export async function pendingCount(): Promise<number> {
   const [row] = await db

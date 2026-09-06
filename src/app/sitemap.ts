@@ -6,20 +6,6 @@ import { blogPosts, categories, pages, products } from '@/db/schema'
 import { CACHE_TAGS, cached } from '@/lib/cache'
 import { absoluteUrl } from '@/lib/seo'
 
-/**
- * XML sitemap. §68.
- *
- * The predicates here are the SAME conditions `shouldIndex` applies on the
- * page — active, not archived, published. That matters more than it looks: if
- * the sitemap had its own notion of "indexable" the two would eventually
- * disagree, and a sitemap advertising noindex URLs is worse than none at all.
- *
- * Excluded by construction, because they are never queried: admin, cart,
- * checkout, login, account, order payment, internal search, and the API.
- *
- * Rendered dynamically with its data cached for an hour rather than
- * prerendered — see lib/cache.ts for why the build must not need a database.
- */
 export const dynamic = 'force-dynamic'
 
 const loadEntries = cached(
@@ -61,6 +47,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: new Date(),
       changeFrequency: 'daily',
       priority: 1,
+    },
+    {
+      url: absoluteUrl('/products'),
+      lastModified: new Date(),
+      changeFrequency: 'daily',
+      priority: 0.9,
     },
     {
       url: absoluteUrl('/blog'),

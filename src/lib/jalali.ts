@@ -1,15 +1,3 @@
-/**
- * Jalali (Persian) dates.
- *
- * Built on Intl with the `persian` calendar rather than hand-rolled arithmetic.
- * Leap-year and month-length rules in the Solar Hijri calendar are genuinely
- * intricate, and off-by-one errors around midnight are a classic failure —
- * ICU's implementation is tested by more people than ours ever would be.
- *
- * Timestamps are stored UTC and converted only at render, with the timezone
- * pinned to Asia/Tehran so a server in another zone cannot shift a date.
- */
-
 const TZ = 'Asia/Tehran'
 const LOCALE = 'fa-IR-u-ca-persian'
 
@@ -29,17 +17,14 @@ function formatter(options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
   return f
 }
 
-/** ۱۰ شهریور ۱۴۰۵ */
 export function formatJalali(value: Date | string | number): string {
   return formatter({ dateStyle: 'long' }).format(toDate(value))
 }
 
-/** ۱۴۰۵/۰۶/۱۰ */
 export function formatJalaliShort(value: Date | string | number): string {
   return formatter({ year: 'numeric', month: '2-digit', day: '2-digit' }).format(toDate(value))
 }
 
-/** ۱۰ شهریور ۱۴۰۵ ساعت ۱۳:۳۰ */
 export function formatJalaliDateTime(value: Date | string | number): string {
   const d = toDate(value)
   const date = formatter({ dateStyle: 'long' }).format(d)
@@ -47,12 +32,10 @@ export function formatJalaliDateTime(value: Date | string | number): string {
   return `${date} ساعت ${time}`
 }
 
-/** ۱۳:۳۰ */
 export function formatJalaliTime(value: Date | string | number): string {
   return formatter({ hour: '2-digit', minute: '2-digit', hour12: false }).format(toDate(value))
 }
 
-/** Numeric parts, useful for order numbers and grouping. */
 export function jalaliParts(value: Date | string | number): {
   year: number
   month: number
@@ -70,16 +53,10 @@ export function jalaliParts(value: Date | string | number): {
   return { year: get('year'), month: get('month'), day: get('day') }
 }
 
-/** The Jalali year, used in order numbers such as ORC-1405-000042. */
 export function jalaliYear(value: Date | string | number = new Date()): number {
   return jalaliParts(value).year
 }
 
-/**
- * Relative time in Persian: «۳ روز پیش».
- * Falls back to an absolute date past a month, where "۵ هفته پیش" stops being
- * more useful than the date itself.
- */
 export function relativeTime(value: Date | string | number): string {
   const d = toDate(value)
   const diffMs = Date.now() - d.getTime()
@@ -101,7 +78,6 @@ export function relativeTime(value: Date | string | number): string {
   return formatJalali(d)
 }
 
-/** ISO 8601 for <time datetime> and structured data — always machine-readable. */
 export function isoDate(value: Date | string | number): string {
   return toDate(value).toISOString()
 }

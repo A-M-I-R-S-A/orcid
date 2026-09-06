@@ -16,13 +16,6 @@ import { products } from './catalog'
 import { adminUsers } from './admin'
 import { users } from './identity'
 
-/* ── Reviews ───────────────────────────────────────────────────────────── */
-
-/**
- * One review per customer per product, enforced by a unique index — which is
- * what makes §37's "edit your own review" an UPDATE rather than a duplicate
- * check that can race.
- */
 export const reviews = mysqlTable(
   'reviews',
   {
@@ -42,7 +35,6 @@ export const reviews = mysqlTable(
       .notNull()
       .default('pending'),
 
-    /** True when the customer has a delivered order containing this product. */
     isVerifiedPurchase: boolean('is_verified_purchase').notNull().default(false),
 
     moderatedByAdminId: bigint('moderated_by_admin_id', { mode: 'number', unsigned: true }),
@@ -58,7 +50,6 @@ export const reviews = mysqlTable(
   ],
 )
 
-/** §38. Rendered visually distinct from customer reviews on the storefront. */
 export const reviewReplies = mysqlTable(
   'review_replies',
   {
@@ -79,8 +70,6 @@ export const reviewReplies = mysqlTable(
   (t) => [uniqueIndex('review_reply_unq').on(t.reviewId)],
 )
 
-/* ── SMS ───────────────────────────────────────────────────────────────── */
-
 export const SMS_EVENTS = [
   'otp_login',
   'order_created',
@@ -96,18 +85,12 @@ export const smsTemplates = mysqlTable(
     event: mysqlEnum('event', SMS_EVENTS).notNull(),
     name: varchar('name', { length: 120 }).notNull(),
 
-    /** SMS.ir template id. Not a secret — the API key is. */
     providerTemplateId: varchar('provider_template_id', { length: 40 }),
 
-    /** Named parameters the template expects, for admin reference. */
     parameters: json('parameters'),
 
     isEnabled: boolean('is_enabled').notNull().default(false),
 
-    /**
-     * §27. When true, a queued message of this event waits for an explicit
-     * administrator approval before it may be dispatched.
-     */
     requiresApproval: boolean('requires_approval').notNull().default(false),
 
     createdAt: timestamp('created_at').notNull().defaultNow(),
@@ -116,11 +99,6 @@ export const smsTemplates = mysqlTable(
   (t) => [uniqueIndex('sms_templates_event_unq').on(t.event)],
 )
 
-/**
- * The queue. Approval and dispatch are separate states so an approved message
- * simply waits for whatever triggers the worker — cron if the host has it,
- * an admin action plus opportunistic processing if not. Planning §G.
- */
 export const smsMessages = mysqlTable(
   'sms_messages',
   {
@@ -129,7 +107,6 @@ export const smsMessages = mysqlTable(
     event: mysqlEnum('event', SMS_EVENTS).notNull(),
     phone: varchar('phone', { length: 11 }).notNull(),
 
-    /** Template parameters. NEVER contains an OTP code — those never queue. */
     payload: json('payload'),
 
     status: mysqlEnum('status', ['pending', 'approved', 'sending', 'sent', 'failed', 'cancelled'])
@@ -144,7 +121,6 @@ export const smsMessages = mysqlTable(
     attempts: int('attempts').notNull().default(0),
     maxAttempts: int('max_attempts').notNull().default(3),
 
-    /** Provider message id on success, or a scrubbed error on failure. */
     providerMessageId: varchar('provider_message_id', { length: 80 }),
     lastError: varchar('last_error', { length: 255 }),
 
@@ -159,8 +135,6 @@ export const smsMessages = mysqlTable(
   ],
 )
 
-/* ── CMS ───────────────────────────────────────────────────────────────── */
-
 export const pages = mysqlTable(
   'pages',
   {
@@ -168,8 +142,9 @@ export const pages = mysqlTable(
     slug: varchar('slug', { length: 190 }).notNull(),
     title: varchar('title', { length: 190 }).notNull(),
 
-    /** Sanitised server-side with an allowlist before render. §K. */
     body: text('body'),
+
+    imagePath: varchar('image_path', { length: 255 }),
 
     isPublished: boolean('is_published').notNull().default(true),
     showInFooter: boolean('show_in_footer').notNull().default(false),
@@ -184,10 +159,6 @@ export const pages = mysqlTable(
   (t) => [uniqueIndex('pages_slug_unq').on(t.slug)],
 )
 
-/**
- * §54. A fixed catalogue of section TYPES with per-section settings — not a
- * free-form page builder, which the spec explicitly warns against.
- */
 export const homepageSections = mysqlTable(
   'homepage_sections',
   {
@@ -212,7 +183,6 @@ export const homepageSections = mysqlTable(
     linkUrl: varchar('link_url', { length: 255 }),
     linkLabel: varchar('link_label', { length: 80 }),
 
-    /** Kind-specific extras, e.g. { "limit": 8, "categoryId": 3 }. */
     config: json('config'),
 
     isVisible: boolean('is_visible').notNull().default(true),
@@ -222,8 +192,6 @@ export const homepageSections = mysqlTable(
   },
   (t) => [index('homepage_sections_order_idx').on(t.isVisible, t.sortOrder)],
 )
-
-/* ── Blog ──────────────────────────────────────────────────────────────── */
 
 export const blogCategories = mysqlTable(
   'blog_categories',
@@ -271,16 +239,6 @@ export const blogPosts = mysqlTable(
   ],
 )
 
-/* ── Configuration ─────────────────────────────────────────────────────── */
-
-/**
- * Typed key/value settings, namespaced. Theme, typography, SEO defaults,
- * Enamad, SMS credentials and Torob Pay all live here rather than in eight
- * near-identical single-row tables — one mechanism, one cache, one audit trail.
- *
- * `isSecret` rows are AES-256-GCM encrypted at rest and are never serialised
- * to the client. Planning §D-4.
- */
 export const settings = mysqlTable(
   'settings',
   {
@@ -297,18 +255,12 @@ export const settings = mysqlTable(
   ],
 )
 
-/**
- * Bumped on every settings write. Worker processes poll this cheaply to notice
- * that another worker changed the theme — the closest thing to cache
- * invalidation available without a shared cache. Planning §C.
- */
 export const settingsVersion = mysqlTable('settings_version', {
   id: int('id').primaryKey(),
   version: bigint('version', { mode: 'number', unsigned: true }).notNull().default(1),
   updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
 })
 
-/** §66 — a changed slug must 308, not 404. */
 export const slugRedirects = mysqlTable(
   'slug_redirects',
   {

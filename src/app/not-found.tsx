@@ -1,12 +1,5 @@
 import Link from 'next/link'
 
-/**
- * 404. §74.
- *
- * Next returns a real HTTP 404 with this page — the requirement that a missing
- * page must never respond 200 is satisfied by the framework, and the e2e suite
- * asserts the status rather than assuming it.
- */
 export const metadata = {
   title: 'صفحه یافت نشد',
   robots: { index: false, follow: true },

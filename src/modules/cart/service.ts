@@ -18,18 +18,6 @@ import { generateToken } from '@/lib/crypto'
 import { MESSAGES, errors } from '@/lib/errors'
 import { effectivePrice } from '@/lib/money'
 
-/**
- * Cart. §21.
- *
- * THE RULE: a cart item stores only a variant id and a quantity. Prices are
- * never stored on the cart and never accepted from the client — every total is
- * recomputed from live variant rows on each read, and recomputed again inside
- * the checkout transaction.
- *
- * This is why "the price changed while it was in my cart" is a visible,
- * handled state here rather than a silent discrepancy at payment time.
- */
-
 const CART_COOKIE = 'orchid_cart'
 const CART_TTL_DAYS = 30
 
@@ -48,7 +36,6 @@ export interface CartLine {
   quantity: number
   lineTotal: number
   stockQty: number
-  /** Quantity exceeds available stock — checkout is blocked until resolved. */
   exceedsStock: boolean
   isAvailable: boolean
 }
@@ -73,14 +60,6 @@ export const EMPTY_CART: CartView = {
   hasIssues: false,
 }
 
-/* ── Resolution ─────────────────────────────────────────────────────────── */
-
-/**
- * Finds or creates the active cart.
- *
- * A signed-in customer's cart is keyed by user id, so it follows them between
- * devices. A guest's is keyed by an opaque cookie token.
- */
 export async function resolveCart(
   userId: number | null,
   options: { create?: boolean } = {},
@@ -107,7 +86,6 @@ export async function resolveCart(
       .limit(1)
 
     if (existing) {
-      // Claim a guest cart on login.
       if (userId && !existing.userId) {
         await db.update(carts).set({ userId }).where(eq(carts.id, existing.id))
       }
@@ -132,11 +110,6 @@ export async function resolveCart(
   return { id, token: newToken }
 }
 
-/**
- * Merges a guest cart into the customer's cart at login.
- * Quantities are summed and capped at available stock rather than overwritten,
- * so nothing a customer added silently disappears.
- */
 export async function mergeGuestCart(userId: number): Promise<void> {
   const store = await cookies()
   const token = store.get(CART_COOKIE)?.value
@@ -185,14 +158,6 @@ export async function mergeGuestCart(userId: number): Promise<void> {
   await db.delete(carts).where(eq(carts.id, guestCart.id))
 }
 
-/* ── Reading ────────────────────────────────────────────────────────────── */
-
-/**
- * Builds the cart view, pricing every line from live variant rows.
- *
- * Bounded queries: one for the items with their variant and product, one for
- * images, one for variant labels. Never one per line.
- */
 export async function getCart(userId: number | null): Promise<CartView> {
   const cart = await resolveCart(userId)
   if (!cart) return EMPTY_CART
@@ -318,7 +283,6 @@ export async function getCart(userId: number | null): Promise<CartView> {
   }
 }
 
-/** Badge counter for the header. One cheap aggregate, no line hydration. */
 export async function cartCount(userId: number | null): Promise<number> {
   const cart = await resolveCart(userId)
   if (!cart) return 0
@@ -331,15 +295,11 @@ export async function cartCount(userId: number | null): Promise<number> {
   return Number(row?.count ?? 0)
 }
 
-/* ── Mutation ───────────────────────────────────────────────────────────── */
-
 export async function addItem(
   userId: number | null,
   variantId: number,
   quantity: number,
 ): Promise<void> {
-  // Validate against live data. The client sent a variant id and a quantity;
-  // neither is trusted for anything else.
   const [variant] = await db
     .select({
       id: productVariants.id,
@@ -362,8 +322,6 @@ export async function addItem(
   const cart = await resolveCart(userId, { create: true })
   if (!cart) throw errors.internal('Cart could not be created')
 
-  // Cap at available stock rather than rejecting — adding a 6th of 5 available
-  // items should leave 5 in the cart, not an error and an unchanged cart.
   await db
     .insert(cartItems)
     .values({ cartId: cart.id, variantId, quantity: Math.min(quantity, variant.stockQty) })
@@ -389,8 +347,6 @@ export async function updateQuantity(
     return
   }
 
-  // Ownership check: the item must belong to THIS cart. Without it, any
-  // customer could edit any cart by guessing an item id.
   const [item] = await db
     .select({ id: cartItems.id, variantId: cartItems.variantId })
     .from(cartItems)
@@ -427,7 +383,6 @@ export async function clearCart(cartId: number): Promise<void> {
   await db.delete(cartItems).where(eq(cartItems.cartId, cartId))
 }
 
-/** Removes abandoned guest carts. Called from the cron endpoint. */
 export async function pruneAbandoned(days = 60): Promise<void> {
   const cutoff = new Date(Date.now() - days * 86_400_000)
   await db.delete(carts).where(and(lt(carts.updatedAt, cutoff), sql`${carts.userId} IS NULL`))

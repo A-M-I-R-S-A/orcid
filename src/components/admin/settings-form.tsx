@@ -13,23 +13,10 @@ interface Field {
   hint?: string
   dir?: 'ltr' | 'rtl'
   multiline?: boolean
-  /** Rendered as a password field, never populated with the stored value. */
   secret?: boolean
-  /** Whether a credential already exists, for the placeholder text. */
   isSet?: boolean
 }
 
-/**
- * Generic settings section.
- *
- * Secret handling is the part worth reading. §47 requires credentials to be
- * masked, so the stored value is never sent to the browser at all — the input
- * starts empty and a BLANK value means "leave unchanged" on the server.
- *
- * That has a consequence worth being explicit about in the UI: an operator
- * editing the bank name on a form that also contains an API key must not have
- * to retype the key. The placeholder says so.
- */
 export function SettingsSection({
   namespace,
   title,

@@ -159,8 +159,6 @@ function CategoryForm({
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  // A category cannot parent itself, and (with one nesting level in the UI)
-  // cannot be nested under a child either.
   const parentOptions = categories.filter(
     (c) => c.id !== category?.id && c.parentId === null,
   )

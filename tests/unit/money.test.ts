@@ -65,8 +65,6 @@ describe('isValidAmount', () => {
 
   it('rejects anything that is not a whole, non-negative number', () => {
     expect(isValidAmount(-1)).toBe(false)
-    // Floats are the reason this function exists — 0.1 + 0.2 near an order
-    // total is exactly the bug the integer rule prevents.
     expect(isValidAmount(1000.5)).toBe(false)
     expect(isValidAmount(MAX_AMOUNT + 1)).toBe(false)
     expect(isValidAmount(Number.NaN)).toBe(false)
@@ -97,7 +95,6 @@ describe('formatting', () => {
     const formatted = formatPrice(1_250_000)
     expect(formatted).toContain(CURRENCY_LABEL)
     expect(formatted).toMatch(/[۰-۹]/)
-    // Latin digits must not leak into customer-facing prices.
     expect(formatted).not.toMatch(/[0-9]/)
   })
 

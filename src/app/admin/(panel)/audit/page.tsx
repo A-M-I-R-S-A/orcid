@@ -8,13 +8,6 @@ import { AUDIT_ACTIONS, type AuditAction } from '@/lib/audit'
 import { formatJalaliDateTime } from '@/lib/jalali'
 import { toPersianDigits } from '@/lib/persian'
 
-/**
- * Audit log. §58.
- *
- * Read-only by design — there is no edit or delete control anywhere on this
- * screen, and no action exists to build one from. A log an administrator can
- * rewrite is not evidence of anything.
- */
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'گزارش فعالیت' }
 

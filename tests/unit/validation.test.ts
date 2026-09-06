@@ -15,15 +15,6 @@ import {
   searchParamsSchema,
 } from '@/lib/validation'
 
-/**
- * Validation.
- *
- * The recurring theme: a customer typing on a Persian keyboard produces
- * ۰۹۱۲…, and every numeric field must accept that. Rejecting a customer's own
- * phone number as invalid is a self-inflicted wound, and it is the failure
- * these tests mostly guard against.
- */
-
 describe('phoneSchema', () => {
   it('accepts Persian digits', () => {
     const result = phoneSchema.safeParse('۰۹۱۲۱۲۳۴۵۶۷')

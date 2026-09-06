@@ -2,24 +2,14 @@ import { timingSafeEqual } from 'node:crypto'
 import type { NextRequest } from 'next/server'
 
 import { pruneAbandoned } from '@/modules/cart/service'
-import { pruneExpiredOtps } from '@/modules/auth/service'
+import { pruneExpiredOtps, pruneUnverifiedAccounts } from '@/modules/auth/service'
 import { dispatchPending } from '@/modules/sms/service'
 import { pruneExpired as pruneRateLimits } from '@/lib/rate-limit'
 import { pruneSessions } from '@/lib/session'
+import { logger } from '@/lib/logger'
+import { backupAgeHours, dumpDatabase } from '@/lib/backup'
+import { archiveMedia, mediaArchiveAgeHours } from '@/lib/media-backup'
 
-/**
- * Scheduled maintenance. §84 / planning §N-3.
- *
- * The host may or may not have cron — it was never verified. So this is an
- * HTTP endpoint that works either way:
- *
- *   - with cron:    curl -H "Authorization: Bearer $CRON_SECRET" .../api/cron
- *   - without cron: the admin SMS screen calls dispatchPending directly, and
- *                   an external scheduler (or a manual call) can hit this URL.
- *
- * Everything here is idempotent, so running it twice is harmless and a missed
- * run simply catches up on the next one.
- */
 export const dynamic = 'force-dynamic'
 
 function authorized(request: NextRequest): boolean {
@@ -32,60 +22,78 @@ function authorized(request: NextRequest): boolean {
   const a = Buffer.from(presented)
   const b = Buffer.from(secret)
 
-  // Length check first — timingSafeEqual throws on a mismatch, and comparing
-  // lengths leaks only the secret's length, which is not sensitive.
   if (a.length !== b.length) return false
   return timingSafeEqual(a, b)
 }
 
 export async function GET(request: NextRequest) {
   if (!authorized(request)) {
-    // 404 rather than 401 — an unauthenticated caller should not learn that
-    // this endpoint exists at all.
     return new Response('Not found', { status: 404 })
   }
 
   const started = Date.now()
   const results: Record<string, unknown> = {}
+  const failed: string[] = []
 
-  // Each task is isolated: one failure must not stop the rest, and a partial
-  // maintenance run is much better than none.
-  try {
-    results.sms = await dispatchPending(30)
-  } catch (error) {
-    results.sms = { error: String(error) }
+  async function run(name: string, task: () => Promise<unknown>): Promise<void> {
+    try {
+      results[name] = (await task()) ?? 'ok'
+    } catch (error) {
+      failed.push(name)
+      results[name] = { error: error instanceof Error ? error.message : String(error) }
+
+      logger.error('cron task failed', {
+        task: name,
+        detail: error instanceof Error ? (error.stack ?? error.message) : String(error),
+      })
+    }
   }
 
-  try {
+  await run('sms', () => dispatchPending(30))
+  await run('sessions', async () => {
     await pruneSessions()
-    results.sessions = 'pruned'
-  } catch (error) {
-    results.sessions = { error: String(error) }
-  }
-
-  try {
-    await pruneExpiredOtps()
-    results.otps = 'pruned'
-  } catch (error) {
-    results.otps = { error: String(error) }
-  }
-
-  try {
-    results.rateLimits = await pruneRateLimits()
-  } catch (error) {
-    results.rateLimits = { error: String(error) }
-  }
-
-  try {
-    await pruneAbandoned()
-    results.carts = 'pruned'
-  } catch (error) {
-    results.carts = { error: String(error) }
-  }
-
-  return Response.json({
-    ok: true,
-    durationMs: Date.now() - started,
-    results,
+    return 'pruned'
   })
+  await run('otps', async () => {
+    await pruneExpiredOtps()
+    return { pruned: true, unverifiedAccounts: await pruneUnverifiedAccounts() }
+  })
+  await run('rateLimits', () => pruneRateLimits())
+  await run('carts', async () => {
+    await pruneAbandoned()
+    return 'pruned'
+  })
+
+  const force = new URL(request.url).searchParams.get('backup') === 'force'
+  const age = await backupAgeHours()
+
+  if (force || age === null || age >= 20) {
+    await run('backup', async () => {
+      const { file, bytes, rows, tables } = await dumpDatabase()
+      return { file: file.split(/[\\/]/).pop(), bytes, rows, tables }
+    })
+  } else {
+    results.backup = { skipped: `last dump ${age.toFixed(1)}h ago` }
+  }
+
+  const mediaAge = await mediaArchiveAgeHours()
+
+  if (force || mediaAge === null || mediaAge >= 24 * 6) {
+    await run('mediaArchive', async () => {
+      const { file, bytes, files } = await archiveMedia()
+      return { file: file.split(/[\\/]/).pop(), bytes, files }
+    })
+  } else {
+    results.mediaArchive = { skipped: `last archive ${(mediaAge / 24).toFixed(1)}d ago` }
+  }
+
+  const ok = failed.length === 0
+  const durationMs = Date.now() - started
+
+  logger.info('cron run complete', { ok, durationMs, failed })
+
+  return Response.json(
+    { ok, durationMs, failed, results },
+    { status: ok ? 200 : 500 },
+  )
 }
