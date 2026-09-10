@@ -8,6 +8,7 @@ export const CACHE_TAGS = {
   homepage: 'homepage',
   blog: 'blog',
   pages: 'pages',
+  navigation: 'navigation',
   sitemap: 'sitemap',
 } as const
 

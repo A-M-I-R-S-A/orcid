@@ -42,7 +42,7 @@ export function unsafeForDeployment(): EnvProblem[] {
     problems.push({
       variable: 'UPLOAD_DIR',
       message:
-        `UPLOAD_DIR="${uploadDir}" is relative. The standalone server resolves it inside the deploy directory, so media 404s and uploads are destroyed by the next release. Use an absolute path outside it.`,
+        `UPLOAD_DIR="${uploadDir}" is relative. server.js calls process.chdir(__dirname), so a relative path resolves inside the application directory: media 404s and uploads are destroyed by the next deploy. Use an absolute path outside it.`,
     })
   }
 

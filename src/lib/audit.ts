@@ -49,6 +49,7 @@ export const AUDIT_ACTIONS = {
 
   'content.page_update': 'ویرایش صفحه',
   'content.homepage_update': 'ویرایش صفحه اصلی',
+  'content.navigation_update': 'ویرایش منو و فوتر',
   'blog.publish': 'انتشار نوشته',
   'blog.update': 'ویرایش نوشته',
 } as const

@@ -1,7 +1,9 @@
 import Link from 'next/link'
 
 import { listCategories } from '@/modules/catalog/queries'
+import { navLinksFor } from '@/modules/content/queries'
 import { cartCount } from '@/modules/cart/service'
+import { SIZE_GUIDE_HREF, SIZE_GUIDE_LABEL } from '@/lib/size-guide'
 import { getCurrentUser } from '@/lib/session'
 import { getNamespace } from '@/lib/settings'
 import { toPersianDigits } from '@/lib/persian'
@@ -10,24 +12,51 @@ import { MobileNav } from './mobile-nav'
 import { SearchField } from './search-field'
 
 export async function Header() {
-  const [categories, site, social, user] = await Promise.all([
+  const [categories, site, social, user, headerLinks, moreLinks] = await Promise.all([
     listCategories(),
     getNamespace('site'),
     getNamespace('social'),
     getCurrentUser(),
+    navLinksFor('header'),
+    navLinksFor('footer_help'),
   ])
 
   const count = await cartCount(user?.id ?? null)
   const siteName = site.siteName || 'ارکید'
   const topLevel = categories.filter((c) => c.parentId === null).slice(0, 6)
 
+  const navItems =
+    headerLinks.length > 0
+      ? headerLinks
+      : [
+          ...topLevel.map((c) => ({
+            label: c.name,
+            href: `/category/${encodeURIComponent(c.slug)}`,
+          })),
+          { label: SIZE_GUIDE_LABEL, href: SIZE_GUIDE_HREF },
+          { label: 'مجله', href: '/blog' },
+        ]
+
+  const ornamentAfter = headerLinks.length > 0 ? 0 : topLevel.length
+
+  const announcementOn = Boolean(site.announcementText) && site.announcementEnabled !== '0'
+
   return (
     <header
       id="site-header"
       className="sticky top-0 z-40 border-b border-line bg-bg/95 backdrop-blur-sm"
     >
-      {site.announcementText ? (
-        <div className="band px-4 py-2 text-center text-sm">{site.announcementText}</div>
+      {announcementOn ? (
+        site.announcementHref ? (
+          <Link
+            href={site.announcementHref}
+            className="band block px-4 py-2 text-center text-sm hover:underline"
+          >
+            {site.announcementText}
+          </Link>
+        ) : (
+          <div className="band px-4 py-2 text-center text-sm">{site.announcementText}</div>
+        )
       ) : null}
 
       <div className="container-page">
@@ -42,6 +71,7 @@ export async function Header() {
               isSignedIn={Boolean(user)}
               fullName={user?.fullName ?? null}
               cartCount={count}
+              moreLinks={moreLinks}
               social={{
                 instagram: social.instagram,
                 telegram: social.telegram,
@@ -117,9 +147,7 @@ export async function Header() {
         </div>
       </div>
 
-      <CategoryNav
-        categories={topLevel.map((c) => ({ id: c.id, name: c.name, slug: c.slug }))}
-      />
+      <CategoryNav items={navItems} ornamentAfter={ornamentAfter} />
 
       <div className="container-page pb-3 md:hidden">
         <SearchField />

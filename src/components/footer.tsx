@@ -4,27 +4,54 @@ import { eq } from 'drizzle-orm'
 import { db } from '@/db'
 import { pages } from '@/db/schema'
 import { listCategories } from '@/modules/catalog/queries'
+import { navLinksFor } from '@/modules/content/queries'
 import { getNamespace } from '@/lib/settings'
 import { toPersianDigits } from '@/lib/persian'
 import { jalaliYear } from '@/lib/jalali'
 import { sanitizeEnamad } from '@/lib/sanitize'
 
 export async function Footer() {
-  const [categories, site, contact, social, enamad, footerPages] = await Promise.all([
-    listCategories(),
-    getNamespace('site'),
-    getNamespace('contact'),
-    getNamespace('social'),
-    getNamespace('enamad'),
-    db
-      .select({ slug: pages.slug, title: pages.title })
-      .from(pages)
-      .where(eq(pages.showInFooter, true))
-      .orderBy(pages.sortOrder),
-  ])
+  const [categories, site, contact, social, enamad, footerPages, shopLinks, helpLinks] =
+    await Promise.all([
+      listCategories(),
+      getNamespace('site'),
+      getNamespace('contact'),
+      getNamespace('social'),
+      getNamespace('enamad'),
+      db
+        .select({ slug: pages.slug, title: pages.title })
+        .from(pages)
+        .where(eq(pages.showInFooter, true))
+        .orderBy(pages.sortOrder),
+      navLinksFor('footer_shop'),
+      navLinksFor('footer_help'),
+    ])
 
   const siteName = site.siteName || 'ارکید'
   const topLevel = categories.filter((c) => c.parentId === null).slice(0, 6)
+
+  const shopColumn =
+    shopLinks.length > 0
+      ? shopLinks
+      : topLevel.map((c) => ({
+          label: c.name,
+          href: `/category/${encodeURIComponent(c.slug)}`,
+        }))
+
+  const helpColumn =
+    helpLinks.length > 0
+      ? helpLinks
+      : [
+          ...footerPages.map((p) => ({
+            label: p.title,
+            href: `/p/${encodeURIComponent(p.slug)}`,
+          })),
+          { label: 'پیگیری سفارش', href: '/account/orders' },
+        ]
+
+  const shopHeading = site.footerShopHeading || 'فروشگاه'
+  const helpHeading = site.footerHelpHeading || 'راهنما و پشتیبانی'
+  const contactHeading = site.footerContactHeading || 'تماس با ما'
 
   const socialLinks = [
     { key: 'instagram' as const, label: 'اینستاگرام', url: social.instagram },
@@ -74,16 +101,13 @@ export async function Footer() {
 
           <nav aria-labelledby="footer-shop">
             <h2 id="footer-shop" className="mb-4 font-[family-name:var(--font-body)] text-sm font-semibold text-ink">
-              فروشگاه
+              {shopHeading}
             </h2>
             <ul className="space-y-2.5 text-sm text-ink-muted">
-              {topLevel.map((category) => (
-                <li key={category.id}>
-                  <Link
-                    href={`/category/${encodeURIComponent(category.slug)}`}
-                    className="hover:text-accent-2 transition-colors"
-                  >
-                    {category.name}
+              {shopColumn.map((link, index) => (
+                <li key={`${link.href}-${index}`}>
+                  <Link href={link.href} className="hover:text-accent-2 transition-colors">
+                    {link.label}
                   </Link>
                 </li>
               ))}
@@ -92,30 +116,22 @@ export async function Footer() {
 
           <nav aria-labelledby="footer-help">
             <h2 id="footer-help" className="mb-4 font-[family-name:var(--font-body)] text-sm font-semibold text-ink">
-              راهنما و پشتیبانی
+              {helpHeading}
             </h2>
             <ul className="space-y-2.5 text-sm text-ink-muted">
-              {footerPages.map((page) => (
-                <li key={page.slug}>
-                  <Link
-                    href={`/p/${encodeURIComponent(page.slug)}`}
-                    className="hover:text-accent-2 transition-colors"
-                  >
-                    {page.title}
+              {helpColumn.map((link, index) => (
+                <li key={`${link.href}-${index}`}>
+                  <Link href={link.href} className="hover:text-accent-2 transition-colors">
+                    {link.label}
                   </Link>
                 </li>
               ))}
-              <li>
-                <Link href="/account/orders" className="hover:text-accent-2 transition-colors">
-                  پیگیری سفارش
-                </Link>
-              </li>
             </ul>
           </nav>
 
           {hasContactColumn ? (
           <div>
-            <h2 className="mb-4 font-[family-name:var(--font-body)] text-sm font-semibold text-ink">تماس با ما</h2>
+            <h2 className="mb-4 font-[family-name:var(--font-body)] text-sm font-semibold text-ink">{contactHeading}</h2>
             <ul className="space-y-2.5 text-sm text-ink-muted">
               {contact.phone && (
                 <li>

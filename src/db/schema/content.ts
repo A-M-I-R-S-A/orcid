@@ -272,3 +272,21 @@ export const slugRedirects = mysqlTable(
   },
   (t) => [uniqueIndex('slug_redirect_unq').on(t.entityType, t.oldSlug)],
 )
+
+export const NAV_PLACEMENTS = ['header', 'footer_shop', 'footer_help'] as const
+
+export type NavPlacement = (typeof NAV_PLACEMENTS)[number]
+
+export const navLinks = mysqlTable(
+  'nav_links',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    placement: mysqlEnum('placement', NAV_PLACEMENTS).notNull(),
+    label: varchar('label', { length: 60 }).notNull(),
+    href: varchar('href', { length: 255 }).notNull(),
+    isVisible: boolean('is_visible').notNull().default(true),
+    sortOrder: int('sort_order').notNull().default(0),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => [index('nav_links_placement_idx').on(t.placement, t.isVisible, t.sortOrder)],
+)

@@ -17,3 +17,5 @@ next-env.d.ts
 .vercel
 test-results/
 playwright-report/
+tmp/
+.env.deploy

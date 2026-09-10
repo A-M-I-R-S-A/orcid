@@ -5,11 +5,20 @@ import { db } from '@/db'
 import { pages } from '@/db/schema'
 import { ResponsiveImage } from '@/components/media'
 import { Breadcrumbs } from '@/components/ui'
+import { AboutPage } from '@/components/pages/about-page'
+import { ContactPage } from '@/components/pages/contact-page'
+import { FaqPage } from '@/components/pages/faq-page'
 import { breadcrumbSchema, buildMetadata, shouldIndex } from '@/lib/seo'
 import { sanitizeHtml } from '@/lib/sanitize'
 import { JsonLd } from '@/components/json-ld'
 
 export const revalidate = 3600
+
+const TEMPLATES = {
+  about: AboutPage,
+  contact: ContactPage,
+  faq: FaqPage,
+} as const
 
 interface Props {
   params: Promise<{ slug: string }>
@@ -47,6 +56,17 @@ export default async function CmsPage({ params }: Props) {
     { name: 'خانه', path: '/' },
     { name: page.title, path: `/p/${encodeURIComponent(page.slug)}` },
   ]
+
+  const Template = TEMPLATES[page.slug as keyof typeof TEMPLATES]
+
+  if (Template) {
+    return (
+      <>
+        <JsonLd data={breadcrumbSchema(breadcrumbItems)} />
+        <Template page={page} breadcrumbs={breadcrumbItems} />
+      </>
+    )
+  }
 
   return (
     <>

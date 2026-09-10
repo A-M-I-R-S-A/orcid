@@ -50,6 +50,7 @@ export const PERMISSIONS = {
 
   'content.pages': { group: 'content', label: 'مدیریت صفحات' },
   'content.homepage': { group: 'content', label: 'مدیریت صفحه اصلی' },
+  'content.navigation': { group: 'content', label: 'مدیریت منو و فوتر' },
 
   'blog.view': { group: 'blog', label: 'مشاهده نوشته‌ها' },
   'blog.manage': { group: 'blog', label: 'مدیریت نوشته‌ها' },
@@ -97,7 +98,7 @@ export const DEFAULT_ROLES = [
       'customers.view',
       'reviews.view', 'reviews.moderate', 'reviews.reply',
       'sms.view', 'sms.approve',
-      'content.pages', 'content.homepage',
+      'content.pages', 'content.homepage', 'content.navigation',
       'blog.view', 'blog.manage',
       'seo.manage',
       'settings.view',
@@ -122,7 +123,7 @@ export const DEFAULT_ROLES = [
     description: 'مدیریت وبلاگ و صفحات',
     isSystem: false,
     permissions: [
-      'content.pages', 'content.homepage',
+      'content.pages', 'content.homepage', 'content.navigation',
       'blog.view', 'blog.manage',
       'products.view',
       'seo.manage',

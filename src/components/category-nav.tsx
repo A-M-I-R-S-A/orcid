@@ -1,57 +1,60 @@
 'use client'
 
+import { Fragment } from 'react'
 import Link from 'next/link'
 
-import { SIZE_GUIDE_HREF, SIZE_GUIDE_LABEL } from '@/lib/size-guide'
 import { usePathname } from 'next/navigation'
 
 import { OrchidBloom } from './ornament'
 
-export interface NavCategory {
-  id: number
-  name: string
-  slug: string
+export interface NavEntry {
+  label: string
+  href: string
 }
 
-export function CategoryNav({ categories }: { categories: NavCategory[] }) {
+export function CategoryNav({
+  items,
+  ornamentAfter,
+}: {
+  items: NavEntry[]
+  ornamentAfter: number
+}) {
   const pathname = usePathname()
 
   const current = safeDecode(pathname)
+
+  if (items.length === 0) return null
+
+  const showOrnament = ornamentAfter > 0 && ornamentAfter < items.length
 
   return (
     <nav aria-label="ناوبری اصلی" className="header-nav hidden border-y border-line bg-surface lg:block">
       <div className="container-page">
         <ul className="flex items-stretch justify-center">
-          {categories.map((category) => (
-            <li key={category.id}>
-              <NavItem
-                href={`/category/${encodeURIComponent(category.slug)}`}
-                active={current === `/category/${category.slug}`}
-              >
-                {category.name}
-              </NavItem>
-            </li>
+          {items.map((item, index) => (
+            <Fragment key={`${item.href}-${index}`}>
+              {showOrnament && index === ornamentAfter && (
+                <li className="flex items-center px-4" aria-hidden="true">
+                  <OrchidBloom className="h-3.5 w-3.5 text-accent-3" />
+                </li>
+              )}
+              <li>
+                <NavItem href={item.href} active={isActive(current, item.href)}>
+                  {item.label}
+                </NavItem>
+              </li>
+            </Fragment>
           ))}
-
-          <li className="flex items-center px-4" aria-hidden="true">
-            <OrchidBloom className="h-3.5 w-3.5 text-accent-3" />
-          </li>
-
-          <li>
-            <NavItem href={SIZE_GUIDE_HREF} active={current === SIZE_GUIDE_HREF}>
-              {SIZE_GUIDE_LABEL}
-            </NavItem>
-          </li>
-
-          <li>
-            <NavItem href="/blog" active={current.startsWith('/blog')}>
-              مجله
-            </NavItem>
-          </li>
         </ul>
       </div>
     </nav>
   )
+}
+
+function isActive(current: string, href: string): boolean {
+  if (href === '/') return current === '/'
+  if (href.startsWith('http')) return false
+  return current === href || current === safeDecode(href) || current.startsWith(`${href}/`)
 }
 
 function NavItem({

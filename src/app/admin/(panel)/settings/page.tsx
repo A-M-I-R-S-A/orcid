@@ -52,7 +52,39 @@ export default async function SettingsPage() {
                 value: site.announcementText ?? '',
                 hint: 'خالی بگذارید تا نمایش داده نشود.',
               },
+              {
+                key: 'announcementHref',
+                label: 'پیوند نوار اعلان',
+                value: site.announcementHref ?? '',
+                dir: 'ltr',
+                hint: 'اختیاری. با / شروع شود یا نشانی کامل https باشد.',
+              },
+              {
+                key: 'announcementEnabled',
+                label: 'نمایش نوار اعلان',
+                value: site.announcementEnabled ?? '1',
+                hint: 'برای پنهان کردن موقت بدون پاک کردن متن، مقدار را 0 بگذارید.',
+                dir: 'ltr',
+              },
               { key: 'footerNote', label: 'یادداشت فوتر', value: site.footerNote ?? '' },
+              {
+                key: 'footerShopHeading',
+                label: 'عنوان ستون اول فوتر',
+                value: site.footerShopHeading ?? '',
+                hint: 'خالی بگذارید تا «فروشگاه» استفاده شود.',
+              },
+              {
+                key: 'footerHelpHeading',
+                label: 'عنوان ستون دوم فوتر',
+                value: site.footerHelpHeading ?? '',
+                hint: 'خالی بگذارید تا «راهنما و پشتیبانی» استفاده شود.',
+              },
+              {
+                key: 'footerContactHeading',
+                label: 'عنوان ستون تماس فوتر',
+                value: site.footerContactHeading ?? '',
+                hint: 'خالی بگذارید تا «تماس با ما» استفاده شود.',
+              },
             ]}
           />
         )}

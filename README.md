@@ -81,7 +81,7 @@ See `.claude/launch.json`.)
 | --- | --- |
 | `npm run dev` | Development server |
 | `npm run build` | Production build (needs no database) |
-| `npm start` | Run the built standalone server |
+| `npm start` | Run the built server locally |
 | `npm run typecheck` | TypeScript, no emit |
 | `npm test` | 197 unit tests + 11 integration tests |
 | `npm run test:e2e` | 144 Playwright checks × desktop/mobile/tablet |
@@ -171,46 +171,53 @@ re-entering every integration credential.
 > actually deploying, including TLS, the release layout, cron, smoke tests,
 > rollback and troubleshooting.
 
-The build does **not** require a database. Build off-host, upload the artifact.
+The host is cPanel with Phusion Passenger and **no SSH**. `server.js` at the
+repository root is the Passenger entrypoint; cPanel's "Setup Node.js App" loads
+it, ignores the port it asks for, and hands it a socket.
 
 ```
-Local / CI                          Host
-──────────                          ────
+Your computer                       Host (cPanel, no SSH)
+─────────────                       ─────────────────────
 npm ci
-npm run build          ────────►    upload .next/standalone + .next/static
-                                    + public → releases/<timestamp>/
+npm run build          ────────►    upload the project (File Manager or Git)
                                          │
-                                         ├─ mysqldump → backups/pre-migrate.sql
-                                         ├─ npm run db:migrate
-                                         ├─ symlink current → releases/<ts>
-                                         ├─ restart the Node app
-                                         └─ smoke test → rollback if red
+                                         ├─ Setup Node.js App → NPM Install
+                                         ├─ Application mode = Production
+                                         ├─ Run JS script → db:migrate
+                                         ├─ Restart (or touch tmp/restart.txt)
+                                         └─ smoke test
 ```
 
-Releases go in timestamped directories with a `current` symlink, so rollback is
-repointing the symlink and restarting. Keep the last three.
+The build does **not** require a database.
 
-### Three things that must be right
+### Four things that must be right
 
-1. **`UPLOAD_DIR` must be outside the deploy directory.** If it points inside a
-   release folder, every product image is destroyed on the next deploy.
+1. **Application mode must be Production.** cPanel's dropdown sets `NODE_ENV`,
+   and a non-production value ships `unsafe-eval` in the CSP and drops HSTS.
+   `server.js` refuses to start rather than serve the weaker policy.
 
-2. **HTTPS is not optional — the cart depends on it.** Session and cart
+2. **`UPLOAD_DIR` must be absolute and outside the application directory.**
+   `server.js` calls `process.chdir(__dirname)`, so a relative path lands
+   inside the app and every product image dies on the next deploy.
+
+3. **HTTPS is not optional — the cart depends on it.** Session and cart
    cookies are `Secure`, and Safari will not send a `Secure` cookie over plain
    `http` (Chromium makes a localhost exception; WebKit does not). Served over
-   `http`, the cart silently reads back empty on every Apple device. Verify the
-   certificate and the `http → https` redirect before launch.
+   `http`, the cart silently reads back empty on every Apple device. Use
+   cPanel's AutoSSL and force the redirect before launch.
 
-3. **`DB_POOL_SIZE` is per worker.** Managed hosts run several. A default of 10
-   across four workers is 40 connections — past the `max_user_connections`
-   ceiling common on shared plans. Keep it at 3–5 and confirm the host's real
-   limit.
+4. **`DB_POOL_SIZE` is per worker.** A default of 10 across four workers is 40
+   connections — past the `max_user_connections` ceiling common on shared
+   plans. Keep it at 3–5 and confirm the host's real limit in cPanel.
 
-### Host discovery
+### Restarting
 
-The restart command depends on the host's process model (Passenger, a panel
-Node-app manager, or a bare process) and was never verified. Run the discovery
-script in §A of the planning package and fill in that step before deploying.
+Passenger has no service to stop. Either press **Restart** in Setup Node.js App,
+or touch the file it watches:
+
+```
+tmp/restart.txt
+```
 
 ### Scheduled work
 

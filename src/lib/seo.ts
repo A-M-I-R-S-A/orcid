@@ -249,6 +249,19 @@ export function articleSchema(input: {
   }
 }
 
+export function faqSchema(items: { question: string; answer: string }[]): Json {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    inLanguage: 'fa-IR',
+    mainEntity: items.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: { '@type': 'Answer', text: item.answer },
+    })),
+  }
+}
+
 export function jsonLd(data: Json | Json[]): string {
   return JSON.stringify(data).replace(/</g, '\\u003c')
 }

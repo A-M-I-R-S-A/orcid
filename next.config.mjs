@@ -1,5 +1,3 @@
-import type { NextConfig } from 'next'
-
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
@@ -14,9 +12,8 @@ const securityHeaders = [
   },
 ]
 
-const nextConfig: NextConfig = {
-  output: 'standalone',
-
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   compress: true,

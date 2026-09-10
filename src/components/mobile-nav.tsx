@@ -21,6 +21,7 @@ export function MobileNav({
   fullName,
   cartCount,
   social,
+  moreLinks = [],
 }: {
   categories: DrawerCategory[]
   isSignedIn: boolean
@@ -31,6 +32,7 @@ export function MobileNav({
     telegram?: string | null
     whatsapp?: string | null
   }
+  moreLinks?: { label: string; href: string }[]
 }) {
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -241,11 +243,21 @@ export function MobileNav({
           <div className="px-4 pb-6 pt-4">
             <p className="eyebrow mb-3">بیشتر</p>
             <ul className="space-y-0.5">
-              <TextLink href={SIZE_GUIDE_HREF}>{SIZE_GUIDE_LABEL}</TextLink>
-              <TextLink href="/blog">مجله ارکید</TextLink>
-              <TextLink href="/p/about">درباره ما</TextLink>
-              <TextLink href="/p/shipping">شیوه ارسال</TextLink>
-              <TextLink href="/p/contact">تماس با ما</TextLink>
+              {moreLinks.length > 0 ? (
+                moreLinks.map((link) => (
+                  <TextLink key={link.href} href={link.href}>
+                    {link.label}
+                  </TextLink>
+                ))
+              ) : (
+                <>
+                  <TextLink href={SIZE_GUIDE_HREF}>{SIZE_GUIDE_LABEL}</TextLink>
+                  <TextLink href="/blog">مجله ارکید</TextLink>
+                  <TextLink href="/p/about">درباره ما</TextLink>
+                  <TextLink href="/p/shipping">شیوه ارسال</TextLink>
+                  <TextLink href="/p/contact">تماس با ما</TextLink>
+                </>
+              )}
             </ul>
           </div>
         </div>

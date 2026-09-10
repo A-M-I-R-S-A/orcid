@@ -258,3 +258,19 @@ export function formToObject(formData: FormData): Record<string, unknown> {
   }
   return out
 }
+
+export const navHrefSchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(255)
+  .refine(
+    (value) => value.startsWith('/') || /^https:\/\//i.test(value),
+    'پیوند باید با / شروع شود یا یک نشانی https باشد.',
+  )
+  .refine((value) => !value.startsWith('//'), 'پیوند معتبر نیست.')
+
+export const navLinkSchema = z.object({
+  label: z.string().trim().min(1, 'عنوان الزامی است.').max(60),
+  href: navHrefSchema,
+})

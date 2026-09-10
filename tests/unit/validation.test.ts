@@ -6,6 +6,8 @@ import {
   checkoutSchema,
   fieldErrors,
   formToObject,
+  navHrefSchema,
+  navLinkSchema,
   otpCodeSchema,
   paymentReferenceSchema,
   phoneSchema,
@@ -236,5 +238,65 @@ describe('formToObject', () => {
     form.append('tag', 'b')
 
     expect(formToObject(form).tag).toEqual(['a', 'b'])
+  })
+})
+
+describe('navHrefSchema', () => {
+  it('accepts internal paths', () => {
+    for (const href of ['/', '/blog', '/category/bra', '/products?sort=best', '/p/size-guide']) {
+      expect(navHrefSchema.safeParse(href).success).toBe(true)
+    }
+  })
+
+  it('accepts absolute https urls', () => {
+    expect(navHrefSchema.safeParse('https://instagram.com/orchid').success).toBe(true)
+  })
+
+  it('rejects script and data urls', () => {
+    for (const href of [
+      'javascript:alert(1)',
+      'JavaScript:alert(1)',
+      'data:text/html,<script>alert(1)</script>',
+      'vbscript:msgbox(1)',
+    ]) {
+      expect(navHrefSchema.safeParse(href).success).toBe(false)
+    }
+  })
+
+  it('rejects protocol-relative urls, which escape the site silently', () => {
+    expect(navHrefSchema.safeParse('//evil.example').success).toBe(false)
+  })
+
+  it('rejects plain http, since the site is https only', () => {
+    expect(navHrefSchema.safeParse('http://example.com').success).toBe(false)
+  })
+
+  it('rejects empty and whitespace-only values', () => {
+    expect(navHrefSchema.safeParse('').success).toBe(false)
+    expect(navHrefSchema.safeParse('   ').success).toBe(false)
+  })
+
+  it('rejects a bare label with no scheme or leading slash', () => {
+    expect(navHrefSchema.safeParse('category/bra').success).toBe(false)
+  })
+})
+
+describe('navLinkSchema', () => {
+  it('requires a label', () => {
+    expect(navLinkSchema.safeParse({ label: '', href: '/blog' }).success).toBe(false)
+  })
+
+  it('caps the label at sixty characters, matching the column', () => {
+    expect(navLinkSchema.safeParse({ label: 'a'.repeat(61), href: '/blog' }).success).toBe(false)
+    expect(navLinkSchema.safeParse({ label: 'a'.repeat(60), href: '/blog' }).success).toBe(true)
+  })
+
+  it('trims surrounding whitespace', () => {
+    const parsed = navLinkSchema.safeParse({ label: '  حراج  ', href: '  /category/sale  ' })
+    expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.data.label).toBe('حراج')
+      expect(parsed.data.href).toBe('/category/sale')
+    }
   })
 })

@@ -8,26 +8,26 @@ read `meta/_journal.json` and it does not use `drizzle-kit migrate`.
 
 ## `meta/_journal.json` is stale, on purpose
 
-It lists only `0000_initial_schema`. Migrations `0001`–`0003` were hand-written
+It lists only `0000_initial_schema`. Migrations `0001`–`0004` were hand-written
 — for things drizzle-kit cannot emit (fulltext indexes, explicit collations,
 generated columns) — and no snapshot was recorded for any of them.
 
 This does not affect deployment: `scripts/migrate.mjs` never consults the
-journal, so all four files apply in order on a fresh database.
+journal, so all five files apply in order on a fresh database.
 
 It does affect **`npm run db:generate`**, so read this before running it:
 
 - drizzle-kit diffs `src/db/schema` against the newest snapshot it knows about,
-  which is `0000`. It would therefore re-emit every change that `0001`–`0003`
+  which is `0000`. It would therefore re-emit every change that `0001`–`0004`
   already made.
 - It would also number the result `0001_*`, colliding with the existing
   `0001_search_and_constraints.sql` in a directory the runner sorts by name.
 
 **Do not run `db:generate` and ship its output unread.** Write the migration by
-hand, in the style of `0001`–`0003`:
+hand, in the style of `0001`–`0004`:
 
 ```
-drizzle/0004_short_description.sql
+drizzle/0005_short_description.sql
 ```
 
 Separate statements with `--> statement-breakpoint`. The runner splits on it and

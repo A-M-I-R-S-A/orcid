@@ -87,6 +87,12 @@ const NAV: NavGroup[] = [
         icon: 'M7 3h7l5 5v13H7V3zm7 0v5h5M10 13h6M10 17h6',
       },
       {
+        href: '/admin/navigation',
+        label: 'منو و فوتر',
+        permission: 'content.navigation',
+        icon: 'M4 6h16M4 12h16M4 18h10',
+      },
+      {
         href: '/admin/blog',
         label: 'وبلاگ',
         permission: 'blog.view',

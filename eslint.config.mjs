@@ -40,6 +40,13 @@ const config = [
   },
 
   {
+    files: ['server.js'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+
+  {
     files: ['scripts/**/*.{mjs,ts}', 'tests/**/*.{ts,tsx}'],
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',

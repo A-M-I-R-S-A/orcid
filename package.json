@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build && node scripts/bundle-standalone.mjs",
-    "start": "node .next/standalone/server.js",
+    "build": "next build",
+    "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
@@ -24,7 +24,6 @@
     "dev:otp": "node --env-file=.env scripts/dev-otp.mjs",
     "dev:account": "node --env-file=.env scripts/dev-account.mjs",
     "demo:orders": "tsx --conditions=react-server scripts/demo-orders.ts",
-    "build:only": "next build",
     "test:integration": "node --env-file=.env scripts/test-integration.mjs",
     "db:restore-drill": "node --env-file=.env scripts/restore-drill.mjs"
   },
