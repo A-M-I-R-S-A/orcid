@@ -7,6 +7,7 @@ import {
   auditLogs,
   orderItems,
   orders,
+  paymentGatewayAttempts,
   payments,
   productVariants,
   products,
@@ -63,6 +64,8 @@ export async function getForUser(userId: number, orderId: number) {
       shipCity: orders.shipCity,
       shipAddressLine: orders.shipAddressLine,
       shipPostalCode: orders.shipPostalCode,
+      shipmentCompany: orders.shipmentCompany,
+      shipmentTrackingCode: orders.shipmentTrackingCode,
       customerNote: orders.customerNote,
       paidAt: orders.paidAt,
       shippedAt: orders.shippedAt,
@@ -199,9 +202,19 @@ export async function getForAdmin(orderId: number) {
 
   if (!order) return null
 
-  const [items, [payment], smsRows] = await Promise.all([
+  const [items, [payment], [gatewayAttempt], smsRows] = await Promise.all([
     db.select().from(orderItems).where(eq(orderItems.orderId, orderId)),
     db.select().from(payments).where(eq(payments.orderId, orderId)).limit(1),
+    db
+      .select({
+        status: paymentGatewayAttempts.status,
+        reference: paymentGatewayAttempts.reference,
+        createdAt: paymentGatewayAttempts.createdAt,
+      })
+      .from(paymentGatewayAttempts)
+      .innerJoin(payments, eq(paymentGatewayAttempts.paymentId, payments.id))
+      .where(eq(payments.orderId, orderId))
+      .limit(1),
     db.execute(
       sql`SELECT id, event, status, attempts, last_error, sent_at, created_at
           FROM sms_messages WHERE order_id = ${orderId} ORDER BY created_at DESC`,
@@ -213,6 +226,7 @@ export async function getForAdmin(orderId: number) {
     customer: { id: order.customerId, phone: order.customerPhone, name: order.customerName },
     items,
     payment: payment ?? null,
+    gatewayAttempt: gatewayAttempt ?? null,
     smsMessages: (smsRows as unknown as [Record<string, unknown>[], unknown])[0] ?? [],
   }
 }

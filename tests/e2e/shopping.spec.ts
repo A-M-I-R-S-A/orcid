@@ -402,6 +402,7 @@ test.describe('authentication — §24', () => {
 
     for (const path of [
       '/account/orders',
+      '/account/get-later',
       '/account/wishlist',
       '/account/addresses',
       '/account/profile',
@@ -429,7 +430,13 @@ test.describe('admin is protected', () => {
     await expect(page).toHaveURL(/\/admin\/login/)
   })
 
-  for (const path of ['/admin/orders', '/admin/payments', '/admin/products', '/admin/settings']) {
+  for (const path of [
+    '/admin/orders',
+    '/admin/payments',
+    '/admin/products',
+    '/admin/settings',
+    '/admin/get-later',
+  ]) {
     test(`${path} is protected`, async ({ page, context }) => {
       await context.clearCookies()
       await page.goto(path)

@@ -122,13 +122,14 @@ export function HomepageSectionEditor({
           >
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="sm:col-span-2">
-                <label className="label">عنوان</label>
-                <input name="title" defaultValue={section.title ?? ''} className="field" />
+                <label htmlFor={`homepage-title-${section.id}`} className="label">عنوان</label>
+                <input id={`homepage-title-${section.id}`} name="title" defaultValue={section.title ?? ''} className="field" />
               </div>
 
               <div className="sm:col-span-2">
-                <label className="label">زیرعنوان</label>
+                <label htmlFor={`homepage-subtitle-${section.id}`} className="label">زیرعنوان</label>
                 <textarea
+                  id={`homepage-subtitle-${section.id}`}
                   name="subtitle"
                   rows={2}
                   defaultValue={section.subtitle ?? ''}
@@ -137,8 +138,9 @@ export function HomepageSectionEditor({
               </div>
 
               <div>
-                <label className="label">نشانی دکمه</label>
+                <label htmlFor={`homepage-linkUrl-${section.id}`} className="label">نشانی دکمه</label>
                 <input
+                  id={`homepage-linkUrl-${section.id}`}
                   name="linkUrl"
                   defaultValue={section.linkUrl ?? ''}
                   dir="ltr"
@@ -148,13 +150,14 @@ export function HomepageSectionEditor({
               </div>
 
               <div>
-                <label className="label">متن دکمه</label>
-                <input name="linkLabel" defaultValue={section.linkLabel ?? ''} className="field" />
+                <label htmlFor={`homepage-linkLabel-${section.id}`} className="label">متن دکمه</label>
+                <input id={`homepage-linkLabel-${section.id}`} name="linkLabel" defaultValue={section.linkLabel ?? ''} className="field" />
               </div>
 
               <div>
-                <label className="label">ترتیب نمایش</label>
+                <label htmlFor={`homepage-sortOrder-${section.id}`} className="label">ترتیب نمایش</label>
                 <input
+                  id={`homepage-sortOrder-${section.id}`}
                   name="sortOrder"
                   type="number"
                   defaultValue={section.sortOrder}

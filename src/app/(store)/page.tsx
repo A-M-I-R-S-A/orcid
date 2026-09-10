@@ -13,6 +13,7 @@ import { CACHE_TAGS, cached } from '@/lib/cache'
 import { getNamespace } from '@/lib/settings'
 import { buildMetadata } from '@/lib/seo'
 import { formatJalali } from '@/lib/jalali'
+import { safePublicHref } from '@/lib/public-url'
 import {
   BANNER_ALIGN_CLASS,
   BANNER_HEIGHT_CLASS,
@@ -273,7 +274,7 @@ function BannerCopy({ section, design, heading, defaults }: BannerProps) {
   const light = design.tone === 'light'
   const Heading = heading
 
-  const href = section.linkUrl && section.linkUrl !== '/' ? section.linkUrl : defaults.href
+  const href = safePublicHref(section.linkUrl, true) ?? defaults.href
   const label = section.linkLabel || defaults.label
 
   const alignSelf =
@@ -469,7 +470,7 @@ function PromoBanner({ section }: { section: Section }) {
 
             <div className={`mt-9 flex ${alignSelf}`}>
               <BannerCta
-                href={section.linkUrl || defaults.href}
+                href={safePublicHref(section.linkUrl, true) ?? defaults.href}
                 label={section.linkLabel || defaults.label}
                 ctaStyle={design.ctaStyle === 'solid' ? 'outline' : design.ctaStyle}
                 light
@@ -483,6 +484,7 @@ function PromoBanner({ section }: { section: Section }) {
 }
 
 function BrandStory({ section }: { section: Section }) {
+  const href = safePublicHref(section.linkUrl, true)
   return (
     <section className="movement-open container-page">
       <div className="grid gap-10 md:grid-cols-12 md:gap-8">
@@ -495,8 +497,8 @@ function BrandStory({ section }: { section: Section }) {
           {section.subtitle && (
             <p className="text-lg leading-loose text-ink-muted">{section.subtitle}</p>
           )}
-          {section.linkUrl && (
-            <Link href={section.linkUrl} className="link-rule mt-9">
+          {href && (
+            <Link href={href} className="link-rule mt-9">
               {section.linkLabel || 'بیشتر بخوانید'}
               <span aria-hidden="true" className="mirror-rtl">
                 →

@@ -38,7 +38,7 @@ export default async function CheckoutPage() {
   if (cart.hasIssues) redirect('/cart')
 
   const [methods, prefill, saved] = await Promise.all([
-    getEnabledMethods(),
+    getEnabledMethods({ amount: cart.grandTotal }),
     lastUsedAddress(user.id),
     listAddresses(user.id),
   ])
@@ -129,6 +129,10 @@ export default async function CheckoutPage() {
                 </dd>
               </div>
             )}
+            <div className="flex justify-between gap-4">
+              <dt className="text-ink-muted">هزینه ارسال</dt>
+              <dd>{cart.shippingTotal > 0 ? <Price amount={cart.shippingTotal} size="sm" /> : 'رایگان'}</dd>
+            </div>
             <div className="flex justify-between gap-4 pt-4 mt-4 border-t border-line">
               <dt className="font-semibold">مبلغ قابل پرداخت</dt>
               <dd>

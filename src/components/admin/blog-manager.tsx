@@ -156,13 +156,14 @@ function PostForm({
       >
         <div className="grid sm:grid-cols-2 gap-5">
           <div className="sm:col-span-2">
-            <label className="label">عنوان</label>
-            <input name="title" required defaultValue={post?.title ?? ''} className="field" />
+            <label htmlFor="blog-title" className="label">عنوان</label>
+            <input id="blog-title" name="title" required defaultValue={post?.title ?? ''} className="field" />
           </div>
 
           <div>
-            <label className="label">نشانی (slug)</label>
+            <label htmlFor="blog-slug" className="label">نشانی (slug)</label>
             <input
+              id="blog-slug"
               name="slug"
               defaultValue={post?.slug ?? ''}
               className="field"
@@ -171,8 +172,8 @@ function PostForm({
           </div>
 
           <div>
-            <label className="label">دسته‌بندی</label>
-            <select name="categoryId" defaultValue={post?.categoryId ?? ''} className="field">
+            <label htmlFor="blog-categoryId" className="label">دسته‌بندی</label>
+            <select id="blog-categoryId" name="categoryId" defaultValue={post?.categoryId ?? ''} className="field">
               <option value="">بدون دسته‌بندی</option>
               {categories.map((category) => (
                 <option key={category.id} value={category.id}>
@@ -183,8 +184,9 @@ function PostForm({
           </div>
 
           <div className="sm:col-span-2">
-            <label className="label">خلاصه</label>
+            <label htmlFor="blog-excerpt" className="label">خلاصه</label>
             <textarea
+              id="blog-excerpt"
               name="excerpt"
               rows={2}
               maxLength={320}
@@ -195,8 +197,9 @@ function PostForm({
           </div>
 
           <div className="sm:col-span-2">
-            <label className="label">متن نوشته</label>
+            <label htmlFor="blog-body" className="label">متن نوشته</label>
             <textarea
+              id="blog-body"
               name="body"
               rows={14}
               defaultValue={post?.body ?? ''}
@@ -206,13 +209,14 @@ function PostForm({
           </div>
 
           <div>
-            <label className="label">عنوان سئو</label>
-            <input name="seoTitle" defaultValue={post?.seoTitle ?? ''} className="field" />
+            <label htmlFor="blog-seoTitle" className="label">عنوان سئو</label>
+            <input id="blog-seoTitle" name="seoTitle" defaultValue={post?.seoTitle ?? ''} className="field" />
           </div>
 
           <div>
-            <label className="label">توضیحات سئو</label>
+            <label htmlFor="blog-seoDescription" className="label">توضیحات سئو</label>
             <input
+              id="blog-seoDescription"
               name="seoDescription"
               defaultValue={post?.seoDescription ?? ''}
               className="field"
@@ -220,8 +224,9 @@ function PostForm({
           </div>
 
           <div className="sm:col-span-2">
-            <label className="label">متن جایگزین تصویر شاخص</label>
+            <label htmlFor="blog-coverImageAlt" className="label">متن جایگزین تصویر شاخص</label>
             <input
+              id="blog-coverImageAlt"
               name="coverImageAlt"
               defaultValue={post?.coverImageAlt ?? ''}
               className="field"

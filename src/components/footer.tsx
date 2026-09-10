@@ -9,6 +9,7 @@ import { getNamespace } from '@/lib/settings'
 import { toPersianDigits } from '@/lib/persian'
 import { jalaliYear } from '@/lib/jalali'
 import { sanitizeEnamad } from '@/lib/sanitize'
+import { safePublicHref } from '@/lib/public-url'
 
 export async function Footer() {
   const [categories, site, contact, social, enamad, footerPages, shopLinks, helpLinks] =
@@ -54,9 +55,9 @@ export async function Footer() {
   const contactHeading = site.footerContactHeading || 'تماس با ما'
 
   const socialLinks = [
-    { key: 'instagram' as const, label: 'اینستاگرام', url: social.instagram },
-    { key: 'telegram' as const, label: 'تلگرام', url: social.telegram },
-    { key: 'whatsapp' as const, label: 'واتس‌اپ', url: social.whatsapp },
+    { key: 'instagram' as const, label: 'اینستاگرام', url: safePublicHref(social.instagram) },
+    { key: 'telegram' as const, label: 'تلگرام', url: safePublicHref(social.telegram) },
+    { key: 'whatsapp' as const, label: 'واتس‌اپ', url: safePublicHref(social.whatsapp) },
   ].filter((s) => Boolean(s.url))
 
   const hasContactColumn = Boolean(

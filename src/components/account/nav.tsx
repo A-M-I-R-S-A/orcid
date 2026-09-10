@@ -16,8 +16,10 @@ interface NavItem {
 
 export function AccountNav({
   counts,
+  getLaterEnabled = false,
 }: {
-  counts: { orders: number; wishlist: number; addresses: number }
+  counts: { orders: number; wishlist: number; addresses: number; getLater: number }
+  getLaterEnabled?: boolean
 }) {
   const pathname = usePathname()
 
@@ -34,6 +36,14 @@ export function AccountNav({
       count: counts.orders,
       icon: 'M5 7h14l-1.1 12a2 2 0 01-2 1.8H8.1a2 2 0 01-2-1.8L5 7zm4 0V5.5a3 3 0 016 0V7',
     },
+    ...(getLaterEnabled || counts.getLater > 0
+      ? [{
+          href: '/account/get-later',
+          label: 'پرداخت بعدی',
+          count: counts.getLater,
+          icon: 'M4 7h16v11H4V7zm3-3v6m10-6v6M7 14h4m5-2v4m-2-2h4',
+        }]
+      : []),
     {
       href: '/account/wishlist',
       label: 'علاقه‌مندی‌ها',

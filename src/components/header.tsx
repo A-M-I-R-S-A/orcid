@@ -7,6 +7,7 @@ import { SIZE_GUIDE_HREF, SIZE_GUIDE_LABEL } from '@/lib/size-guide'
 import { getCurrentUser } from '@/lib/session'
 import { getNamespace } from '@/lib/settings'
 import { toPersianDigits } from '@/lib/persian'
+import { safePublicHref } from '@/lib/public-url'
 import { CategoryNav } from './category-nav'
 import { MobileNav } from './mobile-nav'
 import { SearchField } from './search-field'
@@ -23,6 +24,7 @@ export async function Header() {
 
   const count = await cartCount(user?.id ?? null)
   const siteName = site.siteName || 'ارکید'
+  const announcementHref = safePublicHref(site.announcementHref, true)
   const topLevel = categories.filter((c) => c.parentId === null).slice(0, 6)
 
   const navItems =
@@ -47,9 +49,9 @@ export async function Header() {
       className="sticky top-0 z-40 border-b border-line bg-bg/95 backdrop-blur-sm"
     >
       {announcementOn ? (
-        site.announcementHref ? (
+        announcementHref ? (
           <Link
-            href={site.announcementHref}
+            href={announcementHref}
             className="band block px-4 py-2 text-center text-sm hover:underline"
           >
             {site.announcementText}

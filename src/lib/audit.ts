@@ -18,6 +18,10 @@ export const AUDIT_ACTIONS = {
 
   'order.status_change': 'تغییر وضعیت سفارش',
   'order.note': 'ثبت یادداشت سفارش',
+  'get_later.create': 'ایجاد سبد پرداخت بعدی',
+  'get_later.update': 'ویرایش سبد پرداخت بعدی',
+  'get_later.open': 'فعال‌سازی سبد پرداخت بعدی',
+  'get_later.cancel': 'لغو سبد پرداخت بعدی',
 
   'payment.approve': 'تأیید پرداخت',
   'payment.reject': 'رد پرداخت',

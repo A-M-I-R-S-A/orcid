@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
 import { ResponsiveImage } from '@/components/media'
+import { GatewayPaymentStatus } from '@/components/gateway-payment-status'
 import { Alert, OrderStatusBadge, Price } from '@/components/ui'
 import { getForUser } from '@/modules/orders/queries'
 import { requireUser } from '@/lib/session'
@@ -17,11 +18,11 @@ export default async function OrderDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ submitted?: string }>
+  searchParams: Promise<{ submitted?: string; payment?: string }>
 }) {
   const user = await requireUser()
   const { id } = await params
-  const { submitted } = await searchParams
+  const { submitted, payment } = await searchParams
 
   const orderId = Number(id)
   if (!Number.isInteger(orderId) || orderId <= 0) notFound()
@@ -53,6 +54,19 @@ export default async function OrderDetailPage({
         </Alert>
       )}
 
+      {payment === 'verified' && (
+        <Alert tone="positive" title="پرداخت تأیید شد">
+          تراکنش از درگاه استعلام شد و سفارش شما با موفقیت پرداخت شد.
+        </Alert>
+      )}
+
+      {payment === 'pending' && order.paymentStatus !== 'approved' && (
+        <Alert tone="negative" title="پرداخت هنوز تأیید نشده است">
+          اگر مبلغ از حساب شما کسر شده، وضعیت را دوباره بررسی کنید و از ایجاد پرداخت تازه خودداری
+          کنید.
+        </Alert>
+      )}
+
       {order.payment?.status === 'rejected' && (
         <Alert tone="negative" title="پرداخت تأیید نشد">
           {order.payment.rejectionReason ||
@@ -63,9 +77,18 @@ export default async function OrderDetailPage({
       {isPayable(order.status) && (
         <div className="card p-5 flex flex-wrap items-center justify-between gap-4 bg-warning-bg">
           <p className="text-sm text-warning">این سفارش در انتظار پرداخت است.</p>
-          <Link href={`/order/${order.id}/pay`} className="btn btn-primary btn-sm">
-            پرداخت سفارش
-          </Link>
+          {order.paymentMethod === 'torob_pay' || order.paymentMethod === 'bitpay' ? (
+            <div className="flex flex-wrap gap-2">
+              <Link href={`/order/${order.id}/pay`} className="btn btn-primary btn-sm">
+                ادامه پرداخت
+              </Link>
+              <GatewayPaymentStatus orderId={order.id} />
+            </div>
+          ) : (
+            <Link href={`/order/${order.id}/pay`} className="btn btn-primary btn-sm">
+              پرداخت سفارش
+            </Link>
+          )}
         </div>
       )}
 
@@ -159,6 +182,12 @@ export default async function OrderDetailPage({
             <p>{order.shipAddressLine}</p>
             <p className="nums">کد پستی: {toPersianDigits(order.shipPostalCode)}</p>
           </address>
+          {order.shipmentTrackingCode && (
+            <dl className="mt-4 space-y-2 border-t border-line pt-4 text-sm">
+              <div className="flex justify-between gap-4"><dt className="text-ink-muted">شرکت حمل</dt><dd>{order.shipmentCompany || '—'}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-ink-muted">کد رهگیری مرسوله</dt><dd className="nums" dir="ltr">{order.shipmentTrackingCode}</dd></div>
+            </dl>
+          )}
           {order.customerNote && (
             <p className="mt-4 pt-4 border-t border-line text-sm text-ink-muted">
               یادداشت شما: {order.customerNote}
@@ -173,7 +202,15 @@ export default async function OrderDetailPage({
           <dl className="text-sm space-y-3">
             <div className="flex justify-between gap-4">
               <dt className="text-ink-muted">روش پرداخت</dt>
-              <dd>{order.paymentMethod === 'card_to_card' ? 'کارت به کارت' : order.paymentMethod}</dd>
+              <dd>
+                {order.paymentMethod === 'card_to_card'
+                  ? 'کارت به کارت'
+                  : order.paymentMethod === 'torob_pay'
+                    ? 'ترب‌پی'
+                    : order.paymentMethod === 'bitpay'
+                      ? 'بیت‌پی'
+                      : order.paymentMethod}
+              </dd>
             </div>
             <div className="flex justify-between gap-4">
               <dt className="text-ink-muted">وضعیت</dt>

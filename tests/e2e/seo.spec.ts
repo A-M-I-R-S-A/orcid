@@ -112,7 +112,15 @@ test.describe('§61/§67 — metadata and canonicals', () => {
 })
 
 test.describe('§70 — private pages are not indexable', () => {
-  for (const path of ['/cart', '/checkout', '/login', '/search?q=test', '/admin/login']) {
+  for (const path of [
+    '/cart',
+    '/checkout',
+    '/login',
+    '/search?q=test',
+    '/admin/login',
+    '/account/get-later',
+    '/admin/get-later',
+  ]) {
     test(`${path} is noindex`, async ({ request }) => {
       const response = await request.get(path)
       const html = await response.text()

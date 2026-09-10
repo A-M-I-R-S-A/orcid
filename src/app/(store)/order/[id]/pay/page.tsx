@@ -2,6 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 
 import { PaymentReferenceForm } from '@/components/payment-form'
+import { GatewayPaymentButton } from '@/components/gateway-payment-button'
 import { Alert, OrderStatusBadge, Price } from '@/components/ui'
 import { getForUser } from '@/modules/orders/queries'
 import { getProvider } from '@/modules/payments/registry'
@@ -36,18 +37,53 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
     redirect(`/account/orders/${orderId}`)
   }
 
+  const wasRejected = order.payment?.status === 'rejected'
+
+  if (provider.info.kind === 'gateway') {
+    return (
+      <div className="container-page py-10 md:py-16">
+        <div className="max-w-2xl mx-auto">
+          <header className="mb-8">
+            <p className="eyebrow mb-2">سفارش {toPersianDigits(order.orderNumber)}</p>
+            <h1 className="text-3xl text-ink">{provider.info.label}</h1>
+            <p className="mt-3 text-sm text-ink-muted leading-relaxed">
+              {provider.info.description}
+            </p>
+          </header>
+
+          <div className="card p-6 mb-6 text-center bg-surface-sunken">
+            <p className="text-sm text-ink-muted mb-2">مبلغ قابل پرداخت</p>
+            <p className="text-3xl">
+              <Price amount={order.grandTotal} />
+            </p>
+          </div>
+
+          <section className="card p-6 space-y-5">
+            <p className="text-sm text-ink-muted leading-relaxed">
+              پس از انتقال به درگاه، نتیجه پرداخت فقط با استعلام مستقیم از سرویس پرداخت تأیید
+              می‌شود. اگر پاسخ درگاه قطع شد، پرداخت تازه‌ای ایجاد نکنید و از صفحه سفارش وضعیت را
+              بررسی کنید.
+            </p>
+            <GatewayPaymentButton orderId={order.id} label={`ادامه و ${provider.info.label}`} />
+          </section>
+
+          <div className="mt-8 text-center">
+            <Link href={`/account/orders/${order.id}`} className="text-sm text-accent-2 hover:underline">
+              بازگشت به جزئیات سفارش
+            </Link>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   const initiation = await provider.initiate({
     id: order.id,
     orderNumber: order.orderNumber,
     amount: order.grandTotal,
   })
-
-  if (initiation.kind === 'redirect') {
-    redirect(initiation.url)
-  }
-
+  if (initiation.kind !== 'instructions') notFound()
   const { instructions } = initiation
-  const wasRejected = order.payment?.status === 'rejected'
 
   return (
     <div className="container-page py-10 md:py-16">

@@ -20,6 +20,8 @@ import { MESSAGES, errors } from '@/lib/errors'
 import { jalaliYear } from '@/lib/jalali'
 import { effectivePrice } from '@/lib/money'
 import { toPersianDigits } from '@/lib/persian'
+import { getShippingConfig } from '@/lib/shipping-config'
+import { calculateShipping, type ShippingConfig } from '@/lib/shipping'
 import { enforce } from '@/lib/rate-limit'
 import * as sms from '@/modules/sms/service'
 import { getEnabledMethods } from '@/modules/payments/registry'
@@ -72,17 +74,19 @@ export async function placeOrder(
   userId: number,
   cartId: number,
   input: CheckoutInput,
+  quotedGrandTotal?: number,
 ): Promise<CheckoutResult> {
   await enforce(`user:${userId}`, 'checkout')
 
-  const enabled = await getEnabledMethods()
+  const shippingConfig = await getShippingConfig()
+  const enabled = await getEnabledMethods({ amount: quotedGrandTotal })
   if (!enabled.some((m) => m.key === input.paymentMethod)) {
     throw errors.payment(MESSAGES.paymentMethodUnavailable)
   }
 
   for (let attempt = 1; ; attempt++) {
     try {
-      return await placeOrderOnce(userId, cartId, input)
+      return await placeOrderOnce(userId, cartId, input, shippingConfig, quotedGrandTotal)
     } catch (error) {
       if (attempt >= ORDER_NUMBER_ATTEMPTS || !isDuplicateOrderNumber(error)) throw error
     }
@@ -93,6 +97,8 @@ async function placeOrderOnce(
   userId: number,
   cartId: number,
   input: CheckoutInput,
+  shippingConfig: ShippingConfig,
+  quotedGrandTotal?: number,
 ): Promise<CheckoutResult> {
   return db.transaction(async (tx) => {
     const orderNumber = await generateOrderNumber(tx)
@@ -190,7 +196,13 @@ async function placeOrderOnce(
       })
     }
 
-    const grandTotal = subtotal - discountTotal
+    const merchandiseTotal = subtotal - discountTotal
+    const shippingTotal = calculateShipping(merchandiseTotal, shippingConfig)
+    const grandTotal = merchandiseTotal + shippingTotal
+
+    if (quotedGrandTotal != null && grandTotal !== quotedGrandTotal) {
+      throw errors.validation(MESSAGES.priceChanged)
+    }
 
     for (const item of prepared) {
       const result = await tx
@@ -216,7 +228,7 @@ async function placeOrderOnce(
       paymentMethod: input.paymentMethod,
       subtotal,
       discountTotal,
-      shippingTotal: 0,
+      shippingTotal,
       grandTotal,
       shipFullName: input.fullName,
       shipPhone: input.phone,

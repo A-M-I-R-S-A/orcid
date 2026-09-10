@@ -4,8 +4,10 @@ import { notFound } from 'next/navigation'
 import { Badge, PageHeader, Table, Td, Th } from '@/components/admin/ui'
 import { OrderStatusControl, OrderNoteForm } from '@/components/admin/order-controls'
 import { PaymentReviewActions } from '@/components/admin/payment-actions'
+import { AdminGatewayPaymentStatus } from '@/components/admin/gateway-payment-status'
 import { OrderTimeline } from '@/components/admin/order-timeline'
 import { CopyField } from '@/components/admin/copy-field'
+import { OrderSmsPanel } from '@/components/admin/order-sms-panel'
 import { ResponsiveImage } from '@/components/media'
 import { storedWidth } from '@/lib/media-url'
 import { getForAdmin, timelineForAdmin } from '@/modules/orders/queries'
@@ -23,15 +25,6 @@ import { toPersianDigits } from '@/lib/persian'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'جزئیات سفارش' }
-
-const SMS_STATUS_LABELS: Record<string, string> = {
-  pending: 'در انتظار تأیید',
-  approved: 'تأیید شده — در صف ارسال',
-  sending: 'در حال ارسال',
-  sent: 'ارسال شده',
-  failed: 'ناموفق',
-  cancelled: 'لغو شده',
-}
 
 export default async function AdminOrderDetailPage({
   params,
@@ -53,8 +46,18 @@ export default async function AdminOrderDetailPage({
   const canNote = hasPermission(admin, 'orders.note')
   const canApprove = hasPermission(admin, 'payments.approve')
   const canReject = hasPermission(admin, 'payments.reject')
+  const canSendSms = hasPermission(admin, 'sms.approve')
 
-  const nextStatuses = ADMIN_TRANSITIONS[order.status]
+  const isGateway = order.paymentMethod === 'torob_pay' || order.paymentMethod === 'bitpay'
+  const nextStatuses = ADMIN_TRANSITIONS[order.status].filter(
+    (status) =>
+      status !== 'shipped' &&
+      (status !== 'paid' || order.paymentStatus === 'approved') &&
+      (!isGateway ||
+      (status === 'cancelled'
+        ? !order.gatewayAttempt || order.gatewayAttempt.status === 'failed'
+        : order.paymentStatus === 'approved')),
+  )
 
   return (
     <>
@@ -175,7 +178,13 @@ export default async function AdminOrderDetailPage({
                   <div>
                     <dt className="text-xs text-ink-muted mb-1">روش</dt>
                     <dd>
-                      {order.payment.method === 'card_to_card' ? 'کارت به کارت' : order.payment.method}
+                      {order.payment.method === 'card_to_card'
+                        ? 'کارت به کارت'
+                        : order.payment.method === 'torob_pay'
+                          ? 'ترب‌پی'
+                          : order.payment.method === 'bitpay'
+                            ? 'بیت‌پی'
+                            : order.payment.method}
                     </dd>
                   </div>
                   {order.payment.referenceCode ? (
@@ -215,57 +224,39 @@ export default async function AdminOrderDetailPage({
                     />
                   </div>
                 )}
+
+                {isGateway && order.payment.status !== 'approved' && (
+                  <AdminGatewayPaymentStatus orderId={order.id} />
+                )}
+
+                {isGateway && order.gatewayAttempt && (
+                  <dl className="mt-4 grid sm:grid-cols-2 gap-4 border-t border-line pt-4 text-sm">
+                    <div>
+                      <dt className="text-xs text-ink-muted mb-1">وضعیت درخواست درگاه</dt>
+                      <dd>{gatewayAttemptLabel(order.gatewayAttempt.status)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs text-ink-muted mb-1">زمان ایجاد درخواست</dt>
+                      <dd className="nums text-xs">
+                        {formatJalaliDateTime(order.gatewayAttempt.createdAt)}
+                      </dd>
+                    </div>
+                  </dl>
+                )}
               </>
             ) : (
               <p className="text-sm text-ink-subtle">پرداختی ثبت نشده است.</p>
             )}
           </section>
 
-          {order.smsMessages.length > 0 && (
-            <section className="card overflow-hidden">
-              <h2 className="text-sm text-ink-muted px-4 py-3 bg-surface-sunken">
-                پیامک‌های این سفارش
-              </h2>
-              <div className="overflow-x-auto">
-                <Table>
-                  <thead>
-                    <tr>
-                      <Th>رویداد</Th>
-                      <Th>وضعیت</Th>
-                      <Th>تلاش</Th>
-                      <Th>زمان ارسال</Th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {(order.smsMessages as Record<string, unknown>[]).map((message) => (
-                      <tr key={String(message.id)}>
-                        <Td className="text-xs">{String(message.event)}</Td>
-                        <Td>
-                          <Badge
-                            tone={
-                              message.status === 'sent'
-                                ? 'positive'
-                                : message.status === 'failed'
-                                  ? 'negative'
-                                  : 'pending'
-                            }
-                          >
-                            {SMS_STATUS_LABELS[String(message.status)] ?? String(message.status)}
-                          </Badge>
-                        </Td>
-                        <Td className="nums text-xs">{toPersianDigits(Number(message.attempts))}</Td>
-                        <Td className="text-xs nums">
-                          {message.sent_at
-                            ? formatJalaliDateTime(String(message.sent_at))
-                            : '—'}
-                        </Td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </Table>
-              </div>
-            </section>
-          )}
+          <OrderSmsPanel
+            orderId={order.id}
+            orderStatus={order.status}
+            company={order.shipmentCompany}
+            trackingCode={order.shipmentTrackingCode}
+            messages={order.smsMessages as { id: number; event: string; status: string; attempts: number; last_error?: string | null; sent_at?: string | Date | null }[]}
+            canSend={canSendSms}
+          />
         </div>
 
         <div className="space-y-6">
@@ -338,4 +329,15 @@ export default async function AdminOrderDetailPage({
       </div>
     </>
   )
+}
+
+function gatewayAttemptLabel(status: string): string {
+  const labels: Record<string, string> = {
+    creating: 'در حال ایجاد',
+    pending: 'در انتظار نتیجه',
+    review: 'نیازمند بررسی',
+    paid: 'تأیید شده',
+    failed: 'ناموفق',
+  }
+  return labels[status] ?? status
 }

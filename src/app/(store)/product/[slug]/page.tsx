@@ -14,6 +14,7 @@ import {
 } from '@/modules/catalog/queries'
 import * as reviewService from '@/modules/reviews/service'
 import { getCurrentUser } from '@/lib/session'
+import { getConfig as getLaterConfig } from '@/modules/get-later/service'
 import { JsonLd } from '@/components/json-ld'
 import {
   breadcrumbSchema,
@@ -68,12 +69,13 @@ export default async function ProductPage({ params }: Props) {
 
   if (product.isArchived || !product.isActive) notFound()
 
-  const [trail, related, reviews, user, guide] = await Promise.all([
+  const [trail, related, reviews, user, guide, getLater] = await Promise.all([
     product.primaryCategoryId ? categoryTrail(product.primaryCategoryId) : Promise.resolve([]),
     relatedProducts(product.id, product.primaryCategoryId, 4),
     reviewService.listForProduct(product.id),
     getCurrentUser(),
     sizeGuide(),
+    getLaterConfig(),
   ])
 
   const ownReview = user ? await reviewService.getOwnReview(user.id, product.id) : null
@@ -142,7 +144,7 @@ export default async function ProductPage({ params }: Props) {
             )}
 
             <div className="mt-8">
-              <ProductPurchasePanel product={product} sizeGuide={guide} />
+              <ProductPurchasePanel product={product} sizeGuide={guide} payLaterEnabled={getLater.enabled} signedIn={Boolean(user)} />
             </div>
           </div>
         </div>

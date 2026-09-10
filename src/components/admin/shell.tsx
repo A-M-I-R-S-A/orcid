@@ -45,6 +45,12 @@ const NAV: NavGroup[] = [
         permission: 'customers.view',
         icon: 'M12 12a4 4 0 100-8 4 4 0 000 8zM4 21c0-3.6 3.6-6 8-6s8 2.4 8 6',
       },
+      {
+        href: '/admin/get-later',
+        label: 'پرداخت بعدی',
+        permission: 'orders.update_status',
+        icon: 'M4 7h16v11H4V7zm3-3v6m10-6v6M7 14h4m5-2v4m-2-2h4',
+      },
     ],
   },
   {

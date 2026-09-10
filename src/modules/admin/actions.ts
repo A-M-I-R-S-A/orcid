@@ -9,6 +9,7 @@ import { destroyAdminSession } from '@/lib/session'
 import { adminLoginSchema, parseOrThrow } from '@/lib/validation'
 import * as audit from '@/lib/audit'
 import * as payments from '@/modules/payments/service'
+import { checkGatewayPaymentForAdmin } from '@/modules/payments/gateway-service'
 import * as reviews from '@/modules/reviews/service'
 import * as sms from '@/modules/sms/service'
 import { requireAdmin, requirePermission, login as loginService } from './auth'
@@ -81,6 +82,21 @@ export async function rejectPaymentAction(input: {
   }
 }
 
+export async function checkGatewayPaymentAdminAction(input: {
+  orderId: number
+}): Promise<ActionResult<{ paid: boolean }>> {
+  try {
+    await requirePermission('payments.view')
+    const result = await checkGatewayPaymentForAdmin(input.orderId)
+    revalidatePath(`/admin/orders/${input.orderId}`)
+    revalidatePath('/admin/orders')
+    revalidatePath('/admin/payments')
+    return ok(result)
+  } catch (error) {
+    return fail(error, { action: 'checkGatewayPaymentAdmin', orderId: input.orderId })
+  }
+}
+
 export async function updateOrderStatusAction(input: {
   orderId: number
   status: OrderStatus
@@ -125,6 +141,34 @@ export async function addOrderNoteAction(input: {
     return ok(undefined)
   } catch (error) {
     return fail(error, { action: 'addOrderNote', orderId: input.orderId })
+  }
+}
+
+export async function sendOrderSmsAction(input: { orderId: number; messageId: number }): Promise<ActionResult<void>> {
+  try {
+    const admin = await requirePermission('sms.approve')
+    if (!Number.isInteger(input.orderId) || !Number.isInteger(input.messageId)) throw new Error('شناسه پیامک معتبر نیست.')
+    const result = await sms.approveAndDispatchForOrder(input.messageId, input.orderId, admin.id)
+    if (result !== 'sent') throw new Error('ارسال پیامک انجام نشد؛ وضعیت خطا را بررسی کنید.')
+    revalidatePath(`/admin/orders/${input.orderId}`)
+    revalidatePath('/admin/sms')
+    return ok(undefined)
+  } catch (error) {
+    return fail(error, { action: 'sendOrderSms', orderId: input.orderId, messageId: input.messageId })
+  }
+}
+
+export async function sendShipmentSmsAction(input: { orderId: number; company: string; trackingCode: string }): Promise<ActionResult<void>> {
+  try {
+    const admin = await requirePermission('sms.approve')
+    const result = await sms.sendShipmentForOrder({ ...input, adminId: admin.id })
+    if (result !== 'sent') throw new Error('ارسال پیامک رهگیری انجام نشد؛ وضعیت خطا را بررسی کنید.')
+    revalidatePath(`/admin/orders/${input.orderId}`)
+    revalidatePath('/admin/orders')
+    revalidatePath('/admin/sms')
+    return ok(undefined)
+  } catch (error) {
+    return fail(error, { action: 'sendShipmentSms', orderId: input.orderId })
   }
 }
 

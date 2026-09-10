@@ -1,9 +1,6 @@
 #!/usr/bin/env node
 
 import mysql from 'mysql2/promise'
-import { createRequire } from 'node:module'
-
-const require = createRequire(import.meta.url)
 
 if (process.env.NODE_ENV === 'production') {
   console.error('Refusing to run with NODE_ENV=production.')

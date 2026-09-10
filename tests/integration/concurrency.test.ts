@@ -179,7 +179,7 @@ describe.skipIf(!hasTestDb)('concurrency and clock regressions', () => {
     expect(row?.reference).toBeTruthy()
   })
 
-  it('approving a payment does not drag a shipped order backwards', async () => {
+  it('refuses to approve a payment after the order has already shipped', async () => {
     const db = testDb()
     const payments = await import('@/modules/payments/service')
 
@@ -216,7 +216,7 @@ describe.skipIf(!hasTestDb)('concurrency and clock regressions', () => {
 
     const admin = { id: 1, fullName: 'مدیر آزمایشی', roleKey: 'superadmin', permissions: [] } as never
 
-    await payments.approve(admin, paymentId, undefined)
+    await expect(payments.approve(admin, paymentId, undefined)).rejects.toThrow()
 
     const [row] = await db
       .select({ status: schema.orders.status, paymentStatus: schema.orders.paymentStatus })
@@ -224,6 +224,59 @@ describe.skipIf(!hasTestDb)('concurrency and clock regressions', () => {
       .where(eq(schema.orders.id, orderId))
 
     expect(row?.status).toBe('shipped')
-    expect(row?.paymentStatus).toBe('approved')
+    expect(row?.paymentStatus).toBe('reference_submitted')
+  })
+
+  it('expires an unpaid order once after seven days and restores inventory', async () => {
+    const db = testDb()
+    const { expireUnpaidOrders } = await import('@/modules/payments/service')
+    const userId = await createUser()
+    const { productId, variantId } = await createProductWithVariant({ stock: 5 })
+    await db.update(schema.productVariants).set({ stockQty: 3 }).where(eq(schema.productVariants.id, variantId))
+    await db.update(schema.products).set({ salesCount: 2 }).where(eq(schema.products.id, productId))
+
+    const [order] = await db.insert(schema.orders).values({
+      orderNumber: `ORC-EXPIRE-${Date.now()}`,
+      userId,
+      status: 'awaiting_payment',
+      paymentStatus: 'pending',
+      paymentMethod: 'card_to_card',
+      subtotal: 200_000,
+      discountTotal: 0,
+      shippingTotal: 0,
+      grandTotal: 200_000,
+      shipFullName: 'آزمایش',
+      shipPhone: '09121234567',
+      shipProvince: 'تهران',
+      shipCity: 'تهران',
+      shipAddressLine: 'خیابان آزمایشی',
+      shipPostalCode: '1234567890',
+      createdAt: new Date(Date.now() - 8 * 86_400_000),
+    })
+    const orderId = (order as unknown as { insertId: number }).insertId
+    await db.insert(schema.orderItems).values({
+      orderId,
+      variantId,
+      productId,
+      productName: 'محصول آزمایشی',
+      productSlug: 'test-expiry',
+      sku: `EXP-${Date.now()}`,
+      unitPrice: 100_000,
+      quantity: 2,
+      lineTotal: 200_000,
+    })
+    await db.insert(schema.payments).values({ orderId, userId, method: 'card_to_card', status: 'pending', amount: 200_000 })
+
+    expect(await expireUnpaidOrders(7)).toMatchObject({ expired: 1 })
+    expect(await expireUnpaidOrders(7)).toMatchObject({ expired: 0 })
+
+    const [storedOrder] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId))
+    const [storedPayment] = await db.select().from(schema.payments).where(eq(schema.payments.orderId, orderId))
+    const [variant] = await db.select().from(schema.productVariants).where(eq(schema.productVariants.id, variantId))
+    const [product] = await db.select().from(schema.products).where(eq(schema.products.id, productId))
+    expect(storedOrder?.status).toBe('cancelled')
+    expect(storedPayment?.status).toBe('rejected')
+    expect(variant?.stockQty).toBe(5)
+    expect(product?.salesCount).toBe(0)
   })
 })

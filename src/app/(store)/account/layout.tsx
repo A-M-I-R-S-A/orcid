@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/session'
 import { maskPhone } from '@/lib/persian'
 import { addressCount, wishlistCount } from '@/modules/account/service'
 import { countForUser } from '@/modules/orders/queries'
+import { activeCountForUser, getConfig as getLaterConfig } from '@/modules/get-later/service'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,10 +17,12 @@ export default async function AccountLayout({ children }: { children: React.Reac
   const user = await getCurrentUser()
   if (!user) redirect('/login?next=/account')
 
-  const [orders, wishlist, addresses] = await Promise.all([
+  const [orders, wishlist, addresses, getLater, getLaterSettings] = await Promise.all([
     countForUser(user.id),
     wishlistCount(user.id),
     addressCount(user.id),
+    activeCountForUser(user.id),
+    getLaterConfig(),
   ])
 
   return (
@@ -41,7 +44,10 @@ export default async function AccountLayout({ children }: { children: React.Reac
             </div>
           </div>
 
-          <AccountNav counts={{ orders, wishlist, addresses }} />
+          <AccountNav
+            counts={{ orders, wishlist, addresses, getLater }}
+            getLaterEnabled={getLaterSettings.enabled}
+          />
         </aside>
 
         <div className="min-w-0 lg:col-span-3">{children}</div>

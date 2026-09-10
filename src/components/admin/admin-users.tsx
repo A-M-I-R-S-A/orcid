@@ -137,13 +137,14 @@ function AdminUserForm({
       >
         <div className="grid sm:grid-cols-2 gap-5">
           <div>
-            <label className="label">نام و نام خانوادگی</label>
-            <input name="fullName" required defaultValue={admin?.fullName ?? ''} className="field" />
+            <label htmlFor="admin-fullName" className="label">نام و نام خانوادگی</label>
+            <input id="admin-fullName" name="fullName" required defaultValue={admin?.fullName ?? ''} className="field" />
           </div>
 
           <div>
-            <label className="label">نام کاربری</label>
+            <label htmlFor="admin-username" className="label">نام کاربری</label>
             <input
+              id="admin-username"
               name="username"
               required
               dir="ltr"
@@ -155,8 +156,9 @@ function AdminUserForm({
           </div>
 
           <div>
-            <label className="label">ایمیل (اختیاری)</label>
+            <label htmlFor="admin-email" className="label">ایمیل (اختیاری)</label>
             <input
+              id="admin-email"
               name="email"
               type="email"
               dir="ltr"
@@ -166,8 +168,8 @@ function AdminUserForm({
           </div>
 
           <div>
-            <label className="label">نقش</label>
-            <select name="roleId" defaultValue={admin?.roleId ?? ''} required className="field">
+            <label htmlFor="admin-roleId" className="label">نقش</label>
+            <select id="admin-roleId" name="roleId" defaultValue={admin?.roleId ?? ''} required className="field">
               <option value="">انتخاب کنید</option>
               {roles.map((role) => (
                 <option key={role.id} value={role.id}>
@@ -178,10 +180,11 @@ function AdminUserForm({
           </div>
 
           <div className="sm:col-span-2">
-            <label className="label">
+            <label htmlFor="admin-password" className="label">
               {admin ? 'رمز عبور جدید (اختیاری)' : 'رمز عبور'}
             </label>
             <input
+              id="admin-password"
               name="password"
               type="password"
               dir="ltr"

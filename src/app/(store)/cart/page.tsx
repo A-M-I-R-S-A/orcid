@@ -71,7 +71,9 @@ export default async function CartPage() {
 
             <div className="flex justify-between gap-4">
               <dt className="text-ink-muted">هزینه ارسال</dt>
-              <dd className="text-ink-muted text-xs">در مرحله بعد محاسبه می‌شود</dd>
+              <dd className="nums">
+                {cart.shippingTotal > 0 ? <Price amount={cart.shippingTotal} size="sm" /> : 'رایگان'}
+              </dd>
             </div>
 
             <div className="flex justify-between gap-4 pt-4 mt-4 border-t border-line text-base">

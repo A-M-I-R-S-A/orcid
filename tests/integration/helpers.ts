@@ -38,7 +38,10 @@ export async function closeTestDb() {
 const TRUNCATION_ORDER = [
   'variant_option_values',
   'cart_items',
+  'get_later_items',
+  'get_later_carts',
   'order_items',
+  'payment_gateway_attempts',
   'payments',
   'review_replies',
   'reviews',

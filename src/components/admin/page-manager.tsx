@@ -122,13 +122,14 @@ function PageForm({ page, onDone }: { page: CmsPage | null; onDone: () => void }
       >
         <div className="grid sm:grid-cols-2 gap-5">
           <div>
-            <label className="label">عنوان صفحه</label>
-            <input name="title" required defaultValue={page?.title ?? ''} className="field" />
+            <label htmlFor="page-title" className="label">عنوان صفحه</label>
+            <input id="page-title" name="title" required defaultValue={page?.title ?? ''} className="field" />
           </div>
 
           <div>
-            <label className="label">نشانی (slug)</label>
+            <label htmlFor="page-slug" className="label">نشانی (slug)</label>
             <input
+              id="page-slug"
               name="slug"
               defaultValue={page?.slug ?? ''}
               className="field"
@@ -137,8 +138,9 @@ function PageForm({ page, onDone }: { page: CmsPage | null; onDone: () => void }
           </div>
 
           <div className="sm:col-span-2">
-            <label className="label">محتوا</label>
+            <label htmlFor="page-body" className="label">محتوا</label>
             <textarea
+              id="page-body"
               name="body"
               rows={12}
               defaultValue={page?.body ?? ''}
@@ -152,13 +154,14 @@ function PageForm({ page, onDone }: { page: CmsPage | null; onDone: () => void }
           </div>
 
           <div>
-            <label className="label">عنوان سئو</label>
-            <input name="seoTitle" defaultValue={page?.seoTitle ?? ''} className="field" />
+            <label htmlFor="page-seoTitle" className="label">عنوان سئو</label>
+            <input id="page-seoTitle" name="seoTitle" defaultValue={page?.seoTitle ?? ''} className="field" />
           </div>
 
           <div>
-            <label className="label">توضیحات سئو</label>
+            <label htmlFor="page-seoDescription" className="label">توضیحات سئو</label>
             <input
+              id="page-seoDescription"
               name="seoDescription"
               defaultValue={page?.seoDescription ?? ''}
               className="field"
@@ -166,8 +169,9 @@ function PageForm({ page, onDone }: { page: CmsPage | null; onDone: () => void }
           </div>
 
           <div>
-            <label className="label">ترتیب در فوتر</label>
+            <label htmlFor="page-sortOrder" className="label">ترتیب در فوتر</label>
             <input
+              id="page-sortOrder"
               name="sortOrder"
               type="number"
               defaultValue={page?.sortOrder ?? 0}
@@ -200,7 +204,7 @@ function PageForm({ page, onDone }: { page: CmsPage | null; onDone: () => void }
 
         {page && (
           <div className="border-t border-line pt-5">
-            <label className="label">
+            <label htmlFor="page-image" className="label">
               تصویر صفحه
               {page.slug === SIZE_GUIDE_SLUG && (
                 <span className="font-normal text-ink-muted">
@@ -221,6 +225,7 @@ function PageForm({ page, onDone }: { page: CmsPage | null; onDone: () => void }
 
               <div className="flex flex-wrap items-end gap-3">
                 <input
+                  id="page-image"
                   ref={fileRef}
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/avif"

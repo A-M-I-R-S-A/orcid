@@ -3,8 +3,9 @@ import 'server-only'
 import { and, eq, inArray, lt, sql } from 'drizzle-orm'
 
 import { affectedRows, db } from '@/db'
-import { type SMS_EVENTS, smsMessages, smsTemplates } from '@/db/schema'
+import { type SMS_EVENTS, orders, smsMessages, smsTemplates } from '@/db/schema'
 import { formatAmountLatin } from '@/lib/money'
+import { errors } from '@/lib/errors'
 import { getProvider } from './provider'
 
 type SmsEvent = (typeof SMS_EVENTS)[number]
@@ -94,12 +95,18 @@ export async function queueOrderShipped(params: {
   phone: string
   orderId: number
   orderNumber: string
+  company?: string
+  trackingCode?: string
 }): Promise<number | null> {
   return enqueue({
     event: 'order_shipped',
     phone: params.phone,
     orderId: params.orderId,
-    payload: { ORDER: params.orderNumber },
+    payload: {
+      ORDER: params.orderNumber,
+      SHIPMENT: params.company ?? '',
+      TRACK: params.trackingCode ?? '',
+    },
   })
 }
 
@@ -137,16 +144,25 @@ export async function dispatchPending(limit = 20): Promise<{ sent: number; faile
   let failed = 0
 
   for (const { id } of candidates) {
+    const result = await dispatchOne(id)
+    if (result === 'sent') sent++
+    if (result === 'failed') failed++
+  }
+
+  return { sent, failed }
+}
+
+export async function dispatchOne(id: number): Promise<'sent' | 'failed' | 'skipped'> {
     const claim = await db
       .update(smsMessages)
       .set({ status: 'sending', attempts: sql`${smsMessages.attempts} + 1` })
       .where(and(eq(smsMessages.id, id), eq(smsMessages.status, 'approved')))
 
     const claimed = affectedRows(claim)
-    if (claimed === 0) continue
+    if (claimed === 0) return 'skipped'
 
     const [message] = await db.select().from(smsMessages).where(eq(smsMessages.id, id)).limit(1)
-    if (!message) continue
+    if (!message) return 'skipped'
 
     const [template] = await db
       .select()
@@ -159,8 +175,7 @@ export async function dispatchPending(limit = 20): Promise<{ sent: number; faile
         .update(smsMessages)
         .set({ status: 'failed', lastError: 'قالب پیامک غیرفعال یا ناقص است.' })
         .where(eq(smsMessages.id, id))
-      failed++
-      continue
+      return 'failed'
     }
 
     const provider = await getProvider()
@@ -180,7 +195,7 @@ export async function dispatchPending(limit = 20): Promise<{ sent: number; faile
           lastError: null,
         })
         .where(eq(smsMessages.id, id))
-      sent++
+      return 'sent'
     } else {
       const exhausted = message.attempts + 1 >= message.maxAttempts
       await db
@@ -190,11 +205,79 @@ export async function dispatchPending(limit = 20): Promise<{ sent: number; faile
           lastError: result.error?.slice(0, 255) ?? 'ارسال ناموفق',
         })
         .where(eq(smsMessages.id, id))
-      failed++
+      return 'failed'
     }
+}
+
+export async function approveAndDispatchForOrder(messageId: number, orderId: number, adminId: number) {
+  const [message] = await db
+    .select({ id: smsMessages.id, orderId: smsMessages.orderId, status: smsMessages.status })
+    .from(smsMessages)
+    .where(and(eq(smsMessages.id, messageId), eq(smsMessages.orderId, orderId)))
+    .limit(1)
+  if (!message) throw errors.notFound('پیامک این سفارش پیدا نشد.')
+  if (message.status === 'sent') throw errors.conflict('این پیامک قبلاً ارسال شده است.')
+  if (message.status === 'cancelled' || message.status === 'sending') throw errors.conflict('این پیامک اکنون قابل ارسال نیست.')
+
+  await db.update(smsMessages).set({
+    status: 'approved',
+    attempts: message.status === 'failed' ? 0 : undefined,
+    approvedByAdminId: adminId,
+    approvedAt: new Date(),
+    lastError: null,
+  }).where(eq(smsMessages.id, messageId))
+  return dispatchOne(messageId)
+}
+
+export async function sendShipmentForOrder(input: {
+  orderId: number
+  adminId: number
+  company: string
+  trackingCode: string
+}) {
+  const company = input.company.trim()
+  const trackingCode = input.trackingCode.trim()
+  if (!company || company.length > 80 || !trackingCode || trackingCode.length > 80) {
+    throw errors.validation('شرکت حمل و کد رهگیری را کامل و معتبر وارد کنید.')
   }
 
-  return { sent, failed }
+  const [order] = await db.select({
+    id: orders.id,
+    status: orders.status,
+    phone: orders.shipPhone,
+    orderNumber: orders.orderNumber,
+  }).from(orders).where(eq(orders.id, input.orderId)).limit(1)
+  if (!order) throw errors.notFound('سفارش پیدا نشد.')
+  if (order.status !== 'processing' && order.status !== 'shipped') {
+    throw errors.conflict('پیامک رهگیری زمانی قابل ارسال است که سفارش در حال آماده‌سازی باشد.')
+  }
+
+  await db.update(orders).set({ shipmentCompany: company, shipmentTrackingCode: trackingCode }).where(eq(orders.id, order.id))
+
+  const [existing] = await db.select({ id: smsMessages.id, status: smsMessages.status })
+    .from(smsMessages)
+    .where(and(eq(smsMessages.orderId, order.id), eq(smsMessages.event, 'order_shipped')))
+    .orderBy(sql`${smsMessages.createdAt} DESC`)
+    .limit(1)
+  if (existing?.status === 'sent') throw errors.conflict('پیامک رهگیری این سفارش قبلاً ارسال شده است.')
+
+  const messageId = existing?.id ?? await queueOrderShipped({
+    phone: order.phone,
+    orderId: order.id,
+    orderNumber: order.orderNumber,
+    company,
+    trackingCode,
+  })
+  if (!messageId) throw errors.conflict('قالب پیامک رهگیری غیرفعال یا ناقص است.')
+
+  if (existing) {
+    await db.update(smsMessages).set({ payload: { ORDER: order.orderNumber, SHIPMENT: company, TRACK: trackingCode } }).where(eq(smsMessages.id, messageId))
+  }
+  const result = await approveAndDispatchForOrder(messageId, order.id, input.adminId)
+  if (result === 'sent' && order.status === 'processing') {
+    await db.update(orders).set({ status: 'shipped', shippedAt: new Date() }).where(and(eq(orders.id, order.id), eq(orders.status, 'processing')))
+  }
+  return result
 }
 
 export async function pendingApprovalCount(): Promise<number> {

@@ -9,7 +9,7 @@ import { smsTemplates } from '@/db/schema'
 import * as audit from '@/lib/audit'
 import { type ActionResult, errors, fail, ok } from '@/lib/errors'
 import { clientIp } from '@/lib/rate-limit'
-import { type Namespace, setMany } from '@/lib/settings'
+import { getSecret, type Namespace, setMany } from '@/lib/settings'
 import { DEFAULT_THEME, isValidHex } from '@/lib/theme'
 import { AVAILABLE_FONTS, findFont } from '@/lib/typography'
 import { resetProvider } from '@/modules/sms/provider'
@@ -140,12 +140,15 @@ const NAMESPACE_PERMISSIONS = {
   enamad: 'settings.enamad',
   payment_card: 'settings.payment',
   torob: 'settings.payment',
+  bitpay: 'settings.payment',
   sms: 'sms.configure',
+  get_later: 'settings.manage',
 } as const
 
 const SECRET_KEYS: Partial<Record<Namespace, readonly string[]>> = {
   sms: ['apiKey'],
-  torob: ['apiKey', 'accessCode'],
+  torob: ['clientSecret', 'password'],
+  bitpay: ['apiKey'],
 }
 
 const AUDIT_ACTIONS: Partial<Record<Namespace, audit.AuditAction>> = {
@@ -153,7 +156,67 @@ const AUDIT_ACTIONS: Partial<Record<Namespace, audit.AuditAction>> = {
   enamad: 'enamad.change',
   payment_card: 'payment_config.change',
   torob: 'payment_config.change',
+  bitpay: 'payment_config.change',
   sms: 'sms.config_change',
+}
+
+const ALLOWED_SETTING_KEYS: Record<Exclude<Namespace, 'theme' | 'typography'>, readonly string[]> = {
+  site: ['siteName', 'tagline', 'announcementText', 'announcementHref', 'announcementEnabled', 'footerNote', 'footerShopHeading', 'footerHelpHeading', 'footerContactHeading'],
+  contact: ['phone', 'email', 'address', 'workingHours'],
+  social: ['instagram', 'telegram', 'whatsapp'],
+  shipping: ['shippingFee', 'freeShippingThreshold', 'shippingInfo', 'returnPolicy'],
+  seo: ['defaultTitle', 'defaultDescription', 'titleSeparator'],
+  enamad: ['embedCode', 'metaTag'],
+  payment_card: ['bankName', 'cardNumber', 'accountHolder', 'instructions', 'enabled'],
+  torob: ['clientId', 'clientSecret', 'username', 'password', 'enabled'],
+  bitpay: ['apiKey', 'enabled'],
+  sms: ['apiKey', 'provider'],
+  get_later: ['title', 'description', 'deadlineDays', 'submitLabel', 'enabled'],
+}
+
+function validPublicUrl(value: string, allowRelative = false): boolean {
+  if (!value) return true
+  if (allowRelative && value.startsWith('/') && !value.startsWith('//')) return true
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' && !url.username && !url.password
+  } catch {
+    return false
+  }
+}
+
+function validateSettings(namespace: Exclude<Namespace, 'theme' | 'typography'>, values: Record<string, string>) {
+  const allowed = new Set(ALLOWED_SETTING_KEYS[namespace])
+  if (Object.keys(values).some((key) => !allowed.has(key))) throw errors.validation('یکی از فیلدهای تنظیمات معتبر نیست.')
+  if (Object.values(values).some((value) => typeof value !== 'string' || value.length > 10_000)) {
+    throw errors.validation('یکی از مقادیر تنظیمات بیش از حد طولانی است.')
+  }
+  if (values.enabled != null && !['0', '1'].includes(values.enabled)) throw errors.validation('وضعیت فعال‌سازی معتبر نیست.')
+
+  if (namespace === 'site') {
+    if (!validPublicUrl(values.announcementHref?.trim() ?? '', true)) throw errors.validation('پیوند نوار اعلان باید با / شروع شود یا نشانی کامل HTTPS باشد.')
+    if (values.announcementEnabled != null && !['0', '1'].includes(values.announcementEnabled)) throw errors.validation('وضعیت نوار اعلان معتبر نیست.')
+  }
+  if (namespace === 'social') {
+    for (const value of Object.values(values)) {
+      if (!validPublicUrl(value.trim())) throw errors.validation('نشانی شبکه اجتماعی باید کامل و با HTTPS باشد.')
+    }
+  }
+  if (namespace === 'contact' && values.email?.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email.trim())) {
+    throw errors.validation('نشانی ایمیل معتبر نیست.')
+  }
+  if (namespace === 'shipping') {
+    for (const key of ['shippingFee', 'freeShippingThreshold'] as const) {
+      const amount = Number(values[key])
+      if (!Number.isSafeInteger(amount) || amount < 0 || amount > 1_000_000_000) {
+        throw errors.validation('مبلغ ارسال باید عدد صحیحی بین صفر تا یک میلیارد تومان باشد.')
+      }
+    }
+  }
+  if (namespace === 'payment_card' && values.cardNumber?.trim() && !/^\d{16}$/.test(values.cardNumber.trim())) {
+    throw errors.validation('شماره کارت باید دقیقاً ۱۶ رقم باشد.')
+  }
+  if (namespace === 'sms' && values.provider !== 'sms_ir') throw errors.validation('ارائه‌دهنده پیامک معتبر نیست.')
 }
 
 export async function saveSettingsAction(
@@ -164,10 +227,66 @@ export async function saveSettingsAction(
     const permission = NAMESPACE_PERMISSIONS[namespace as keyof typeof NAMESPACE_PERMISSIONS]
     if (!permission) throw errors.forbidden()
 
+    validateSettings(namespace as Exclude<Namespace, 'theme' | 'typography'>, values)
+
     const admin = await requirePermission(permission)
     const headerList = await headers()
 
     const secretKeys = SECRET_KEYS[namespace] ?? []
+
+    if (namespace === 'torob') {
+      if ((values.clientId?.length ?? 0) > 500 || (values.username?.length ?? 0) > 500) {
+        throw errors.validation('شناسه یا نام کاربری ترب‌پی بیش از حد طولانی است.')
+      }
+      if ((values.clientSecret?.length ?? 0) > 2000 || (values.password?.length ?? 0) > 2000) {
+        throw errors.validation('اطلاعات محرمانه ترب‌پی بیش از حد طولانی است.')
+      }
+    }
+    if (namespace === 'bitpay' && (values.apiKey?.length ?? 0) > 2000) {
+      throw errors.validation('کلید API بیت‌پی بیش از حد طولانی است.')
+    }
+    if (namespace === 'get_later') {
+      const days = Number(values.deadlineDays)
+      if (!Number.isInteger(days) || days < 1 || days > 30) {
+        throw errors.validation('مهلت پیش‌فرض باید عددی بین ۱ تا ۳۰ روز باشد.')
+      }
+      if ((values.title?.trim().length ?? 0) < 2 || (values.title?.length ?? 0) > 120) {
+        throw errors.validation('عنوان این قابلیت باید بین ۲ تا ۱۲۰ کاراکتر باشد.')
+      }
+      if ((values.description?.length ?? 0) > 1000 || (values.submitLabel?.length ?? 0) > 60) {
+        throw errors.validation('متن واردشده بیش از حد طولانی است.')
+      }
+    }
+
+    if (namespace === 'torob' && values.enabled === '1') {
+      const [savedSecret, savedPassword] = await Promise.all([
+        getSecret('torob', 'clientSecret'),
+        getSecret('torob', 'password'),
+      ])
+      if (
+        !values.clientId?.trim() ||
+        !(values.clientSecret?.trim() || savedSecret) ||
+        !values.username?.trim() ||
+        !(values.password || savedPassword)
+      ) {
+        throw errors.validation('برای فعال‌سازی ترب‌پی، هر چهار مشخصه دسترسی را کامل کنید.')
+      }
+    }
+
+    if (namespace === 'bitpay' && values.enabled === '1') {
+      const savedApiKey = await getSecret('bitpay', 'apiKey')
+      if (!(values.apiKey?.trim() || savedApiKey)) {
+        throw errors.validation('برای فعال‌سازی بیت‌پی، کلید API را وارد کنید.')
+      }
+    }
+
+    if ((namespace === 'torob' || namespace === 'bitpay') && values.enabled === '1') {
+      const appUrl = process.env.APP_URL ?? ''
+      if (!appUrl.startsWith('https://')) {
+        throw errors.validation('پیش از فعال‌سازی درگاه، APP_URL باید نشانی کامل HTTPS سایت باشد.')
+      }
+    }
+
     await setMany(namespace, values, secretKeys)
 
     if (namespace === 'sms') resetProvider()

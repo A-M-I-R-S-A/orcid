@@ -6,16 +6,19 @@ import { addressCount, wishlistCount } from '@/modules/account/service'
 import { requireUser } from '@/lib/session'
 import { formatJalali } from '@/lib/jalali'
 import { toPersianDigits } from '@/lib/persian'
+import { activeCountForUser, getConfig as getLaterConfig } from '@/modules/get-later/service'
 
 export const metadata = { title: 'پیشخوان' }
 
 export default async function AccountPage() {
   const user = await requireUser()
 
-  const [orders, wishlist, addresses] = await Promise.all([
+  const [orders, wishlist, addresses, getLater, getLaterSettings] = await Promise.all([
     listForUser(user.id, 4),
     wishlistCount(user.id),
     addressCount(user.id),
+    activeCountForUser(user.id),
+    getLaterConfig(),
   ])
 
   const awaiting = orders.filter(
@@ -31,7 +34,7 @@ export default async function AccountPage() {
         </h1>
       </header>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <Tile
           href="/account/orders"
           label="سفارش‌ها"
@@ -39,6 +42,15 @@ export default async function AccountPage() {
           hint={awaiting > 0 ? `${toPersianDigits(awaiting)} در انتظار پرداخت` : undefined}
           tone={awaiting > 0 ? 'attention' : 'plain'}
         />
+        {(getLaterSettings.enabled || getLater > 0) && (
+          <Tile
+            href="/account/get-later"
+            label="سبد پرداخت بعدی"
+            value={getLater}
+            hint={getLater > 0 ? 'منتظر تصمیم شما' : 'سبد فعالی ندارید'}
+            tone={getLater > 0 ? 'attention' : 'plain'}
+          />
+        )}
         <Tile href="/account/wishlist" label="علاقه‌مندی‌ها" value={wishlist} />
         <Tile
           href="/account/addresses"

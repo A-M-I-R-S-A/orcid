@@ -193,13 +193,14 @@ function CategoryForm({
       >
         <div className="grid sm:grid-cols-2 gap-5">
           <div>
-            <label className="label">نام دسته‌بندی</label>
-            <input name="name" required defaultValue={category?.name ?? ''} className="field" />
+            <label htmlFor="category-name" className="label">نام دسته‌بندی</label>
+            <input id="category-name" name="name" required defaultValue={category?.name ?? ''} className="field" />
           </div>
 
           <div>
-            <label className="label">نشانی (slug)</label>
+            <label htmlFor="category-slug" className="label">نشانی (slug)</label>
             <input
+              id="category-slug"
               name="slug"
               defaultValue={category?.slug ?? ''}
               className="field"
@@ -208,8 +209,8 @@ function CategoryForm({
           </div>
 
           <div>
-            <label className="label">دسته والد</label>
-            <select name="parentId" defaultValue={category?.parentId ?? ''} className="field">
+            <label htmlFor="category-parentId" className="label">دسته والد</label>
+            <select id="category-parentId" name="parentId" defaultValue={category?.parentId ?? ''} className="field">
               <option value="">بدون والد (سطح اول)</option>
               {parentOptions.map((option) => (
                 <option key={option.id} value={option.id}>
@@ -220,8 +221,9 @@ function CategoryForm({
           </div>
 
           <div>
-            <label className="label">ترتیب نمایش</label>
+            <label htmlFor="category-sortOrder" className="label">ترتیب نمایش</label>
             <input
+              id="category-sortOrder"
               name="sortOrder"
               type="number"
               defaultValue={category?.sortOrder ?? 0}
@@ -231,8 +233,9 @@ function CategoryForm({
           </div>
 
           <div className="sm:col-span-2">
-            <label className="label">توضیحات</label>
+            <label htmlFor="category-description" className="label">توضیحات</label>
             <textarea
+              id="category-description"
               name="description"
               rows={3}
               defaultValue={category?.description ?? ''}
@@ -242,13 +245,14 @@ function CategoryForm({
           </div>
 
           <div>
-            <label className="label">عنوان سئو</label>
-            <input name="seoTitle" defaultValue={category?.seoTitle ?? ''} className="field" />
+            <label htmlFor="category-seoTitle" className="label">عنوان سئو</label>
+            <input id="category-seoTitle" name="seoTitle" defaultValue={category?.seoTitle ?? ''} className="field" />
           </div>
 
           <div>
-            <label className="label">توضیحات سئو</label>
+            <label htmlFor="category-seoDescription" className="label">توضیحات سئو</label>
             <input
+              id="category-seoDescription"
               name="seoDescription"
               defaultValue={category?.seoDescription ?? ''}
               className="field"

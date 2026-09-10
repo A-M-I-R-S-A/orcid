@@ -3,16 +3,31 @@
 import { revalidatePath } from 'next/cache'
 import { eq } from 'drizzle-orm'
 
-import { db } from '@/db'
+import { affectedRows, db } from '@/db'
 import { blogPosts, homepageSections, pages, slugRedirects } from '@/db/schema'
 import * as audit from '@/lib/audit'
 import { CACHE_TAGS, invalidate } from '@/lib/cache'
 import { type ActionResult, errors, fail, ok } from '@/lib/errors'
 import { isBannerKind, parseBannerSettings } from '@/lib/banner'
-import { processUpload } from '@/lib/images'
+import { deleteImageSet, deleteStored, processUpload } from '@/lib/images'
 import { sanitizeHtml } from '@/lib/sanitize'
 import { slugify, uniqueSlug } from '@/lib/slug'
 import { requirePermission } from './auth'
+
+function validContentLink(value: string): boolean {
+  if (!value) return true
+  if (value.startsWith('/') && !value.startsWith('//')) return true
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' && !url.username && !url.password
+  } catch {
+    return false
+  }
+}
+
+async function removeNewFiles(files: string[]) {
+  await Promise.all(files.map((file) => deleteStored(file).catch(() => {})))
+}
 
 export async function saveBannerDesignAction(
   input: { id: number } & Record<string, unknown>,
@@ -68,7 +83,15 @@ export async function saveHomepageSectionAction(input: {
   try {
     const admin = await requirePermission('content.homepage')
 
-    await db
+    if (!Number.isInteger(input.id) || input.id <= 0 || !Number.isInteger(input.sortOrder) || input.sortOrder < 0 || input.sortOrder > 10_000) {
+      throw errors.validation('شناسه یا ترتیب بخش معتبر نیست.')
+    }
+    if ((input.title?.length ?? 0) > 300 || (input.subtitle?.length ?? 0) > 2000 || (input.linkLabel?.length ?? 0) > 100) {
+      throw errors.validation('متن بخش بیش از حد طولانی است.')
+    }
+    if (!validContentLink(input.linkUrl?.trim() ?? '')) throw errors.validation('پیوند باید داخلی یا یک نشانی کامل HTTPS باشد.')
+
+    const changed = await db
       .update(homepageSections)
       .set({
         title: input.title?.trim() || null,
@@ -79,6 +102,7 @@ export async function saveHomepageSectionAction(input: {
         sortOrder: input.sortOrder,
       })
       .where(eq(homepageSections.id, input.id))
+    if (affectedRows(changed) === 0) throw errors.notFound()
 
     await audit.log({
       actor: admin,
@@ -103,14 +127,21 @@ export async function uploadHomepageImageAction(formData: FormData): Promise<Act
     const sectionId = Number(formData.get('sectionId'))
     const file = formData.get('file')
 
+    if (!Number.isInteger(sectionId) || sectionId <= 0) throw errors.validation('بخش نامعتبر است.')
     if (!(file instanceof File)) throw errors.validation('فایلی انتخاب نشده است.')
 
-    const processed = await processUpload(file, { folder: 'homepage' })
+    const [section] = await db.select({ id: homepageSections.id, imagePath: homepageSections.imagePath }).from(homepageSections).where(eq(homepageSections.id, sectionId)).limit(1)
+    if (!section) throw errors.notFound()
 
-    await db
-      .update(homepageSections)
-      .set({ imagePath: processed.path })
-      .where(eq(homepageSections.id, sectionId))
+    const processed = await processUpload(file, { folder: 'homepage' })
+    try {
+      const changed = await db.update(homepageSections).set({ imagePath: processed.path }).where(eq(homepageSections.id, sectionId))
+      if (affectedRows(changed) === 0) throw errors.conflict('بخش هم‌زمان تغییر کرده است.')
+    } catch (error) {
+      await removeNewFiles(processed.files)
+      throw error
+    }
+    if (section.imagePath) await deleteImageSet(section.imagePath)
 
     invalidate(CACHE_TAGS.homepage)
     revalidatePath('/')
@@ -236,7 +267,7 @@ export async function uploadPageImageAction(formData: FormData): Promise<ActionR
     if (!(file instanceof File)) throw errors.validation('فایلی انتخاب نشده است.')
 
     const [page] = await db
-      .select({ id: pages.id, slug: pages.slug })
+      .select({ id: pages.id, slug: pages.slug, imagePath: pages.imagePath })
       .from(pages)
       .where(eq(pages.id, pageId))
       .limit(1)
@@ -245,7 +276,14 @@ export async function uploadPageImageAction(formData: FormData): Promise<ActionR
 
     const processed = await processUpload(file, { folder: 'pages' })
 
-    await db.update(pages).set({ imagePath: processed.path }).where(eq(pages.id, pageId))
+    try {
+      const changed = await db.update(pages).set({ imagePath: processed.path }).where(eq(pages.id, pageId))
+      if (affectedRows(changed) === 0) throw errors.conflict('صفحه هم‌زمان تغییر کرده است.')
+    } catch (error) {
+      await removeNewFiles(processed.files)
+      throw error
+    }
+    if (page.imagePath) await deleteImageSet(page.imagePath)
 
     invalidate(CACHE_TAGS.pages)
     revalidatePath(`/p/${page.slug}`)
@@ -393,14 +431,21 @@ export async function uploadBlogCoverAction(formData: FormData): Promise<ActionR
     const postId = Number(formData.get('postId'))
     const file = formData.get('file')
 
+    if (!Number.isInteger(postId) || postId <= 0) throw errors.validation('نوشته نامعتبر است.')
     if (!(file instanceof File)) throw errors.validation('فایلی انتخاب نشده است.')
 
-    const processed = await processUpload(file, { folder: 'blog' })
+    const [post] = await db.select({ id: blogPosts.id, coverImagePath: blogPosts.coverImagePath }).from(blogPosts).where(eq(blogPosts.id, postId)).limit(1)
+    if (!post) throw errors.notFound()
 
-    await db
-      .update(blogPosts)
-      .set({ coverImagePath: processed.path })
-      .where(eq(blogPosts.id, postId))
+    const processed = await processUpload(file, { folder: 'blog' })
+    try {
+      const changed = await db.update(blogPosts).set({ coverImagePath: processed.path }).where(eq(blogPosts.id, postId))
+      if (affectedRows(changed) === 0) throw errors.conflict('نوشته هم‌زمان تغییر کرده است.')
+    } catch (error) {
+      await removeNewFiles(processed.files)
+      throw error
+    }
+    if (post.coverImagePath) await deleteImageSet(post.coverImagePath)
 
     invalidate(CACHE_TAGS.blog)
     revalidatePath('/blog')

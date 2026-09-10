@@ -12,11 +12,11 @@ import { collectFiles, tarReadable } from '@/lib/tar'
 
 const run = promisify(execFile)
 
-const TAR = (args: string[]) => run('tar', ['--force-local', ...args])
-
-const hasTar = await run('tar', ['--version'])
-  .then(() => true)
-  .catch(() => false)
+const tarHelp = await run('tar', ['--help']).catch(() => null)
+const hasTar = tarHelp !== null
+const forceLocalSupported = tarHelp?.stdout.includes('--force-local') ?? false
+const TAR = (args: string[]) =>
+  run('tar', [...(forceLocalSupported ? ['--force-local'] : []), ...args])
 
 describe('ustar writer', () => {
   let workspace: string
@@ -66,7 +66,7 @@ describe('ustar writer', () => {
     ).rejects.toThrow(/too long for ustar/)
   })
 
-  it.skipIf(!hasTar)('produces an archive GNU tar can list', async () => {
+  it.skipIf(!hasTar)('produces an archive the installed tar can list', async () => {
     const { stdout } = await TAR(['-tzf', archive])
     const listed = stdout.split('\n').map((l) => l.trim()).filter(Boolean).sort()
 

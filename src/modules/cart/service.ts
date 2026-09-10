@@ -17,6 +17,8 @@ import {
 import { generateToken } from '@/lib/crypto'
 import { MESSAGES, errors } from '@/lib/errors'
 import { effectivePrice } from '@/lib/money'
+import { getShippingConfig } from '@/lib/shipping-config'
+import { calculateShipping } from '@/lib/shipping'
 
 const CART_COOKIE = 'orchid_cart'
 const CART_TTL_DAYS = 30
@@ -46,6 +48,7 @@ export interface CartView {
   itemCount: number
   subtotal: number
   discountTotal: number
+  shippingTotal: number
   grandTotal: number
   hasIssues: boolean
 }
@@ -56,6 +59,7 @@ export const EMPTY_CART: CartView = {
   itemCount: 0,
   subtotal: 0,
   discountTotal: 0,
+  shippingTotal: 0,
   grandTotal: 0,
   hasIssues: false,
 }
@@ -272,13 +276,17 @@ export async function getCart(userId: number | null): Promise<CartView> {
     }
   })
 
+  const merchandiseTotal = subtotal - discountTotal
+  const shippingTotal = calculateShipping(merchandiseTotal, await getShippingConfig())
+
   return {
     id: cart.id,
     lines,
     itemCount,
     subtotal,
     discountTotal,
-    grandTotal: subtotal - discountTotal,
+    shippingTotal,
+    grandTotal: merchandiseTotal + shippingTotal,
     hasIssues,
   }
 }

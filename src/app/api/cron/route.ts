@@ -9,6 +9,7 @@ import { pruneSessions } from '@/lib/session'
 import { logger } from '@/lib/logger'
 import { backupAgeHours, dumpDatabase } from '@/lib/backup'
 import { archiveMedia, mediaArchiveAgeHours } from '@/lib/media-backup'
+import { expireUnpaidOrders } from '@/modules/payments/service'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
     await pruneAbandoned()
     return 'pruned'
   })
+  await run('unpaidOrders', () => expireUnpaidOrders(7))
 
   const force = new URL(request.url).searchParams.get('backup') === 'force'
   const age = await backupAgeHours()

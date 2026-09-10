@@ -8,6 +8,7 @@ import { toPersianDigits } from '@/lib/persian'
 import { sanitizeEnamad, sanitizeHtml } from '@/lib/sanitize'
 import { getNamespace } from '@/lib/settings'
 import { splitLead } from '@/lib/rich-text'
+import { safePublicHref } from '@/lib/public-url'
 import { OrchidSpray } from '@/components/ornament'
 import { Icon, type IconName } from './icons'
 import { ClosingBand, Movement, PageHero } from './shell'
@@ -66,6 +67,9 @@ export async function ContactPage({
   const { lead, rest } = splitLead(body)
 
   const channels: Channel[] = []
+  const whatsapp = safePublicHref(social.whatsapp)
+  const telegram = safePublicHref(social.telegram)
+  const instagram = safePublicHref(social.instagram)
 
   if (contact.phone) {
     channels.push({
@@ -80,27 +84,27 @@ export async function ContactPage({
     })
   }
 
-  if (social.whatsapp) {
+  if (whatsapp) {
     channels.push({
       key: 'whatsapp',
       icon: 'whatsapp',
       label: 'واتس‌اپ',
-      value: social.whatsapp,
+      value: whatsapp,
       display: 'گفت‌وگوی مستقیم',
-      href: social.whatsapp,
+      href: whatsapp,
       action: 'شروع گفت‌وگو',
       external: true,
     })
   }
 
-  if (social.telegram) {
+  if (telegram) {
     channels.push({
       key: 'telegram',
       icon: 'telegram',
       label: 'تلگرام',
-      value: social.telegram,
+      value: telegram,
       display: 'پیام در تلگرام',
-      href: social.telegram,
+      href: telegram,
       action: 'ارسال پیام',
       external: true,
     })
@@ -119,14 +123,14 @@ export async function ContactPage({
     })
   }
 
-  if (social.instagram) {
+  if (instagram) {
     channels.push({
       key: 'instagram',
       icon: 'instagram',
       label: 'اینستاگرام',
-      value: social.instagram,
+      value: instagram,
       display: 'جدیدترین‌ها را ببینید',
-      href: social.instagram,
+      href: instagram,
       action: 'دنبال کنید',
       external: true,
     })

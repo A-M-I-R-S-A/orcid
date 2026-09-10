@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 
 import type { ProductDetail } from '@/modules/catalog/queries'
 import { addToCartAction } from '@/modules/cart/actions'
+import { addToGetLaterAction } from '@/modules/get-later/actions'
 import { formatPrice } from '@/lib/money'
 import { toPersianDigits } from '@/lib/persian'
 import { ResponsiveImage } from './media'
@@ -18,9 +19,13 @@ import { WishlistSaveButton } from './wishlist-save-button'
 export function ProductPurchasePanel({
   product,
   sizeGuide,
+  payLaterEnabled,
+  signedIn,
 }: {
   product: ProductDetail
   sizeGuide: SizeGuide | null
+  payLaterEnabled: boolean
+  signedIn: boolean
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -78,6 +83,21 @@ export function ProductPurchasePanel({
       } else {
         setMessage({ tone: 'error', text: result.error })
       }
+    })
+  }
+
+  const handleAddLater = () => {
+    if (!activeVariant) return
+    if (!signedIn) {
+      router.push(`/login?next=${encodeURIComponent(`/product/${product.slug}`)}`)
+      return
+    }
+    startTransition(async () => {
+      const result = await addToGetLaterAction({ variantId: activeVariant.id, quantity: 1 })
+      if (result.ok) {
+        setMessage({ tone: 'ok', text: 'به سبد پرداخت بعدی اضافه شد.' })
+        router.refresh()
+      } else setMessage({ tone: 'error', text: result.error })
     })
   }
 
@@ -188,6 +208,12 @@ export function ProductPurchasePanel({
 
           <WishlistSaveButton productId={product.id} productName={product.name} />
         </div>
+
+        {payLaterEnabled && (
+          <button type="button" onClick={handleAddLater} disabled={outOfStock || pending} className="btn btn-secondary w-full py-3.5">
+            افزودن به سبد پرداخت بعدی
+          </button>
+        )}
 
         {message && (
           <p

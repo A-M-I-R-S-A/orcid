@@ -59,7 +59,9 @@ export default async function AdminPaymentsPage({
 
       <form method="get" action="/admin/payments" className="flex gap-2 mb-5">
         <input type="hidden" name="status" value={status} />
+        <label htmlFor="payment-search" className="sr-only">جستجوی پرداخت</label>
         <input
+          id="payment-search"
           name="q"
           type="search"
           defaultValue={q ?? ''}

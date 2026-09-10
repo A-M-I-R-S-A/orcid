@@ -221,8 +221,10 @@ tmp/restart.txt
 
 ### Scheduled work
 
-`/api/cron` drains the SMS queue and prunes expired sessions, OTPs, rate-limit
-windows and abandoned carts. It is idempotent, so a missed run catches up.
+`/api/cron` drains the SMS queue, prunes expired sessions, OTPs, rate-limit
+windows and abandoned carts, and returns inventory from orders left unpaid for
+seven days. It is idempotent, so a missed run catches up without restoring an
+order twice.
 
 ```bash
 curl -H "Authorization: Bearer $CRON_SECRET" https://orchidbra.ir/api/cron

@@ -666,8 +666,9 @@ On a fresh database:
   would apply  0002_passwords_and_wishlist.sql
   would apply  0003_page_images.sql
   would apply  0004_nav_links.sql
+  would apply  0005_payment_gateways.sql
 
-→ 5 migration(s) pending. Nothing was applied (--dry-run).
+→ 6 migration(s) pending. Nothing was applied (--dry-run).
 ```
 
 This changes nothing. If you get a connection error instead, your Remote MySQL
@@ -680,7 +681,7 @@ node --env-file=.env.deploy scripts/migrate.mjs
 ```
 
 ```
-✓ Applied 5 migration(s).
+✓ Applied 6 migration(s).
 ```
 
 **What this tool does for you.** It records every file it applies with a
@@ -703,7 +704,7 @@ on the server, which is the cleanest alternative.
 
 **phpMyAdmin.** Open your database, go to the **Import** tab, and import each
 file from the `drizzle` folder **in filename order** — `0000`, then `0001`, then
-`0002`, `0003`, then `0004`. This works, but the migration tool will not know they were
+`0002`, `0003`, `0004`, then `0005`. This works, but the migration tool will not know they were
 applied, so a later `db:migrate` would try to re-apply `0000` and fail. If you
 go this route, stay on it and import future migrations by hand too.
 
@@ -912,6 +913,7 @@ people discover during an incident that there is nothing to restore from.
 |---|---|
 | Send queued text messages | every call |
 | Clean up expired sessions, codes, abandoned carts | every call |
+| Cancel orders unpaid for seven days and restore their stock | every call |
 | Compressed database backup, keeping the last 14 | about once a day |
 | Archive of uploaded images | about once every six days |
 
@@ -991,6 +993,10 @@ These are settings, not code. Nothing here needs a deploy.
       offer any payment method until the card number and account holder name
       are filled in.** This is the most common "the shop looks finished but
       nobody can order" cause.
+- [ ] **Online gateways** — Settings, TorobPay / BitPay sections. Keep both
+      disabled until `0005_payment_gateways.sql` is applied, `APP_URL` is HTTPS,
+      credentials are saved, and a merchant-approved live checkout succeeds.
+      See `docs/PAYMENT_GATEWAYS.md` for callback and reconciliation checks.
 - [ ] **SMS provider** — the SMS.ir API key and a template ID per event.
       **Templates ship switched off. Sign-in codes do not work until you enable
       the OTP template.**
@@ -1006,8 +1012,10 @@ These are settings, not code. Nothing here needs a deploy.
 
 ### Things that are deliberately not finished
 
-- **Torob Pay is not implemented.** Card-to-card is the working payment method.
-  The Torob option stays hidden at checkout rather than half-working.
+- **TorobPay and BitPay still require merchant-account certification.** The
+  server flow is implemented, but live provider acceptance cannot be proven
+  without the real credentials and a low-value transaction on the registered
+  HTTPS domain. Keep each gateway disabled until that test passes.
 - **The SMS provider's exact request format has not been tested against the live
   service.** Confirm it against their current documentation before relying on it.
 - **Withdrawn products return 404 rather than 410.** Search engines treat these
@@ -1068,7 +1076,8 @@ Then run the Part 17.1 checks. If anything is wrong, roll back.
 4. Once the site is healthy, delete `orchid-broken`.
 
 **Rolling back the code is safe. Rolling back the database is not.** Migrations
-only go forwards. All four current migrations only *add* things, so an older
+only go forwards. The current migrations add tables/columns or widen a payment
+reference column, so an older
 release runs happily against a newer database. If you add a migration that
 removes or renames something, that stops being true — check before relying on it.
 
@@ -1129,7 +1138,7 @@ release is not deleted by rolling that release back.
 | Persian text shows as `?????` | Database is not `utf8mb4` | Part 5.4. Changing it later does not repair existing rows |
 | Migration tool cannot connect | Remote MySQL not allowing your IP | Part 12.1. Home IPs change — re-add it |
 | Sign-in codes never arrive | SMS template disabled, or wrong API key | Admin panel, SMS section. Templates ship disabled |
-| No payment method at checkout | Bank details not filled in | Admin panel, Settings, card-to-card |
+| No payment method at checkout | Payment method disabled/unconfigured; TorobPay order is ineligible | Admin → Settings; for TorobPay also confirm amount eligibility and credentials |
 | `/api/cron` returns `Not found` | Wrong `CRON_SECRET` | Compare with `.env` exactly. 404 is intentional |
 | "has been modified since it was applied" | An already-applied migration was edited | Never edit applied migrations — add a new one. `drizzle/README.md` |
 | AutoSSL fails | DNS has not spread | `nslookup orchidbra.ir`, wait, retry. Part 4 |

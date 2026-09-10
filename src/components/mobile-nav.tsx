@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation'
 import { ImagePlaceholder, ResponsiveImage } from './media'
 import { toPersianDigits } from '@/lib/persian'
 import { SIZE_GUIDE_HREF, SIZE_GUIDE_LABEL } from '@/lib/size-guide'
+import { safePublicHref } from '@/lib/public-url'
 
 export interface DrawerCategory {
   name: string
@@ -94,9 +95,9 @@ export function MobileNav({
   }, [open])
 
   const socialLinks = [
-    { key: 'instagram' as const, label: 'اینستاگرام', url: social.instagram },
-    { key: 'telegram' as const, label: 'تلگرام', url: social.telegram },
-    { key: 'whatsapp' as const, label: 'واتس‌اپ', url: social.whatsapp },
+    { key: 'instagram' as const, label: 'اینستاگرام', url: safePublicHref(social.instagram) },
+    { key: 'telegram' as const, label: 'تلگرام', url: safePublicHref(social.telegram) },
+    { key: 'whatsapp' as const, label: 'واتس‌اپ', url: safePublicHref(social.whatsapp) },
   ].filter((s) => Boolean(s.url))
 
   const drawer = (

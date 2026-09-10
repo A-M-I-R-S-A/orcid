@@ -1,6 +1,8 @@
 import 'server-only'
 
 import { getBool, getNamespace, getSecret } from '@/lib/settings'
+import { assertTorobEligible, getTorobCredentials, torobConfigured } from './gateway-client'
+import { startGatewayPayment } from './gateway-service'
 
 export interface PaymentMethodInfo {
   key: string
@@ -26,6 +28,7 @@ export interface PaymentProvider {
   readonly info: PaymentMethodInfo
   isEnabled(): Promise<boolean>
   isConfigured(): Promise<boolean>
+  isAvailable?(amount: number): Promise<boolean>
   initiate(order: { id: number; orderNumber: string; amount: number }): Promise<InitiateResult>
 }
 
@@ -78,20 +81,51 @@ class TorobPayProvider implements PaymentProvider {
   }
 
   async isConfigured(): Promise<boolean> {
-    const apiKey = await getSecret('torob', 'apiKey')
-    const accessCode = await getSecret('torob', 'accessCode')
-    return Boolean(apiKey && accessCode)
+    return torobConfigured(await getTorobCredentials())
   }
 
-  async initiate(): Promise<InitiateResult> {
-    throw new Error(
-      'Torob Pay adapter is not implemented. Verify the provider API contract, ' +
-        'implement initiate() and the callback route, then enable it in the admin panel.',
-    )
+  async isAvailable(amount: number): Promise<boolean> {
+    try {
+      await assertTorobEligible(amount)
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  async initiate(order: { id: number; orderNumber: string; amount: number }): Promise<InitiateResult> {
+    return { kind: 'redirect', url: await startGatewayPayment('torob_pay', order) }
   }
 }
 
-const PROVIDERS: PaymentProvider[] = [new CardToCardProvider(), new TorobPayProvider()]
+class BitPayProvider implements PaymentProvider {
+  readonly key = 'bitpay'
+
+  readonly info: PaymentMethodInfo = {
+    key: 'bitpay',
+    label: 'پرداخت آنلاین با بیت‌پی',
+    description: 'پرداخت امن با کارت‌های بانکی عضو شتاب از طریق بیت‌پی.',
+    kind: 'gateway',
+  }
+
+  async isEnabled(): Promise<boolean> {
+    return getBool('bitpay', 'enabled', false)
+  }
+
+  async isConfigured(): Promise<boolean> {
+    return Boolean(await getSecret('bitpay', 'apiKey'))
+  }
+
+  async initiate(order: { id: number; orderNumber: string; amount: number }): Promise<InitiateResult> {
+    return { kind: 'redirect', url: await startGatewayPayment('bitpay', order) }
+  }
+}
+
+const PROVIDERS: PaymentProvider[] = [
+  new CardToCardProvider(),
+  new TorobPayProvider(),
+  new BitPayProvider(),
+]
 
 export function getProvider(key: string): PaymentProvider | undefined {
   return PROVIDERS.find((p) => p.key === key)
@@ -101,14 +135,18 @@ export function allProviders(): PaymentProvider[] {
   return PROVIDERS
 }
 
-export async function getEnabledMethods(): Promise<PaymentMethodInfo[]> {
+export async function getEnabledMethods(options: { amount?: number } = {}): Promise<PaymentMethodInfo[]> {
   const results = await Promise.all(
     PROVIDERS.map(async (provider) => {
       const [enabled, configured] = await Promise.all([
         provider.isEnabled(),
         provider.isConfigured(),
       ])
-      return enabled && configured ? provider.info : null
+      if (!enabled || !configured) return null
+      if (options.amount != null && provider.isAvailable) {
+        return (await provider.isAvailable(options.amount)) ? provider.info : null
+      }
+      return provider.info
     }),
   )
 

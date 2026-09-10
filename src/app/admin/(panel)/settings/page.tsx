@@ -14,8 +14,22 @@ export default async function SettingsPage() {
   const admin = await getCurrentAdmin()
   if (!admin) return null
 
-  const [site, contact, social, shipping, seo, enamad, card, torob, providers, torobKeySet, torobCodeSet] =
-    await Promise.all([
+  const [
+    site,
+    contact,
+    social,
+    shipping,
+    seo,
+    enamad,
+    card,
+    torob,
+    bitpay,
+    getLater,
+    providers,
+    torobSecretSet,
+    torobPasswordSet,
+    bitpayKeySet,
+  ] = await Promise.all([
       getNamespace('site'),
       getNamespace('contact'),
       getNamespace('social'),
@@ -24,9 +38,12 @@ export default async function SettingsPage() {
       getNamespace('enamad'),
       getNamespace('payment_card'),
       getNamespace('torob'),
+      getNamespace('bitpay'),
+      getNamespace('get_later'),
       providerStatuses(),
-      hasSecret('torob', 'apiKey'),
-      hasSecret('torob', 'accessCode'),
+      hasSecret('torob', 'clientSecret'),
+      hasSecret('torob', 'password'),
+      hasSecret('bitpay', 'apiKey'),
     ])
 
   const can = (p: Parameters<typeof hasPermission>[1]) => hasPermission(admin, p)
@@ -92,6 +109,44 @@ export default async function SettingsPage() {
         {can('settings.manage') && (
           <>
             <SettingsSection
+              namespace="get_later"
+              title="خرید با تصمیم بعدی"
+              description="متن و مهلت سبدی که مشتری پس از دریافت کالا درباره نگه‌داشتن یا بازگشت اقلام تصمیم می‌گیرد."
+              fields={[
+                {
+                  key: 'title',
+                  label: 'عنوان در حساب مشتری',
+                  value: getLater.title ?? 'سبد پرداخت بعدی',
+                },
+                {
+                  key: 'description',
+                  label: 'راهنمای مشتری',
+                  value:
+                    getLater.description ??
+                    'کالاهایی را که می‌خواهید نگه دارید مشخص کنید؛ مبلغ همان کالاها برای پرداخت آماده می‌شود.',
+                  multiline: true,
+                },
+                {
+                  key: 'deadlineDays',
+                  label: 'مهلت پیش‌فرض (روز)',
+                  value: getLater.deadlineDays ?? '7',
+                  dir: 'ltr',
+                  hint: 'بین ۱ تا ۳۰ روز. مدیر می‌تواند مهلت هر سبد را جداگانه تغییر دهد.',
+                },
+                {
+                  key: 'submitLabel',
+                  label: 'متن دکمه نهایی',
+                  value: getLater.submitLabel ?? 'ارسال اکنون',
+                },
+              ]}
+              toggle={{
+                key: 'enabled',
+                label: 'فعال‌سازی این خدمت برای مشتریان',
+                value: getLater.enabled === '1',
+              }}
+            />
+
+            <SettingsSection
               namespace="contact"
               title="اطلاعات تماس"
               fields={[
@@ -116,7 +171,22 @@ export default async function SettingsPage() {
             <SettingsSection
               namespace="shipping"
               title="ارسال و بازگشت کالا"
+              description="هزینه‌ها به تومان هستند و در سبد، تسویه‌حساب و سفارش نهایی به‌صورت یکسان محاسبه می‌شوند."
               fields={[
+                {
+                  key: 'shippingFee',
+                  label: 'هزینه ثابت ارسال (تومان)',
+                  value: shipping.shippingFee ?? '0',
+                  dir: 'ltr',
+                  hint: 'صفر یعنی ارسال رایگان.',
+                },
+                {
+                  key: 'freeShippingThreshold',
+                  label: 'حداقل خرید برای ارسال رایگان (تومان)',
+                  value: shipping.freeShippingThreshold ?? '0',
+                  dir: 'ltr',
+                  hint: 'صفر یعنی این شرط غیرفعال است.',
+                },
                 {
                   key: 'shippingInfo',
                   label: 'توضیحات ارسال',
@@ -189,28 +259,57 @@ export default async function SettingsPage() {
               title="ترب‌پی"
               description={
                 torobStatus?.configured
-                  ? 'اعتبارنامه ذخیره شده است.'
-                  : 'برای فعال‌سازی، اعتبارنامه‌ها را وارد کنید. تا پیش از تکمیل پیاده‌سازی درگاه، این روش در تسویه حساب نمایش داده نمی‌شود.'
+                  ? 'اعتبارنامه ذخیره شده است. ترب‌پی فقط برای سفارش‌های واجد شرایط نمایش داده می‌شود.'
+                  : 'برای فعال‌سازی، چهار مشخصه دسترسی دریافت‌شده از ترب‌پی را وارد کنید.'
               }
               fields={[
                 {
-                  key: 'apiKey',
-                  label: 'API Key',
-                  value: '',
+                  key: 'clientId',
+                  label: 'شناسه مشتری (Client ID)',
+                  value: torob.clientId ?? '',
                   dir: 'ltr',
-                  secret: true,
-                  isSet: torobKeySet,
                 },
                 {
-                  key: 'accessCode',
-                  label: 'Access Code',
+                  key: 'clientSecret',
+                  label: 'کد دسترسی (Client Secret)',
                   value: '',
                   dir: 'ltr',
                   secret: true,
-                  isSet: torobCodeSet,
+                  isSet: torobSecretSet,
+                },
+                {
+                  key: 'username',
+                  label: 'نام کاربری ترب‌پی',
+                  value: torob.username ?? '',
+                  dir: 'ltr',
+                },
+                {
+                  key: 'password',
+                  label: 'رمز عبور ترب‌پی',
+                  value: '',
+                  dir: 'ltr',
+                  secret: true,
+                  isSet: torobPasswordSet,
                 },
               ]}
               toggle={{ key: 'enabled', label: 'فعال', value: torob.enabled === '1' }}
+            />
+
+            <SettingsSection
+              namespace="bitpay"
+              title="درگاه بیت‌پی"
+              description="کلید API را از پنل bitpay.ir دریافت کنید. اطلاعات کارت بانکی مشتری در سایت ذخیره نمی‌شود."
+              fields={[
+                {
+                  key: 'apiKey',
+                  label: 'کلید API بیت‌پی',
+                  value: '',
+                  dir: 'ltr',
+                  secret: true,
+                  isSet: bitpayKeySet,
+                },
+              ]}
+              toggle={{ key: 'enabled', label: 'فعال', value: bitpay.enabled === '1' }}
             />
           </>
         )}
