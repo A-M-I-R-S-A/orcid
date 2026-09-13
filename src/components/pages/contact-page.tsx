@@ -14,6 +14,9 @@ import { safePublicHref } from '@/lib/public-url'
 import { OrchidSpray } from '@/components/ornament'
 import { Icon, type IconName } from './icons'
 import { ClosingBand, Movement, PageHero } from './shell'
+import { ManagedTemplateSections } from './managed-page-section'
+import type { PageSectionRecord } from '@/lib/page-sections'
+import { SYSTEM_PAGE_SECTIONS } from '@/lib/system-page-sections'
 
 type PageRow = typeof pages.$inferSelect
 
@@ -54,9 +57,11 @@ const loadShortcuts = cached(
 export async function ContactPage({
   page,
   breadcrumbs,
+  sections,
 }: {
   page: PageRow
   breadcrumbs: { name: string; path: string }[]
+  sections: PageSectionRecord[]
 }) {
   const [contact, social, enamad, shortcuts, content] = await Promise.all([
     getNamespace('contact'),
@@ -167,7 +172,7 @@ export async function ContactPage({
     ) : null
 
   return (
-    <>
+    <ManagedTemplateSections pageId={page.id} sections={sections} defaults={SYSTEM_PAGE_SECTIONS.contact}>
       <PageHero
         eyebrow={content.text('contact.eyebrow')}
         title={content.text('contact.title')}
@@ -334,6 +339,6 @@ export async function ContactPage({
           { label: content.text('common.viewProducts'), href: '/products' },
         ]}
       />
-    </>
+    </ManagedTemplateSections>
   )
 }

@@ -485,6 +485,9 @@ export async function savePageSectionAction(input: {
     if ((input.title?.length ?? 0) > 300 || (input.subtitle?.length ?? 0) > 1000 || (input.body?.length ?? 0) > 50_000) throw errors.validation('محتوای بخش بیش از حد طولانی است.')
     if (!validContentLink(input.linkUrl?.trim() ?? '')) throw errors.validation('پیوند باید داخلی یا HTTPS باشد.')
 
+    const [existing] = input.id
+      ? await db.select({ config: pageSections.config }).from(pageSections).where(eq(pageSections.id, input.id)).limit(1)
+      : []
     const values = {
       pageId: input.pageId,
       kind: input.kind as (typeof PAGE_SECTION_KINDS)[number],
@@ -496,7 +499,7 @@ export async function savePageSectionAction(input: {
       imagePath: input.imagePath?.trim() || null,
       linkLabel: input.linkLabel?.trim() || null,
       linkUrl: input.linkUrl?.trim() || null,
-      config: input.config ?? {},
+      config: { ...(existing?.config ?? {}), ...(input.config ?? {}) },
       background: input.background as (typeof PAGE_SECTION_BACKGROUNDS)[number],
       spacing: input.spacing as (typeof PAGE_SECTION_SPACING)[number],
       isVisible: input.isVisible,
@@ -526,6 +529,9 @@ export async function deletePageSectionAction(id: number): Promise<ActionResult<
   try {
     await requirePermission('content.pages')
     if (!Number.isInteger(id) || id <= 0) throw errors.validation('بخش معتبر نیست.')
+    const [existing] = await db.select({ config: pageSections.config }).from(pageSections).where(eq(pageSections.id, id)).limit(1)
+    if (!existing) throw errors.notFound()
+    if ((existing.config as PageSectionConfig | null)?.locked) throw errors.validation('بخش‌های اصلی صفحه قابل حذف نیستند؛ می‌توانید آن‌ها را مخفی کنید.')
     await db.delete(pageSections).where(eq(pageSections.id, id))
     invalidate(CACHE_TAGS.pages)
     revalidatePath('/p/[slug]', 'page')

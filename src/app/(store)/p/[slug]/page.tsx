@@ -12,8 +12,9 @@ import { breadcrumbSchema, buildMetadata, shouldIndex } from '@/lib/seo'
 import { sanitizeHtml } from '@/lib/sanitize'
 import { JsonLd } from '@/components/json-ld'
 import { getSiteContent } from '@/lib/site-content'
-import { PageSectionRenderer } from '@/components/pages/page-section-renderer'
 import type { PageSectionRecord } from '@/lib/page-sections'
+import { ManagedTemplateSections } from '@/components/pages/managed-page-section'
+import { GENERIC_PAGE_SECTIONS } from '@/lib/system-page-sections'
 
 export const revalidate = 3600
 
@@ -82,8 +83,7 @@ export default async function CmsPage({ params }: Props) {
     return (
       <>
         <JsonLd data={breadcrumbSchema(breadcrumbItems)} />
-        <Template page={page} breadcrumbs={breadcrumbItems} />
-        <PageSectionRenderer sections={sections} />
+        <Template page={page} breadcrumbs={breadcrumbItems} sections={sections} />
       </>
     )
   }
@@ -96,7 +96,8 @@ export default async function CmsPage({ params }: Props) {
         <Breadcrumbs items={breadcrumbItems} />
       </div>
 
-      <article className="container-page pb-20">
+      <ManagedTemplateSections pageId={page.id} sections={sections} defaults={GENERIC_PAGE_SECTIONS}>
+      <article className="container-page pb-10">
         <header className="max-w-3xl mb-10">
           <h1 className="text-3xl md:text-5xl text-ink leading-[1.4]">{page.title}</h1>
         </header>
@@ -116,6 +117,8 @@ export default async function CmsPage({ params }: Props) {
           </figure>
         )}
 
+      </article>
+      <article className="container-page pb-20">
         {page.body && (
           <div
             className="prose max-w-3xl text-ink-muted"
@@ -123,7 +126,7 @@ export default async function CmsPage({ params }: Props) {
           />
         )}
       </article>
-      <PageSectionRenderer sections={sections} />
+      </ManagedTemplateSections>
     </>
   )
 }

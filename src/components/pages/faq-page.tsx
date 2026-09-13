@@ -14,6 +14,9 @@ import { getSiteContent } from '@/lib/site-content'
 import { JsonLd } from '@/components/json-ld'
 import { Icon } from './icons'
 import { ClosingBand, Movement, PageHero } from './shell'
+import { ManagedTemplateSections } from './managed-page-section'
+import type { PageSectionRecord } from '@/lib/page-sections'
+import { SYSTEM_PAGE_SECTIONS } from '@/lib/system-page-sections'
 
 type PageRow = typeof pages.$inferSelect
 
@@ -37,9 +40,11 @@ function groupId(index: number) {
 export async function FaqPage({
   page,
   breadcrumbs,
+  sections,
 }: {
   page: PageRow
   breadcrumbs: { name: string; path: string }[]
+  sections: PageSectionRecord[]
 }) {
   const [contact, helpPages, content] = await Promise.all([getNamespace('contact'), loadHelpPages(), getSiteContent()])
 
@@ -57,7 +62,8 @@ export async function FaqPage({
   let counter = 0
 
   return (
-    <>
+    <ManagedTemplateSections pageId={page.id} sections={sections} defaults={SYSTEM_PAGE_SECTIONS.faq}>
+      <>
       {schemaItems.length > 0 && <JsonLd data={faqSchema(schemaItems)} />}
 
       <PageHero
@@ -98,6 +104,7 @@ export async function FaqPage({
           ) : null
         }
       />
+      </>
 
       {groups.length === 0 ? (
         <Movement>
@@ -239,6 +246,6 @@ export async function FaqPage({
           { label: content.text('footer.tracking'), href: '/account/orders' },
         ]}
       />
-    </>
+    </ManagedTemplateSections>
   )
 }

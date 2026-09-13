@@ -12,6 +12,9 @@ import { splitLead } from '@/lib/rich-text'
 import { Divider, OrchidBloom } from '@/components/ornament'
 import { Icon, type IconName } from './icons'
 import { ClosingBand, Movement, PageHero, RelatedPages } from './shell'
+import { ManagedTemplateSections } from './managed-page-section'
+import type { PageSectionRecord } from '@/lib/page-sections'
+import { SYSTEM_PAGE_SECTIONS } from '@/lib/system-page-sections'
 
 type PageRow = typeof pages.$inferSelect
 
@@ -61,9 +64,11 @@ const loadSiblings = cached(
 export async function AboutPage({
   page,
   breadcrumbs,
+  sections,
 }: {
   page: PageRow
   breadcrumbs: { name: string; path: string }[]
+  sections: PageSectionRecord[]
 }) {
   const [site, shipping, stats, siblings, content] = await Promise.all([
     getNamespace('site'),
@@ -94,7 +99,7 @@ export async function AboutPage({
   ].filter((promise) => Boolean(promise.value))
 
   return (
-    <>
+    <ManagedTemplateSections pageId={page.id} sections={sections} defaults={SYSTEM_PAGE_SECTIONS.about}>
       <PageHero
         eyebrow={content.text('about.eyebrow')}
         title={content.text('about.title')}
@@ -213,6 +218,6 @@ export async function AboutPage({
           { label: content.text('about.faq'), href: '/p/faq' },
         ]}
       />
-    </>
+    </ManagedTemplateSections>
   )
 }

@@ -7,10 +7,21 @@ export type PageSectionBackground = (typeof PAGE_SECTION_BACKGROUNDS)[number]
 export type PageSectionSpacing = (typeof PAGE_SECTION_SPACING)[number]
 
 export interface PageSectionConfig {
+  slot?: string
+  locked?: boolean
   alignment?: 'start' | 'center'
   imagePosition?: 'start' | 'end'
   columns?: 2 | 3 | 4
   items?: { title: string; body: string; linkLabel?: string; linkUrl?: string }[]
+}
+
+export interface SystemPageSectionDefault {
+  slot: string
+  kind: PageSectionKind
+  name: string
+  sortOrder: number
+  background?: PageSectionBackground
+  spacing?: PageSectionSpacing
 }
 
 export interface PageSectionRecord {
