@@ -447,7 +447,9 @@ function VariantsPanel({ product }: { product: ProductDetail }) {
   const [error, setError] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [duplicatingId, setDuplicatingId] = useState<number | null>(null)
   const editing = product.variants.find((variant) => variant.id === editingId) ?? null
+  const duplicating = product.variants.find((variant) => variant.id === duplicatingId) ?? null
 
   const label = (selection: Record<number, number>) =>
     product.options
@@ -470,7 +472,7 @@ function VariantsPanel({ product }: { product: ProductDetail }) {
         {product.options.length > 0 && (
           <button
             type="button"
-            onClick={() => { setEditingId(null); setAdding((v) => !v) }}
+            onClick={() => { setEditingId(null); setDuplicatingId(null); setAdding((v) => !v) }}
             className="btn btn-secondary btn-sm"
           >
             {adding ? 'انصراف' : 'تنوع جدید'}
@@ -486,6 +488,7 @@ function VariantsPanel({ product }: { product: ProductDetail }) {
 
       {adding && <VariantForm product={product} onDone={() => setAdding(false)} />}
       {editing && <VariantForm key={editing.id} product={product} variant={editing} onDone={() => setEditingId(null)} />}
+      {duplicating && <VariantForm key={`duplicate-${duplicating.id}`} product={product} variant={duplicating} duplicate onDone={() => setDuplicatingId(null)} />}
 
       {product.variants.length > 0 && (
         <div className="overflow-x-auto mt-4">
@@ -529,11 +532,19 @@ function VariantsPanel({ product }: { product: ProductDetail }) {
                   <td className="px-3 py-2.5">
                     <button
                       type="button"
-                      onClick={() => { setAdding(false); setEditingId(variant.id) }}
+                      onClick={() => { setAdding(false); setDuplicatingId(null); setEditingId(variant.id) }}
                       disabled={pending}
                       className="me-3 text-xs text-accent-2 hover:underline"
                     >
                       ویرایش
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setAdding(false); setEditingId(null); setDuplicatingId(variant.id) }}
+                      disabled={pending}
+                      className="me-3 text-xs text-accent-2 hover:underline"
+                    >
+                      دوبلیکیت
                     </button>
                     <button
                       type="button"
@@ -565,16 +576,26 @@ function VariantsPanel({ product }: { product: ProductDetail }) {
 function VariantForm({
   product,
   variant,
+  duplicate = false,
   onDone,
 }: {
   product: ProductDetail
   variant?: ProductDetail['variants'][number]
+  duplicate?: boolean
   onDone: () => void
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [selection, setSelection] = useState<Record<number, number>>(variant?.selection ?? {})
+  const duplicateSku = (() => {
+    if (!duplicate || !variant) return variant?.sku ?? ''
+    const used = new Set(product.variants.map((item) => item.sku.toLocaleLowerCase('en-US')))
+    let candidate = `${variant.sku}-COPY`
+    let suffix = 2
+    while (used.has(candidate.toLocaleLowerCase('en-US'))) candidate = `${variant.sku}-COPY-${suffix++}`
+    return candidate
+  })()
 
   return (
     <form
@@ -590,7 +611,7 @@ function VariantForm({
 
         startTransition(async () => {
           const result = await saveVariantAction(product.id, {
-            id: variant?.id,
+            id: duplicate ? undefined : variant?.id,
             sku: String(formData.get('sku') ?? ''),
             price: Number(toLatinDigits(String(formData.get('price') ?? '0')).replace(/\D/g, '')),
             discountPrice: formData.get('discountPrice')
@@ -611,6 +632,7 @@ function VariantForm({
         })
       }}
     >
+      <p className="text-sm font-medium text-ink">{duplicate ? `ساخت نسخه جدید از ${variant?.sku}` : variant ? `ویرایش ${variant.sku}` : 'تنوع جدید'}</p>
       <div className="flex flex-wrap gap-4">
         {product.options.map((option) => (
           <div key={option.id}>
@@ -638,7 +660,7 @@ function VariantForm({
           <label htmlFor="v-sku" className="label text-xs">
             کد کالا (SKU)
           </label>
-          <input id="v-sku" name="sku" required dir="ltr" defaultValue={variant?.sku ?? ''} className="field py-2 text-sm w-36" />
+          <input id="v-sku" name="sku" required dir="ltr" defaultValue={duplicateSku} className="field py-2 text-sm w-36" />
         </div>
         <div>
           <label htmlFor="v-price" className="label text-xs">
@@ -696,7 +718,7 @@ function VariantForm({
 
       <div className="flex gap-2">
         <button type="submit" disabled={pending} className="btn btn-primary btn-sm">
-          {pending ? 'در حال ذخیره…' : variant ? 'ذخیره تغییرات' : 'ذخیره تنوع'}
+          {pending ? 'در حال ذخیره…' : duplicate ? 'ساخت نسخه جدید' : variant ? 'ذخیره تغییرات' : 'ذخیره تنوع'}
         </button>
         <button type="button" onClick={onDone} className="btn btn-ghost btn-sm">
           انصراف
