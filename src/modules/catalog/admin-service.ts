@@ -19,7 +19,6 @@ import * as audit from '@/lib/audit'
 import { errors } from '@/lib/errors'
 import { deleteImageSet, processUpload } from '@/lib/images'
 import { normalizePersian } from '@/lib/persian'
-import { sanitizeHtml, stripHtml } from '@/lib/sanitize'
 import type { AdminPrincipal } from '@/lib/permissions'
 import { slugify, uniqueSlug } from '@/lib/slug'
 
@@ -47,7 +46,7 @@ export async function rebuildSearchText(productId: number): Promise<void> {
   const parts = [
     row.name,
     row.shortDescription ?? '',
-    stripHtml(row.description ?? '').slice(0, 500),
+    (row.description ?? '').slice(0, 500),
     row.categoryName ?? '',
     ...optionValues.map((v) => v.value),
   ]
@@ -88,7 +87,7 @@ export async function createProduct(
     name: input.name,
     slug,
     shortDescription: input.shortDescription || null,
-    description: input.description ? sanitizeHtml(input.description) : null,
+    description: input.description || null,
     primaryCategoryId: input.primaryCategoryId ?? null,
     isActive: input.isActive,
     isFeatured: input.isFeatured,
@@ -145,7 +144,7 @@ export async function updateProduct(
       name: input.name,
       slug,
       shortDescription: input.shortDescription || null,
-      description: input.description ? sanitizeHtml(input.description) : null,
+      description: input.description || null,
       primaryCategoryId: input.primaryCategoryId ?? null,
       isActive: input.isActive,
       isFeatured: input.isFeatured,

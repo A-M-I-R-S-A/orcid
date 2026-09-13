@@ -561,11 +561,10 @@ export async function uploadContentImageAction(
     const kind = String(formData.get('kind') ?? '')
     if (kind === 'blog') await requirePermission('blog.manage')
     else if (kind === 'page') await requirePermission('content.pages')
-    else if (kind === 'product') await requirePermission('products.update')
     else throw errors.validation('نوع محتوا معتبر نیست.')
     const file = formData.get('file')
     if (!(file instanceof File)) throw errors.validation('فایلی انتخاب نشده است.')
-    const processed = await processUpload(file, { folder: kind === 'blog' ? 'blog' : kind === 'product' ? 'products' : 'pages' })
+    const processed = await processUpload(file, { folder: kind === 'blog' ? 'blog' : 'pages' })
     return ok({ path: processed.path, html: `<img src="/api/media/${processed.path}" alt="" loading="lazy">` })
   } catch (error) {
     return fail(error, { action: 'uploadContentImage' })

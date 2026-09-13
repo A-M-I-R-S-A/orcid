@@ -25,7 +25,6 @@ import {
   uploadProductImageAction,
 } from '@/modules/catalog/admin-actions'
 import { mediaUrl } from '@/lib/media-url'
-import { ContentImageUpload } from '@/components/admin/content-image-upload'
 import { formatAmountLatin } from '@/lib/money'
 import { toLatinDigits, toPersianDigits } from '@/lib/persian'
 
@@ -188,8 +187,6 @@ function BasicsPanel({
               defaultValue={product?.description ?? ''}
               className="field resize-y"
             />
-            <p className="hint">HTML امن و تگ &lt;style&gt; پشتیبانی می‌شود. کدهای اجرایی و CSS ناامن هنگام ذخیره حذف می‌شوند.</p>
-            {product && <div className="mt-3"><ContentImageUpload kind="product" textareaId="description" /></div>}
           </div>
         </div>
 

@@ -4,7 +4,7 @@ import { useRef, useState, useTransition } from 'react'
 
 import { uploadContentImageAction } from '@/modules/admin/content-actions'
 
-export function ContentImageUpload({ kind, textareaId }: { kind: 'blog' | 'page' | 'product'; textareaId: string }) {
+export function ContentImageUpload({ kind, textareaId }: { kind: 'blog' | 'page'; textareaId: string }) {
   const ref = useRef<HTMLInputElement>(null)
   const [pending, startTransition] = useTransition()
   const [message, setMessage] = useState<string | null>(null)
