@@ -762,6 +762,7 @@ function ImagesPanel({ product }: { product: ProductDetail }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const [images, setImages] = useState(product.images)
 
   return (
     <section className="card p-6">
@@ -770,9 +771,9 @@ function ImagesPanel({ product }: { product: ProductDetail }) {
         متن جایگزین (alt) برای سئو و دسترس‌پذیری ضروری است.
       </p>
 
-      {product.images.length > 0 && (
+      {images.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-          {product.images.map((image) => (
+          {images.map((image) => (
             <div key={image.id} className="rounded-xl border border-line overflow-hidden">
               <div className="aspect-[4/5] bg-surface-sunken">
                 <img
@@ -847,10 +848,14 @@ function ImagesPanel({ product }: { product: ProductDetail }) {
 
           startTransition(async () => {
             const result = await uploadProductImageAction(formData)
-            if (result.ok) router.refresh()
-            else setError(result.error)
+            if (result.ok) {
+              setImages((current) => [...current, { ...result.data, sortOrder: current.length }])
+              const form = document.getElementById('product-image-upload-form') as HTMLFormElement | null
+              form?.reset()
+            } else setError(result.error)
           })
         }}
+        id="product-image-upload-form"
       >
         <div>
           <label htmlFor="image-file" className="label text-xs">

@@ -498,7 +498,14 @@ export async function addProductImage(
   productId: number,
   file: File,
   alt: string,
-): Promise<number> {
+): Promise<{
+  id: number
+  path: string
+  alt: string | null
+  width: number
+  height: number
+  isPrimary: boolean
+}> {
   const processed = await processUpload(file, { folder: 'products' })
 
   const [countRow] = await db
@@ -518,7 +525,14 @@ export async function addProductImage(
     sortOrder: Number(countRow?.count ?? 0),
   })
 
-  return (inserted as unknown as { insertId: number }).insertId
+  return {
+    id: (inserted as unknown as { insertId: number }).insertId,
+    path: processed.path,
+    alt: alt || null,
+    width: processed.width,
+    height: processed.height,
+    isPrimary: isFirst,
+  }
 }
 
 export async function deleteProductImage(imageId: number): Promise<void> {

@@ -350,7 +350,14 @@ export async function deleteOptionValueAction(productId: number, optionId: numbe
 
 export async function uploadProductImageAction(
   formData: FormData,
-): Promise<ActionResult<{ id: number }>> {
+): Promise<ActionResult<{
+  id: number
+  path: string
+  alt: string | null
+  width: number
+  height: number
+  isPrimary: boolean
+}>> {
   try {
     await requirePermission('products.update')
 
@@ -361,10 +368,13 @@ export async function uploadProductImageAction(
     if (!Number.isInteger(productId) || productId <= 0) throw errors.validation('محصول نامعتبر است.')
     if (!(file instanceof File)) throw errors.validation('فایلی انتخاب نشده است.')
 
-    const id = await service.addProductImage(productId, file, alt)
-    await revalidateProduct(productId)
+    const image = await service.addProductImage(productId, file, alt)
 
-    return ok({ id })
+    // Keep cached storefront data correct without forcing the large admin
+    // product payload to render again before the upload request can finish.
+    invalidate(CACHE_TAGS.products, CACHE_TAGS.homepage, CACHE_TAGS.sitemap)
+
+    return ok(image)
   } catch (error) {
     return fail(error, { action: 'uploadProductImage' })
   }

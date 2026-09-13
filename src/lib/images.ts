@@ -105,7 +105,9 @@ export async function processUpload(
     : fitting.length > 0
       ? [...fitting]
       : [width]
-  const primaryWidth = widths[widths.length - 1] ?? width
+  // Product photos do not need a 1920px admin-time rendition. Keeping the
+  // stored edge at 1280px makes Sharp substantially faster on shared hosts.
+  const primaryWidth = Math.min(widths[widths.length - 1] ?? width, 1280)
 
   try {
     const webpRel = path.posix.join(options.folder, `${name}-${primaryWidth}.webp`)
@@ -116,7 +118,7 @@ export async function processUpload(
     await sharp(buffer, { failOn: 'error' })
       .rotate()
       .resize({ width: primaryWidth, withoutEnlargement: true })
-      .webp({ quality: 80, effort: 2 })
+      .webp({ quality: 80, effort: 0 })
       .toFile(path.join(uploadRoot(), webpRel))
 
     const scale = Math.min(1, primaryWidth / width)

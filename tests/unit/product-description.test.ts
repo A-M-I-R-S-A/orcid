@@ -15,7 +15,7 @@ describe('structured product descriptions', () => {
     source.features[0] = { title: 'بدون درز', body: 'مناسب استفاده روزانه' }
     const stored = serializeProductDescription(source)
     expect(stored).not.toBeNull()
-    expect(parseProductDescription(stored).features[0].title).toBe('بدون درز')
+    expect(parseProductDescription(stored).features[0]?.title).toBe('بدون درز')
   })
 
   it('stores an empty editor as null', () => {
