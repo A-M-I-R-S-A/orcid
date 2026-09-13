@@ -1,3 +1,5 @@
+'use client'
+
 import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 

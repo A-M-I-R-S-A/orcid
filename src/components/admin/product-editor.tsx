@@ -689,6 +689,11 @@ function ImagesPanel({ product }: { product: ProductDetail }) {
         className="flex flex-wrap items-end gap-3 pt-5 border-t border-line"
         action={(formData) => {
           setError(null)
+          const file = formData.get('file')
+          if (file instanceof File && file.size > 8 * 1024 * 1024) {
+            setError('حجم تصویر نباید بیشتر از ۸ مگابایت باشد.')
+            return
+          }
           formData.set('productId', String(product.id))
 
           startTransition(async () => {

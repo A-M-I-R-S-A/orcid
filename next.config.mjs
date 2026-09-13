@@ -26,7 +26,8 @@ const nextConfig = {
 
   experimental: {
     serverActions: {
-      bodySizeLimit: '8mb',
+      // Multipart encoding adds overhead; processUpload still enforces an 8 MiB file maximum.
+      bodySizeLimit: '10mb',
     },
   },
 
