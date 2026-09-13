@@ -19,6 +19,7 @@ import * as audit from '@/lib/audit'
 import { errors } from '@/lib/errors'
 import { deleteImageSet, processUpload } from '@/lib/images'
 import { normalizePersian } from '@/lib/persian'
+import { parseProductDescription, serializeProductDescription, type ProductDescriptionData } from '@/lib/product-description'
 import type { AdminPrincipal } from '@/lib/permissions'
 import { slugify, uniqueSlug } from '@/lib/slug'
 
@@ -43,10 +44,13 @@ export async function rebuildSearchText(productId: number): Promise<void> {
     .innerJoin(productOptions, eq(productOptionValues.optionId, productOptions.id))
     .where(eq(productOptions.productId, productId))
 
+  const description = parseProductDescription(row.description)
   const parts = [
     row.name,
     row.shortDescription ?? '',
-    (row.description ?? '').slice(0, 500),
+    description.title,
+    description.intro,
+    ...description.features.flatMap((feature) => [feature.title, feature.body]),
     row.categoryName ?? '',
     ...optionValues.map((v) => v.value),
   ]
@@ -60,7 +64,7 @@ export interface ProductInput {
   name: string
   slug?: string
   shortDescription?: string
-  description?: string
+  description?: ProductDescriptionData
   primaryCategoryId?: number | null
   isActive: boolean
   isFeatured: boolean
@@ -87,7 +91,7 @@ export async function createProduct(
     name: input.name,
     slug,
     shortDescription: input.shortDescription || null,
-    description: input.description || null,
+    description: input.description ? serializeProductDescription(input.description) : null,
     primaryCategoryId: input.primaryCategoryId ?? null,
     isActive: input.isActive,
     isFeatured: input.isFeatured,
@@ -144,7 +148,7 @@ export async function updateProduct(
       name: input.name,
       slug,
       shortDescription: input.shortDescription || null,
-      description: input.description || null,
+      description: input.description ? serializeProductDescription(input.description) : null,
       primaryCategoryId: input.primaryCategoryId ?? null,
       isActive: input.isActive,
       isFeatured: input.isFeatured,

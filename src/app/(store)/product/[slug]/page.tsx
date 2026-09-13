@@ -1,4 +1,3 @@
-import { SiteStyledText } from '@/components/site-content-provider'
 import { notFound, permanentRedirect } from 'next/navigation'
 import Link from 'next/link'
 
@@ -7,6 +6,7 @@ import { sizeGuide } from '@/modules/content/queries'
 import { ProductGrid } from '@/components/product-card'
 import { Breadcrumbs, SectionHeading, StarRating } from '@/components/ui'
 import { ReviewSection } from '@/components/reviews'
+import { ProductDescription } from '@/components/product-description'
 import {
   categoryTrail,
   findSlugRedirect,
@@ -17,6 +17,7 @@ import * as reviewService from '@/modules/reviews/service'
 import { getCurrentUser } from '@/lib/session'
 import { getConfig as getLaterConfig } from '@/modules/get-later/service'
 import { getSiteContent } from '@/lib/site-content'
+import { parseProductDescription } from '@/lib/product-description'
 import { JsonLd } from '@/components/json-ld'
 import {
   breadcrumbSchema,
@@ -99,7 +100,7 @@ export default async function ProductPage({ params }: Props) {
   const schemas = [
     productSchema({
       name: product.name,
-      description: product.shortDescription || product.description,
+      description: product.shortDescription || parseProductDescription(product.description).intro,
       slug: product.slug,
       sku: product.variants[0]?.sku,
       images: product.images.map((i) => i.path),
@@ -154,11 +155,8 @@ export default async function ProductPage({ params }: Props) {
         </div>
 
         {product.description && (
-          <section className="mt-20 pt-12 border-t border-line" aria-labelledby="description">
-            <h2 id="description" className="text-2xl text-ink mb-6">
-              <SiteStyledText contentKey="product.description">{content.text('product.description')}</SiteStyledText>
-            </h2>
-            <div className="prose text-ink-muted whitespace-pre-line">{product.description}</div>
+          <section id="description" className="mt-12 border-t border-line pt-8 sm:mt-20 sm:pt-12" aria-label={content.text('product.description')}>
+            <ProductDescription data={parseProductDescription(product.description)} />
           </section>
         )}
 

@@ -27,6 +27,7 @@ import {
 import { mediaUrl } from '@/lib/media-url'
 import { formatAmountLatin } from '@/lib/money'
 import { toLatinDigits, toPersianDigits } from '@/lib/persian'
+import { parseProductDescription } from '@/lib/product-description'
 
 export function ProductEditor({
   product,
@@ -63,6 +64,7 @@ function BasicsPanel({
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
+  const description = parseProductDescription(product?.description)
 
   return (
     <section className="card p-6">
@@ -77,7 +79,23 @@ function BasicsPanel({
             name: String(formData.get('name') ?? ''),
             slug: String(formData.get('slug') ?? ''),
             shortDescription: String(formData.get('shortDescription') ?? ''),
-            description: String(formData.get('description') ?? ''),
+            description: {
+              version: 1 as const,
+              eyebrow: String(formData.get('descriptionEyebrow') ?? ''),
+              title: String(formData.get('descriptionTitle') ?? ''),
+              intro: String(formData.get('descriptionIntro') ?? ''),
+              sectionEyebrow: String(formData.get('descriptionSectionEyebrow') ?? ''),
+              sectionTitle: String(formData.get('descriptionSectionTitle') ?? ''),
+              sectionSubtitle: String(formData.get('descriptionSectionSubtitle') ?? ''),
+              features: Array.from({ length: 4 }, (_, index) => ({ title: String(formData.get(`featureTitle${index}`) ?? ''), body: String(formData.get(`featureBody${index}`) ?? '') })),
+              sizeLabel: String(formData.get('sizeLabel') ?? ''),
+              sizeValue: String(formData.get('sizeValue') ?? ''),
+              fitLabel: String(formData.get('fitLabel') ?? ''),
+              fitValue: String(formData.get('fitValue') ?? ''),
+              guideTitle: String(formData.get('guideTitle') ?? ''),
+              guideBody: String(formData.get('guideBody') ?? ''),
+              notice: String(formData.get('descriptionNotice') ?? ''),
+            },
             primaryCategoryId: formData.get('primaryCategoryId')
               ? Number(formData.get('primaryCategoryId'))
               : null,
@@ -176,18 +194,30 @@ function BasicsPanel({
             <p className="hint">در کارت محصول و به‌عنوان توضیحات پیش‌فرض سئو استفاده می‌شود.</p>
           </div>
 
-          <div className="sm:col-span-2">
-            <label htmlFor="description" className="label">
-              توضیحات کامل
-            </label>
-            <textarea
-              id="description"
-              name="description"
-              rows={7}
-              defaultValue={product?.description ?? ''}
-              className="field resize-y"
-            />
-          </div>
+          <fieldset className="sm:col-span-2 space-y-4 rounded-xl border border-line bg-surface-sunken/30 p-4 sm:p-5">
+            <legend className="px-2 text-base text-ink">توضیحات کامل محصول</legend>
+            <p className="hint">این بخش بدون HTML و به‌صورت کارت‌های استاندارد و سازگار با موبایل نمایش داده می‌شود.</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="label">برچسب بالای معرفی<input name="descriptionEyebrow" defaultValue={description.eyebrow} className="field mt-1" placeholder="مثلاً کد ۰۱۱" /></label>
+              <label className="label">عنوان اصلی<input name="descriptionTitle" defaultValue={description.title} className="field mt-1" /></label>
+              <label className="label sm:col-span-2">متن معرفی<textarea name="descriptionIntro" defaultValue={description.intro} rows={4} className="field mt-1 resize-y" /></label>
+              <label className="label">برچسب بخش ویژگی‌ها<input name="descriptionSectionEyebrow" defaultValue={description.sectionEyebrow} className="field mt-1" placeholder="ویژگی‌های محصول" /></label>
+              <label className="label">عنوان بخش ویژگی‌ها<input name="descriptionSectionTitle" defaultValue={description.sectionTitle} className="field mt-1" /></label>
+              <label className="label sm:col-span-2">زیرعنوان ویژگی‌ها<textarea name="descriptionSectionSubtitle" defaultValue={description.sectionSubtitle} rows={2} className="field mt-1 resize-y" /></label>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {description.features.map((feature, index) => <div key={index} className="rounded-lg border border-line bg-surface p-3"><p className="mb-2 text-xs text-ink-muted">کارت ویژگی {toPersianDigits(index + 1)}</p><input name={`featureTitle${index}`} defaultValue={feature.title} className="field mb-2" placeholder="عنوان ویژگی" /><textarea name={`featureBody${index}`} defaultValue={feature.body} rows={2} className="field resize-y" placeholder="توضیح ویژگی" /></div>)}
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="label">عنوان سایزبندی<input name="sizeLabel" defaultValue={description.sizeLabel} className="field mt-1" /></label>
+              <label className="label">مقادیر سایزبندی<input name="sizeValue" defaultValue={description.sizeValue} className="field mt-1" placeholder="L / XL / 2XL" /></label>
+              <label className="label">عنوان راهنمای فیت<input name="fitLabel" defaultValue={description.fitLabel} className="field mt-1" /></label>
+              <label className="label">مقدار راهنمای فیت<input name="fitValue" defaultValue={description.fitValue} className="field mt-1" /></label>
+              <label className="label">عنوان راهنمای انتخاب<input name="guideTitle" defaultValue={description.guideTitle} className="field mt-1" /></label>
+              <label className="label sm:col-span-2">متن راهنمای انتخاب<textarea name="guideBody" defaultValue={description.guideBody} rows={3} className="field mt-1 resize-y" /></label>
+              <label className="label sm:col-span-2">پیام پایانی<textarea name="descriptionNotice" defaultValue={description.notice} rows={2} className="field mt-1 resize-y" /></label>
+            </div>
+          </fieldset>
         </div>
 
         <fieldset className="pt-4 border-t border-line">
