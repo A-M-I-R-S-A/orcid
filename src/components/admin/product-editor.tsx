@@ -449,6 +449,7 @@ function OptionsPanel({ product, optionLibrary }: { product: ProductDetail; opti
               name: String(formData.get('name') ?? ''),
               kind: String(formData.get('kind') ?? 'other') as 'size' | 'color' | 'other',
               sortOrder: product.options.length,
+              scope: formData.get('scope') === 'global' ? 'global' : 'local',
             })
             if (result.ok) router.refresh()
             else setError(result.error)
@@ -461,8 +462,12 @@ function OptionsPanel({ product, optionLibrary }: { product: ProductDetail; opti
           <option value="color">رنگ</option>
           <option value="other">سایر</option>
         </select>
+        <label className="flex items-center gap-2 text-sm text-ink-muted">
+          <input type="checkbox" name="scope" value="global" />
+          افزودن به ویژگی‌های سراسری
+        </label>
         <button type="submit" disabled={pending} className="btn btn-secondary btn-sm">
-          افزودن ویژگی
+          افزودن ویژگی اختصاصی
         </button>
       </form>
 

@@ -349,7 +349,7 @@ export async function deleteVariant(admin: AdminPrincipal, variantId: number): P
 
 export async function saveOption(
   productId: number,
-  input: { id?: number; name: string; kind: 'size' | 'color' | 'other'; sortOrder: number },
+  input: { id?: number; name: string; kind: 'size' | 'color' | 'other'; sortOrder: number; scope?: 'local' | 'global' },
 ): Promise<number> {
   if (input.id) {
     const [option] = await db.select().from(productOptions).where(and(eq(productOptions.id, input.id), eq(productOptions.productId, productId))).limit(1)
@@ -363,6 +363,17 @@ export async function saveOption(
       await db.update(productOptions).set({ name: input.name, kind: input.kind, sortOrder: input.sortOrder }).where(eq(productOptions.id, input.id))
     }
     return input.id
+  }
+
+  if (input.scope !== 'global') {
+    const [created] = await db.insert(productOptions).values({
+      productId,
+      definitionId: null,
+      name: input.name,
+      kind: input.kind,
+      sortOrder: input.sortOrder,
+    })
+    return (created as unknown as { insertId: number }).insertId
   }
 
   const [existing] = await db.select({ id: optionDefinitions.id }).from(optionDefinitions).where(and(eq(optionDefinitions.name, input.name), eq(optionDefinitions.kind, input.kind))).limit(1)

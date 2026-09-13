@@ -182,7 +182,7 @@ export async function deleteVariantAction(
 
 export async function saveOptionAction(
   productId: number,
-  input: { id?: number; name: string; kind: 'size' | 'color' | 'other'; sortOrder: number },
+  input: { id?: number; name: string; kind: 'size' | 'color' | 'other'; sortOrder: number; scope?: 'local' | 'global' },
 ): Promise<ActionResult<{ id: number }>> {
   try {
     await requirePermission('products.update')

@@ -34,7 +34,7 @@ interface Props {
 
 async function resolve(rawSlug: string) {
   const slug = decodeURIComponent(rawSlug)
-  const product = await getProductBySlug(slug)
+  const product = await getProductBySlug(slug, { onlyUsedVariantOptions: true })
 
   if (product) return { product, slug }
 
@@ -46,7 +46,7 @@ async function resolve(rawSlug: string) {
 
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params
-  const product = await getProductBySlug(decodeURIComponent(slug))
+  const product = await getProductBySlug(decodeURIComponent(slug), { onlyUsedVariantOptions: true })
   const content = await getSiteContent()
 
   if (!product) {

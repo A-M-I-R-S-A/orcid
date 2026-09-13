@@ -418,7 +418,10 @@ export async function searchProducts(
   }
 }
 
-export async function getProductBySlug(slug: string): Promise<ProductDetail | null> {
+export async function getProductBySlug(
+  slug: string,
+  optionsFilter: { onlyUsedVariantOptions?: boolean } = {},
+): Promise<ProductDetail | null> {
   const [product] = await db.select().from(products).where(eq(products.slug, slug)).limit(1)
   if (!product) return null
 
@@ -480,6 +483,12 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
     selectionBy.set(row.variantId, current)
   }
 
+  const usedValueIds = new Set(selections.map((row) => row.optionValueId))
+  const usedOptionIds = new Set(selections.map((row) => row.optionId))
+  const visibleOptions = optionsFilter.onlyUsedVariantOptions
+    ? options.filter((option) => usedOptionIds.has(option.id))
+    : options
+
   return {
     id: product.id,
     name: product.name,
@@ -503,14 +512,14 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       height: i.height,
       isPrimary: i.isPrimary,
     })),
-    options: options.map((o) => ({
+    options: visibleOptions.map((o) => ({
       id: o.id,
       definitionId: o.definitionId,
       name: o.name,
       kind: o.kind,
       note: o.note,
       values: optionValues
-        .filter((v) => v.optionId === o.id)
+        .filter((v) => v.optionId === o.id && (!optionsFilter.onlyUsedVariantOptions || usedValueIds.has(v.id)))
         .map((v) => ({ id: v.id, definitionValueId: v.definitionValueId, value: v.value, swatchHex: v.swatchHex })),
     })),
     variants: variants.map((v) => ({
