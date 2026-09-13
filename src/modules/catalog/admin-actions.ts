@@ -47,6 +47,7 @@ export async function createProductAction(
     const admin = await requirePermission('products.create')
 
     if (!input.name?.trim()) throw errors.validation('نام محصول الزامی است.')
+    if ((input.description?.length ?? 0) > 50_000) throw errors.validation('توضیحات کامل محصول بیش از حد طولانی است.')
 
     const id = await service.createProduct(admin, input)
     revalidatePath('/admin/products')
@@ -65,6 +66,7 @@ export async function updateProductAction(
     const admin = await requirePermission('products.update')
 
     if (!input.name?.trim()) throw errors.validation('نام محصول الزامی است.')
+    if ((input.description?.length ?? 0) > 50_000) throw errors.validation('توضیحات کامل محصول بیش از حد طولانی است.')
 
     await service.updateProduct(admin, productId, input)
     await revalidateProduct(productId)

@@ -17,6 +17,7 @@ import * as reviewService from '@/modules/reviews/service'
 import { getCurrentUser } from '@/lib/session'
 import { getConfig as getLaterConfig } from '@/modules/get-later/service'
 import { getSiteContent } from '@/lib/site-content'
+import { sanitizeHtml, stripHtml } from '@/lib/sanitize'
 import { JsonLd } from '@/components/json-ld'
 import {
   breadcrumbSchema,
@@ -99,7 +100,7 @@ export default async function ProductPage({ params }: Props) {
   const schemas = [
     productSchema({
       name: product.name,
-      description: product.shortDescription || product.description,
+      description: product.shortDescription || stripHtml(product.description ?? ''),
       slug: product.slug,
       sku: product.variants[0]?.sku,
       images: product.images.map((i) => i.path),
@@ -158,7 +159,10 @@ export default async function ProductPage({ params }: Props) {
             <h2 id="description" className="text-2xl text-ink mb-6">
               <SiteStyledText contentKey="product.description">{content.text('product.description')}</SiteStyledText>
             </h2>
-            <div className="prose text-ink-muted whitespace-pre-line">{product.description}</div>
+            <div
+              className="prose whitespace-pre-line text-ink-muted"
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description) }}
+            />
           </section>
         )}
 
