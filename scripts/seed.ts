@@ -211,9 +211,9 @@ async function seedSmsTemplates() {
     },
     {
       event: 'order_created' as const,
-      name: 'ثبت سفارش',
+      name: 'تأیید سفارش مشتری',
       requiresApproval: true,
-      parameters: ['ORDER', 'AMOUNT'],
+      parameters: { ORDER: 'ORDER', NAME: 'NAME' },
     },
     {
       event: 'payment_approved' as const,
@@ -225,7 +225,13 @@ async function seedSmsTemplates() {
       event: 'order_shipped' as const,
       name: 'ارسال سفارش',
       requiresApproval: true,
-      parameters: ['ORDER'],
+      parameters: { ORDER: 'ORDER', NAME: 'NAME', SHIPMENT: 'SHIPMENT', TRACK: 'TRACK' },
+    },
+    {
+      event: 'admin_new_order' as const,
+      name: 'اعلان سفارش جدید برای مدیر',
+      requiresApproval: false,
+      parameters: { ORDER: 'ORDER' },
     },
   ]
 
@@ -239,7 +245,7 @@ async function seedSmsTemplates() {
         isEnabled: false,
         requiresApproval: template.requiresApproval,
       })
-      .onDuplicateKeyUpdate({ set: { name: template.name, parameters: template.parameters } })
+      .onDuplicateKeyUpdate({ set: { name: template.name } })
   }
 
   console.log(`  ✓ ${templates.length} templates (disabled until configured)`)

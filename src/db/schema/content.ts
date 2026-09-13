@@ -75,6 +75,7 @@ export const SMS_EVENTS = [
   'order_created',
   'payment_approved',
   'order_shipped',
+  'admin_new_order',
 ] as const
 
 export const smsTemplates = mysqlTable(

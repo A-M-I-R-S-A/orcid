@@ -1,12 +1,16 @@
 'use client'
 
+import { SiteStyledText } from '@/components/site-content-provider'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
+import { useSiteText } from '@/components/site-content-provider'
 
 export function SearchField() {
   const router = useRouter()
   const params = useSearchParams()
   const [value, setValue] = useState(params.get('q') ?? '')
+  const label = useSiteText('search.label', 'جستجو در محصولات')
+  const placeholder = useSiteText('search.placeholder', 'جستجو در محصولات…')
 
   return (
     <form
@@ -21,7 +25,7 @@ export function SearchField() {
       className="relative"
     >
       <label htmlFor="site-search" className="sr-only">
-        جستجو در محصولات
+        <SiteStyledText contentKey="search.label">{label}</SiteStyledText>
       </label>
 
       <input
@@ -30,7 +34,7 @@ export function SearchField() {
         type="search"
         value={value}
         onChange={(event) => setValue(event.target.value)}
-        placeholder="جستجو در محصولات…"
+        placeholder={placeholder}
         autoComplete="off"
         className="field ps-11 py-2.5 text-[15px] rounded-full"
       />
@@ -38,7 +42,7 @@ export function SearchField() {
       <button
         type="submit"
         className="absolute inset-y-0 start-0 ps-4 flex items-center text-ink-subtle hover:text-accent-2 transition-colors"
-        aria-label="جستجو"
+        aria-label={label}
       >
         <svg
           width="17"

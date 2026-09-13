@@ -1,3 +1,4 @@
+import { SiteStyledText } from '@/components/site-content-provider'
 import { and, eq, ne, sql } from 'drizzle-orm'
 
 import { db } from '@/db'
@@ -6,35 +7,13 @@ import { CACHE_TAGS, cached } from '@/lib/cache'
 import { toPersianDigits } from '@/lib/persian'
 import { sanitizeHtml } from '@/lib/sanitize'
 import { getNamespace } from '@/lib/settings'
+import { getSiteContent } from '@/lib/site-content'
 import { splitLead } from '@/lib/rich-text'
 import { Divider, OrchidBloom } from '@/components/ornament'
 import { Icon, type IconName } from './icons'
 import { ClosingBand, Movement, PageHero, RelatedPages } from './shell'
 
 type PageRow = typeof pages.$inferSelect
-
-const PILLARS: { icon: IconName; title: string; body: string }[] = [
-  {
-    icon: 'sparkle',
-    title: 'پارچه و دوخت',
-    body: 'پارچه‌های نرم و سبک با دوخت تمیز؛ بدون درز آزاردهنده و بدون برچسب اضافه روی پوست.',
-  },
-  {
-    icon: 'ruler',
-    title: 'سایز درست',
-    body: 'برای هر محصول جدول سایز اختصاصی داریم تا انتخاب سایز حدس و گمان نباشد.',
-  },
-  {
-    icon: 'package',
-    title: 'بسته‌بندی محرمانه',
-    body: 'سفارش شما در بسته‌بندی ساده و بدون نشان ارسال می‌شود؛ محتوای بسته روی آن نوشته نمی‌شود.',
-  },
-  {
-    icon: 'heart',
-    title: 'کنار شما',
-    body: 'قبل و بعد از خرید پاسخگوی پرسش‌های شما هستیم؛ از انتخاب سایز تا پیگیری سفارش.',
-  },
-]
 
 const loadStats = cached(
   async () => {
@@ -86,39 +65,46 @@ export async function AboutPage({
   page: PageRow
   breadcrumbs: { name: string; path: string }[]
 }) {
-  const [site, shipping, stats, siblings] = await Promise.all([
+  const [site, shipping, stats, siblings, content] = await Promise.all([
     getNamespace('site'),
     getNamespace('shipping'),
     loadStats(),
     loadSiblings(page.slug),
+    getSiteContent(),
   ])
 
   const siteName = site.siteName || 'ارکید'
+  const pillars: { icon: IconName; title: string; body: string }[] = [
+    { icon: 'sparkle', title: content.text('about.pillar.fabricTitle'), body: content.text('about.pillar.fabricBody') },
+    { icon: 'ruler', title: content.text('about.pillar.sizeTitle'), body: content.text('about.pillar.sizeBody') },
+    { icon: 'package', title: content.text('about.pillar.packageTitle'), body: content.text('about.pillar.packageBody') },
+    { icon: 'heart', title: content.text('about.pillar.supportTitle'), body: content.text('about.pillar.supportBody') },
+  ]
   const body = page.body ? sanitizeHtml(page.body) : ''
   const { lead, rest } = splitLead(body)
 
   const figures = [
-    { label: 'محصول فعال', value: stats.products },
-    { label: 'دسته‌بندی', value: stats.categories },
-    { label: 'دیدگاه ثبت‌شده', value: stats.reviews },
+    { label: content.text('about.activeProducts'), value: stats.products },
+    { label: content.text('about.categories'), value: stats.categories },
+    { label: content.text('about.reviews'), value: stats.reviews },
   ].filter((figure) => figure.value > 0)
 
   const promises = [
-    { key: 'shippingInfo', title: 'ارسال', value: shipping.shippingInfo },
-    { key: 'returnPolicy', title: 'بازگشت کالا', value: shipping.returnPolicy },
+    { key: 'shippingInfo', title: content.text('about.shipping'), value: shipping.shippingInfo },
+    { key: 'returnPolicy', title: content.text('about.returns'), value: shipping.returnPolicy },
   ].filter((promise) => Boolean(promise.value))
 
   return (
     <>
       <PageHero
-        eyebrow="معرفی برند"
+        eyebrow={content.text('about.eyebrow')}
         title={page.title}
         lead={lead || site.tagline || undefined}
         imagePath={page.imagePath}
         breadcrumbs={breadcrumbs}
         links={[
-          { label: 'مشاهده محصولات', href: '/products', primary: true },
-          { label: 'تماس با ما', href: '/p/contact' },
+          { label: content.text('common.viewProducts'), href: '/products', primary: true },
+          { label: content.text('common.contactUs'), href: '/p/contact' },
         ]}
       />
 
@@ -143,7 +129,7 @@ export async function AboutPage({
                   <dd className="nums font-[family-name:var(--font-heading)] text-4xl text-accent-2 md:text-5xl">
                     {toPersianDigits(stats.rating.toFixed(1))}
                   </dd>
-                  <dt className="mt-3 text-sm text-ink-muted">میانگین امتیاز مشتریان</dt>
+                  <dt className="mt-3 text-sm text-ink-muted"><SiteStyledText contentKey="about.averageRating">{content.text('about.averageRating')}</SiteStyledText></dt>
                 </div>
               )}
             </dl>
@@ -158,7 +144,7 @@ export async function AboutPage({
               <div className="md:sticky md:top-32">
                 <span aria-hidden="true" className="mb-8 block h-px w-14 bg-accent-2" />
                 <h2 className="font-[family-name:var(--font-heading)] text-3xl leading-tight text-ink md:text-[2.6rem]">
-                  داستان ما
+                  <SiteStyledText contentKey="about.storyTitle">{content.text('about.storyTitle')}</SiteStyledText>
                 </h2>
                 <OrchidBloom className="mt-8 hidden h-10 w-10 text-accent-3 md:block" />
               </div>
@@ -176,12 +162,12 @@ export async function AboutPage({
 
       <Movement tone="sunken">
         <div className="max-w-2xl">
-          <p className="eyebrow">قول ما به شما</p>
-          <h2 className="section-title mt-6">چیزی که در هر سفارش تکرار می‌شود</h2>
+          <p className="eyebrow"><SiteStyledText contentKey="about.promiseEyebrow">{content.text('about.promiseEyebrow')}</SiteStyledText></p>
+          <h2 className="section-title mt-6"><SiteStyledText contentKey="about.promiseTitle">{content.text('about.promiseTitle')}</SiteStyledText></h2>
         </div>
 
         <div className="mt-12 grid gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
-          {PILLARS.map((pillar, index) => (
+              {pillars.map((pillar, index) => (
             <div key={pillar.title}>
               <div className="flex items-center gap-4">
                 <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line-strong text-accent-2">
@@ -216,15 +202,15 @@ export async function AboutPage({
         </Movement>
       )}
 
-      <RelatedPages pages={siblings} heading="بیشتر بدانید" />
+      <RelatedPages pages={siblings} heading={content.text('about.learnMore')} />
 
       <ClosingBand
-        eyebrow="شروع کنید"
+        eyebrow={content.text('about.start')}
         title={`مجموعه ${siteName} را ببینید`}
-        body="هر قطعه با همان دقتی انتخاب شده که در این صفحه خواندید."
+        body={content.text('about.closingBody')}
         links={[
-          { label: 'مشاهده محصولات', href: '/products', primary: true },
-          { label: 'سوالات متداول', href: '/p/faq' },
+          { label: content.text('common.viewProducts'), href: '/products', primary: true },
+          { label: content.text('about.faq'), href: '/p/faq' },
         ]}
       />
     </>

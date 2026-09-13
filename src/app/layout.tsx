@@ -1,3 +1,4 @@
+import { SiteStyledText } from '@/components/site-content-provider'
 import type { Metadata, Viewport } from 'next'
 import { Lalezar, Vazirmatn } from 'next/font/google'
 
@@ -6,6 +7,8 @@ import { getTheme, themeToCss } from '@/lib/theme'
 import { getTypography, typographyToCss } from '@/lib/typography'
 import { organizationSchema, siteUrl, websiteSchema } from '@/lib/seo'
 import { JsonLd } from '@/components/json-ld'
+import { SiteContentProvider } from '@/components/site-content-provider'
+import { getSiteContent } from '@/lib/site-content'
 
 import './globals.css'
 
@@ -67,10 +70,11 @@ export const viewport: Viewport = {
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
-  const [theme, typography, enamad] = await Promise.all([
+  const [theme, typography, enamad, content] = await Promise.all([
     getTheme(),
     getTypography(),
     getNamespace('enamad'),
+    getSiteContent(),
   ])
 
   const [orgSchema, siteSchema] = await Promise.all([organizationSchema(), websiteSchema()])
@@ -91,9 +95,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       </head>
       <body>
         <a href="#main" className="sr-only focus:not-sr-only">
-          پرش به محتوای اصلی
+          <SiteStyledText contentKey="site.skipContent">{content.text('site.skipContent')}</SiteStyledText>
         </a>
-        {children}
+        <SiteContentProvider copy={content.resolvedCopy} styles={content.rawStyles}>{children}</SiteContentProvider>
       </body>
     </html>
   )

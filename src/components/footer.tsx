@@ -1,3 +1,4 @@
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 import { eq } from 'drizzle-orm'
 
@@ -10,9 +11,10 @@ import { toPersianDigits } from '@/lib/persian'
 import { jalaliYear } from '@/lib/jalali'
 import { sanitizeEnamad } from '@/lib/sanitize'
 import { safePublicHref } from '@/lib/public-url'
+import { getSiteContent } from '@/lib/site-content'
 
 export async function Footer() {
-  const [categories, site, contact, social, enamad, footerPages, shopLinks, helpLinks] =
+  const [categories, site, contact, social, enamad, footerPages, shopLinks, helpLinks, content] =
     await Promise.all([
       listCategories(),
       getNamespace('site'),
@@ -26,6 +28,7 @@ export async function Footer() {
         .orderBy(pages.sortOrder),
       navLinksFor('footer_shop'),
       navLinksFor('footer_help'),
+      getSiteContent(),
     ])
 
   const siteName = site.siteName || 'ارکید'
@@ -47,7 +50,7 @@ export async function Footer() {
             label: p.title,
             href: `/p/${encodeURIComponent(p.slug)}`,
           })),
-          { label: 'پیگیری سفارش', href: '/account/orders' },
+          { label: content.text('footer.tracking'), href: '/account/orders' },
         ]
 
   const shopHeading = site.footerShopHeading || 'فروشگاه'
@@ -55,9 +58,9 @@ export async function Footer() {
   const contactHeading = site.footerContactHeading || 'تماس با ما'
 
   const socialLinks = [
-    { key: 'instagram' as const, label: 'اینستاگرام', url: safePublicHref(social.instagram) },
-    { key: 'telegram' as const, label: 'تلگرام', url: safePublicHref(social.telegram) },
-    { key: 'whatsapp' as const, label: 'واتس‌اپ', url: safePublicHref(social.whatsapp) },
+    { key: 'instagram' as const, label: content.text('footer.instagram'), url: safePublicHref(social.instagram) },
+    { key: 'telegram' as const, label: content.text('footer.telegram'), url: safePublicHref(social.telegram) },
+    { key: 'whatsapp' as const, label: content.text('footer.whatsapp'), url: safePublicHref(social.whatsapp) },
   ].filter((s) => Boolean(s.url))
 
   const hasContactColumn = Boolean(
@@ -154,7 +157,7 @@ export async function Footer() {
 
             {enamad.embedCode ? (
               <div className="mt-6">
-                <p className="eyebrow mb-3">نماد اعتماد</p>
+                <p className="eyebrow mb-3"><SiteStyledText contentKey="footer.trust">{content.text('footer.trust')}</SiteStyledText></p>
                 <div
                   className="inline-block bg-white rounded-lg p-2 [&_img]:max-w-[110px] [&_img]:h-auto"
                   dangerouslySetInnerHTML={{ __html: sanitizeEnamad(enamad.embedCode) }}
@@ -167,7 +170,7 @@ export async function Footer() {
 
         <div className="mt-14 flex flex-col items-center justify-between gap-4 border-t border-line pt-8 text-sm text-ink-subtle sm:flex-row">
           <p className="nums">
-            © {toPersianDigits(jalaliYear())} {siteName}. تمامی حقوق محفوظ است.
+            © {toPersianDigits(jalaliYear())} {siteName}. <SiteStyledText contentKey="footer.rights">{content.text('footer.rights')}</SiteStyledText>
           </p>
           {site.footerNote && <p>{site.footerNote}</p>}
         </div>

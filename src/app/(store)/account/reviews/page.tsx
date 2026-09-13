@@ -1,37 +1,39 @@
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 
 import { EmptyState } from '@/components/ui'
 import { listOwnReviews } from '@/modules/reviews/service'
 import { requireUser } from '@/lib/session'
 import { formatJalali } from '@/lib/jalali'
+import { getSiteContent } from '@/lib/site-content'
 
-export const metadata = { title: 'دیدگاه‌های من' }
-
-const STATUS_LABELS: Record<string, { label: string; tone: string }> = {
-  pending: { label: 'در انتظار تأیید', tone: 'badge-pending' },
-  approved: { label: 'منتشر شده', tone: 'badge-positive' },
-  rejected: { label: 'تأیید نشد', tone: 'badge-negative' },
-  hidden: { label: 'پنهان شده', tone: 'badge-neutral' },
-}
+export async function generateMetadata() { const content = await getSiteContent(); return { title: content.text('reviews.mine') } }
 
 export default async function MyReviewsPage() {
   const user = await requireUser()
   const reviews = await listOwnReviews(user.id)
+  const content = await getSiteContent()
+  const statusLabels: Record<string, { label: string; tone: string }> = {
+    pending: { label: content.text('reviews.pending'), tone: 'badge-pending' },
+    approved: { label: content.text('reviews.published'), tone: 'badge-positive' },
+    rejected: { label: content.text('reviews.rejected'), tone: 'badge-negative' },
+    hidden: { label: content.text('reviews.hidden'), tone: 'badge-neutral' },
+  }
 
   return (
     <div className="space-y-8">
-      <h1 className="text-2xl md:text-3xl text-ink">دیدگاه‌های من</h1>
+      <h1 className="text-2xl md:text-3xl text-ink"><SiteStyledText contentKey="reviews.mine">{content.text('reviews.mine')}</SiteStyledText></h1>
 
       {reviews.length === 0 ? (
         <EmptyState
-          title="هنوز دیدگاهی ثبت نکرده‌اید"
-          description="پس از خرید، تجربه خود را با دیگران به اشتراک بگذارید."
-          action={{ label: 'مشاهده محصولات', href: '/' }}
+          title={content.text('reviews.empty')}
+          description={content.text('reviews.emptyDescription')}
+          action={{ label: content.text('common.viewProducts'), href: '/' }}
         />
       ) : (
         <ul className="space-y-4">
           {reviews.map((review) => {
-            const status = STATUS_LABELS[review.status] ?? STATUS_LABELS.pending!
+            const status = statusLabels[review.status] ?? statusLabels.pending!
 
             return (
               <li key={review.id} className="card p-5">
@@ -64,7 +66,7 @@ export default async function MyReviewsPage() {
                     href={`/product/${encodeURIComponent(review.productSlug)}#reviews`}
                     className="text-xs text-accent-2 hover:underline"
                   >
-                    ویرایش دیدگاه
+                    <SiteStyledText contentKey="reviews.edit">{content.text('reviews.edit')}</SiteStyledText>
                   </Link>
                 </div>
               </li>

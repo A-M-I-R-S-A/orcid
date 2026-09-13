@@ -6,6 +6,8 @@ import { type ActionResult, MESSAGES, errors, fail, ok, reportError } from '@/li
 import { requireUser } from '@/lib/session'
 import { checkoutSchema, parseOrThrow, paymentReferenceSchema } from '@/lib/validation'
 import { getCart } from '@/modules/cart/service'
+import { calculateShipping } from '@/lib/shipping'
+import { resolveShippingMethod } from '@/lib/shipping-config'
 import * as payments from '@/modules/payments/service'
 import { assertTorobEligible } from '@/modules/payments/gateway-client'
 import { checkGatewayPaymentForUser } from '@/modules/payments/gateway-service'
@@ -21,6 +23,7 @@ export async function placeOrderAction(input: {
   addressLine: string
   postalCode: string
   customerNote?: string
+  shippingMethodId?: number
   paymentMethod: string
 }): Promise<ActionResult<{ orderId: number; orderNumber: string }>> {
   try {
@@ -30,8 +33,12 @@ export async function placeOrderAction(input: {
     const cart = await getCart(user.id)
     if (!cart.id || cart.lines.length === 0) throw errors.validation(MESSAGES.cartEmpty)
 
+    const merchandiseTotal = cart.subtotal - cart.discountTotal
+    const shippingMethod = await resolveShippingMethod(parsed.shippingMethodId)
+    const quotedGrandTotal = merchandiseTotal + calculateShipping(merchandiseTotal, shippingMethod)
+
     if (parsed.paymentMethod === 'torob_pay') {
-      await assertTorobEligible(cart.grandTotal)
+      await assertTorobEligible(quotedGrandTotal)
     }
 
     const result = await checkout.placeOrder(
@@ -45,9 +52,10 @@ export async function placeOrderAction(input: {
         addressLine: parsed.addressLine,
         postalCode: parsed.postalCode,
         customerNote: parsed.customerNote || undefined,
+        shippingMethodId: parsed.shippingMethodId,
         paymentMethod: parsed.paymentMethod,
       },
-      cart.grandTotal,
+      quotedGrandTotal,
     )
 
     try {

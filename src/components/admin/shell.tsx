@@ -123,6 +123,12 @@ const NAV: NavGroup[] = [
         icon: 'M12 3a9 9 0 000 18c1.1 0 2-.9 2-2 0-.5-.2-1-.6-1.4-.3-.4-.4-.8-.4-1.1 0-.8.7-1.5 1.5-1.5H17a4 4 0 004-4c0-4.4-4-8-9-8zM7.5 12a1 1 0 100-2 1 1 0 000 2zm3-3.5a1 1 0 100-2 1 1 0 000 2zm5 0a1 1 0 100-2 1 1 0 000 2z',
       },
       {
+        href: '/admin/content',
+        label: 'متن و ظاهر',
+        permission: 'appearance.brand',
+        icon: 'M4 5h16v14H4V5zm4 4h8M8 13h5',
+      },
+      {
         href: '/admin/settings',
         label: 'تنظیمات',
         permission: 'settings.view',

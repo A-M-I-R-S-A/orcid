@@ -1,5 +1,6 @@
 'use client'
 
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
@@ -15,6 +16,7 @@ import {
   SubmitButton,
   useCountdown,
 } from './fields'
+import { useSiteText } from '@/components/site-content-provider'
 
 export function ResetForm({ initialPhone = '' }: { initialPhone?: string }) {
   const router = useRouter()
@@ -25,6 +27,14 @@ export function ResetForm({ initialPhone = '' }: { initialPhone?: string }) {
   const [error, setError] = useState<string | null>(null)
   const [cooldown, setCooldown] = useCountdown(0)
   const [pending, startTransition] = useTransition()
+  const newPassword = useSiteText('auth.newPassword', 'رمز عبور جدید')
+  const passwordHint = useSiteText('auth.passwordHint', 'حداقل ۸ کاراکتر.')
+  const saving = useSiteText('auth.saving', 'در حال ذخیره…')
+  const resetAndLogin = useSiteText('auth.resetAndLogin', 'تغییر رمز عبور و ورود')
+  const sending = useSiteText('auth.sending', 'در حال ارسال…')
+  const sendRecovery = useSiteText('auth.sendRecovery', 'ارسال کد بازیابی')
+  const remembered = useSiteText('auth.remembered', 'رمز عبور را به یاد آوردید؟')
+  const backToLogin = useSiteText('auth.backToLogin', 'بازگشت به ورود')
 
   const sendCode = () => {
     setError(null)
@@ -79,11 +89,11 @@ export function ResetForm({ initialPhone = '' }: { initialPhone?: string }) {
         />
 
         <PasswordField
-          label="رمز عبور جدید"
+          label={newPassword}
           value={password}
           onChange={setPassword}
           autoComplete="new-password"
-          hint="حداقل ۸ کاراکتر."
+          hint={passwordHint}
           invalid={Boolean(error)}
           disabled={pending}
         />
@@ -93,9 +103,9 @@ export function ResetForm({ initialPhone = '' }: { initialPhone?: string }) {
         <SubmitButton
           pending={pending}
           disabled={code.length !== 6 || password.length < 8}
-          pendingLabel="در حال ذخیره…"
+          pendingLabel={saving}
         >
-          تغییر رمز عبور و ورود
+          <SiteStyledText contentKey="auth.resetAndLogin">{resetAndLogin}</SiteStyledText>
         </SubmitButton>
 
         <ResendControl seconds={cooldown} onResend={sendCode} disabled={pending} />
@@ -122,15 +132,15 @@ export function ResetForm({ initialPhone = '' }: { initialPhone?: string }) {
 
         <FormError message={error} />
 
-        <SubmitButton pending={pending} disabled={phone.length < 11} pendingLabel="در حال ارسال…">
-          ارسال کد بازیابی
+        <SubmitButton pending={pending} disabled={phone.length < 11} pendingLabel={sending}>
+          <SiteStyledText contentKey="auth.sendRecovery">{sendRecovery}</SiteStyledText>
         </SubmitButton>
       </form>
 
       <p className="border-t border-line pt-5 text-center text-sm text-ink-muted">
-        رمز عبور را به یاد آوردید؟{' '}
+        <SiteStyledText contentKey="auth.remembered">{remembered}</SiteStyledText>{' '}
         <Link href="/login" className="font-medium text-accent-2 hover:text-accent">
-          بازگشت به ورود
+          <SiteStyledText contentKey="auth.backToLogin">{backToLogin}</SiteStyledText>
         </Link>
       </p>
     </div>

@@ -1,5 +1,6 @@
 'use client'
 
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
@@ -15,6 +16,7 @@ import {
   SubmitButton,
   useCountdown,
 } from './fields'
+import { useSiteText } from '@/components/site-content-provider'
 
 type Mode = 'password' | 'otp'
 
@@ -28,6 +30,15 @@ export function LoginForm({ next }: { next: string }) {
   const [error, setError] = useState<string | null>(null)
   const [cooldown, setCooldown] = useCountdown(0)
   const [pending, startTransition] = useTransition()
+  const checking = useSiteText('auth.checking', 'در حال بررسی…')
+  const login = useSiteText('auth.login', 'ورود')
+  const passwordLabel = useSiteText('auth.password', 'رمز عبور')
+  const forgot = useSiteText('auth.forgotPassword', 'رمز عبور را فراموش کرده‌اید؟')
+  const loggingIn = useSiteText('auth.loggingIn', 'در حال ورود…')
+  const sending = useSiteText('auth.sending', 'در حال ارسال…')
+  const sendOtp = useSiteText('auth.sendOtp', 'ارسال کد تأیید')
+  const noAccount = useSiteText('auth.noAccount', 'حساب کاربری ندارید؟')
+  const registerLink = useSiteText('auth.registerLink', 'ثبت‌نام کنید')
 
   const done = () => {
     router.push(next)
@@ -103,8 +114,8 @@ export function LoginForm({ next }: { next: string }) {
 
         <FormError message={error} />
 
-        <SubmitButton pending={pending} disabled={code.length !== 6} pendingLabel="در حال بررسی…">
-          ورود
+        <SubmitButton pending={pending} disabled={code.length !== 6} pendingLabel={checking}>
+          <SiteStyledText contentKey="auth.login">{login}</SiteStyledText>
         </SubmitButton>
 
         <ResendControl seconds={cooldown} onResend={sendCode} disabled={pending} />
@@ -135,7 +146,7 @@ export function LoginForm({ next }: { next: string }) {
         {mode === 'password' && (
           <>
             <PasswordField
-              label="رمز عبور"
+              label={passwordLabel}
               value={password}
               onChange={setPassword}
               autoComplete="current-password"
@@ -147,7 +158,7 @@ export function LoginForm({ next }: { next: string }) {
                 href={phone.length === 11 ? `/forgot-password?phone=${phone}` : '/forgot-password'}
                 className="text-sm text-accent-2 transition-colors hover:text-accent"
               >
-                رمز عبور را فراموش کرده‌اید؟
+                <SiteStyledText contentKey="auth.forgotPassword">{forgot}</SiteStyledText>
               </Link>
             </div>
           </>
@@ -158,16 +169,16 @@ export function LoginForm({ next }: { next: string }) {
         <SubmitButton
           pending={pending}
           disabled={mode === 'password' ? phone.length < 11 || password.length < 1 : phone.length < 11}
-          pendingLabel={mode === 'password' ? 'در حال ورود…' : 'در حال ارسال…'}
+          pendingLabel={mode === 'password' ? loggingIn : sending}
         >
-          {mode === 'password' ? 'ورود' : 'ارسال کد تأیید'}
+          {mode === 'password' ? login : sendOtp}
         </SubmitButton>
       </form>
 
       <p className="border-t border-line pt-5 text-center text-sm text-ink-muted">
-        حساب کاربری ندارید؟{' '}
+        <SiteStyledText contentKey="auth.noAccount">{noAccount}</SiteStyledText>{' '}
         <Link href="/register" className="font-medium text-accent-2 hover:text-accent">
-          ثبت‌نام کنید
+          <SiteStyledText contentKey="auth.registerLink">{registerLink}</SiteStyledText>
         </Link>
       </p>
     </div>
@@ -175,13 +186,16 @@ export function LoginForm({ next }: { next: string }) {
 }
 
 function ModeTabs({ mode, onChange }: { mode: Mode; onChange: (mode: Mode) => void }) {
+  const password = useSiteText('auth.password', 'رمز عبور')
+  const otp = useSiteText('auth.otpMode', 'کد یک‌بار مصرف')
+  const aria = useSiteText('auth.loginMethod', 'روش ورود')
   const options: { value: Mode; label: string }[] = [
-    { value: 'password', label: 'رمز عبور' },
-    { value: 'otp', label: 'کد یک‌بار مصرف' },
+    { value: 'password', label: password },
+    { value: 'otp', label: otp },
   ]
 
   return (
-    <div role="tablist" aria-label="روش ورود" className="grid grid-cols-2 gap-1 rounded-full bg-surface-sunken p-1">
+    <div role="tablist" aria-label={aria} className="grid grid-cols-2 gap-1 rounded-full bg-surface-sunken p-1">
       {options.map((option) => {
         const active = mode === option.value
         return (

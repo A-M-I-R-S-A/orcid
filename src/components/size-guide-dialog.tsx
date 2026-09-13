@@ -1,16 +1,21 @@
 'use client'
 
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 
 import { ResponsiveImage } from '@/components/media'
 import { SIZE_GUIDE_HREF, SIZE_GUIDE_LABEL, type SizeGuide } from '@/lib/size-guide'
+import { useSiteText } from '@/components/site-content-provider'
 
 export function SizeGuideDialog({ guide }: { guide: SizeGuide }) {
   const [open, setOpen] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const titleId = useId()
+  const closeLabel = useSiteText('sizeGuide.close', 'بستن')
+  const missing = useSiteText('sizeGuide.missing', 'تصویر راهنما هنوز بارگذاری نشده است. برای دیدن جدول اندازه‌ها صفحهٔ راهنما را باز کنید.')
+  const full = useSiteText('sizeGuide.full', 'راهنمای کامل اندازه‌گیری')
 
   const close = useCallback(() => {
     setOpen(false)
@@ -100,7 +105,7 @@ export function SizeGuideDialog({ guide }: { guide: SizeGuide }) {
             <button
               type="button"
               onClick={close}
-              aria-label="بستن"
+              aria-label={closeLabel}
               tabIndex={open ? 0 : -1}
               className="-me-2 rounded-full p-2 text-ink-muted transition-colors hover:bg-surface-sunken hover:text-ink"
             >
@@ -127,8 +132,7 @@ export function SizeGuideDialog({ guide }: { guide: SizeGuide }) {
               />
             ) : (
               <p className="px-2 py-10 text-center text-sm leading-relaxed text-ink-muted">
-                تصویر راهنما هنوز بارگذاری نشده است. برای دیدن جدول اندازه‌ها صفحهٔ راهنما را
-                باز کنید.
+                <SiteStyledText contentKey="sizeGuide.missing">{missing}</SiteStyledText>
               </p>
             )}
           </div>
@@ -139,7 +143,7 @@ export function SizeGuideDialog({ guide }: { guide: SizeGuide }) {
               className="btn btn-secondary w-full"
               tabIndex={open ? 0 : -1}
             >
-              راهنمای کامل اندازه‌گیری
+              <SiteStyledText contentKey="sizeGuide.full">{full}</SiteStyledText>
               <span aria-hidden="true" className="mirror-rtl">
                 →
               </span>

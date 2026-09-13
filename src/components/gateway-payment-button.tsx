@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 
 import { startGatewayPaymentAction } from '@/modules/checkout/actions'
+import { useSiteText } from '@/components/site-content-provider'
 
 export function GatewayPaymentButton({
   orderId,
@@ -13,6 +14,7 @@ export function GatewayPaymentButton({
 }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
+  const connecting = useSiteText('gateway.connecting', 'در حال اتصال به درگاه…')
 
   return (
     <div className="space-y-3">
@@ -32,7 +34,7 @@ export function GatewayPaymentButton({
           })
         }}
       >
-        {pending ? 'در حال اتصال به درگاه…' : label}
+        {pending ? connecting : label}
       </button>
       {error && (
         <p role="alert" className="rounded-md bg-danger-bg p-3 text-sm text-danger">

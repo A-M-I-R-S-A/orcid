@@ -1,9 +1,13 @@
+'use client'
+
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 
 import { CURRENCY_LABEL, formatPrice } from '@/lib/money'
 import { toPersianDigits as faDigits } from '@/lib/persian'
 import { ORDER_STATUS_LABELS, ORDER_STATUS_TONE, type OrderStatus } from '@/lib/order-status'
 import { OrchidBloom } from './ornament'
+import { useSiteText } from './site-content-provider'
 
 export function Price({
   amount,
@@ -16,6 +20,7 @@ export function Price({
   size?: 'sm' | 'md' | 'lg'
   className?: string
 }) {
+  const previousPrice = useSiteText('product.previousPrice', 'قیمت پیشین')
   const sizes = {
     sm: 'text-sm',
     md: 'text-base',
@@ -27,7 +32,7 @@ export function Price({
   return (
     <span className={`nums inline-flex items-baseline gap-2 whitespace-nowrap ${className ?? ''}`}>
       {discounted && (
-        <s className="text-sm text-ink-muted" aria-label="قیمت پیشین">
+        <s className="text-sm text-ink-muted" aria-label={previousPrice}>
           {formatPrice(original, false)}
         </s>
       )}
@@ -54,9 +59,10 @@ export function PriceRange({ min, max }: { min: number; max: number }) {
 }
 
 export function DiscountBadge({ percent }: { percent: number }) {
+  const discountSuffix = useSiteText('product.discountSuffix', 'درصد تخفیف')
   if (percent <= 0) return null
   return (
-    <span className="badge badge-accent nums" aria-label={`${percent} درصد تخفیف`}>
+    <span className="badge badge-accent nums" aria-label={`${percent} ${discountSuffix}`}>
       ٪{faDigits(percent)}
     </span>
   )
@@ -71,6 +77,7 @@ export function StarRating({
   count?: number
   size?: 'sm' | 'md'
 }) {
+  const ratingPrefix = useSiteText('product.ratingPrefix', 'امتیاز')
   if (value == null) return null
 
   const rounded = Math.round(value * 2) / 2
@@ -79,7 +86,7 @@ export function StarRating({
   return (
     <span
       className="inline-flex items-center gap-1"
-      aria-label={`امتیاز ${faDigits(value.toFixed(1))} از ۵`}
+      aria-label={`${ratingPrefix} ${faDigits(value.toFixed(1))} از ۵`}
     >
       <span className="inline-flex" aria-hidden="true">
         {[1, 2, 3, 4, 5].map((i) => (
@@ -110,8 +117,9 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
 }
 
 export function Breadcrumbs({ items }: { items: { name: string; path: string }[] }) {
+  const breadcrumb = useSiteText('common.breadcrumb', 'مسیر صفحه')
   return (
-    <nav aria-label="مسیر صفحه" className="text-sm text-ink-muted">
+    <nav aria-label={breadcrumb} className="text-sm text-ink-muted">
       <ol className="flex flex-wrap items-center gap-x-2 gap-y-1">
         {items.map((item, i) => {
           const isLast = i === items.length - 1
@@ -150,6 +158,9 @@ export function Pagination({
   basePath: string
   searchParams?: Record<string, string | undefined>
 }) {
+  const pagination = useSiteText('common.pagination', 'صفحه‌بندی')
+  const previous = useSiteText('common.previous', 'قبلی')
+  const next = useSiteText('common.next', 'بعدی')
   if (pageCount <= 1) return null
 
   const href = (target: number) => {
@@ -168,13 +179,13 @@ export function Pagination({
   for (let i = from; i <= to; i++) pages.push(i)
 
   return (
-    <nav aria-label="صفحه‌بندی" className="flex items-center justify-center gap-2 pt-8">
+    <nav aria-label={pagination} className="flex items-center justify-center gap-2 pt-8">
       {page > 1 && (
         <Link href={href(page - 1)} rel="prev" className="btn btn-ghost btn-sm">
           <span aria-hidden="true" className="mirror-rtl">
             ←
           </span>
-          قبلی
+          <SiteStyledText contentKey="common.previous">{previous}</SiteStyledText>
         </Link>
       )}
 
@@ -209,7 +220,7 @@ export function Pagination({
 
       {page < pageCount && (
         <Link href={href(page + 1)} rel="next" className="btn btn-ghost btn-sm">
-          بعدی
+          <SiteStyledText contentKey="common.next">{next}</SiteStyledText>
           <span aria-hidden="true" className="mirror-rtl">
             →
           </span>

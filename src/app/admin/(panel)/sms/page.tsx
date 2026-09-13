@@ -8,7 +8,7 @@ import { requirePermission } from '@/modules/admin/auth'
 import { getProvider } from '@/modules/sms/provider'
 import { failedCount, pendingApprovalCount, stalledCount } from '@/modules/sms/service'
 import { hasPermission } from '@/lib/permissions'
-import { hasSecret } from '@/lib/settings'
+import { getNamespace, hasSecret } from '@/lib/settings'
 import { formatJalaliDateTime } from '@/lib/jalali'
 import { maskPhone, toPersianDigits } from '@/lib/persian'
 
@@ -17,9 +17,10 @@ export const metadata = { title: 'پیامک' }
 
 const EVENT_LABELS: Record<string, string> = {
   otp_login: 'کد ورود (OTP)',
-  order_created: 'ثبت سفارش',
+  order_created: 'تأیید سفارش مشتری',
   payment_approved: 'تأیید پرداخت',
   order_shipped: 'ارسال سفارش',
+  admin_new_order: 'اعلان سفارش جدید برای مدیر',
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -37,7 +38,7 @@ export default async function AdminSmsPage() {
   const canApprove = hasPermission(admin, 'sms.approve')
   const canConfigure = hasPermission(admin, 'sms.configure')
 
-  const [queue, templates, pending, stalled, failed, apiKeySet] = await Promise.all([
+  const [queue, templates, pending, stalled, failed, apiKeySet, smsSettings] = await Promise.all([
     db
       .select()
       .from(smsMessages)
@@ -48,6 +49,7 @@ export default async function AdminSmsPage() {
     stalledCount(),
     failedCount(),
     hasSecret('sms', 'apiKey'),
+    getNamespace('sms'),
   ])
 
   const provider = await getProvider()
@@ -164,6 +166,7 @@ export default async function AdminSmsPage() {
                 providerTemplateId: template.providerTemplateId ?? '',
                 isEnabled: template.isEnabled,
                 requiresApproval: template.requiresApproval,
+                parameters: normalizeParameters(template.parameters),
               }}
               canEdit={canConfigure}
             />
@@ -176,9 +179,14 @@ export default async function AdminSmsPage() {
           <h2 id="config" className="text-sm text-ink-muted mb-3">
             تنظیمات سرویس SMS.ir
           </h2>
-          <SmsConfigForm apiKeySet={apiKeySet} credit={credit} />
+          <SmsConfigForm apiKeySet={apiKeySet} credit={credit} adminOrderPhone={smsSettings.adminOrderPhone ?? ''} adminOrderTrigger={smsSettings.adminOrderTrigger ?? 'order_created'} />
         </section>
       )}
     </>
   )
+}
+
+function normalizeParameters(value: unknown): Record<string, string> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) return value as Record<string, string>
+  return Array.isArray(value) ? Object.fromEntries(value.filter((key): key is string => typeof key === 'string').map((key) => [key, key])) : {}
 }

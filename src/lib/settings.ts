@@ -22,6 +22,7 @@ export const NAMESPACES = [
   'bitpay',
   'enamad',
   'get_later',
+  'content',
 ] as const
 
 export type Namespace = (typeof NAMESPACES)[number]

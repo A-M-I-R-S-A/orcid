@@ -1,3 +1,4 @@
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 import { desc, eq, sql } from 'drizzle-orm'
 
@@ -9,6 +10,7 @@ import { CACHE_TAGS, cached } from '@/lib/cache'
 import { breadcrumbSchema, buildMetadata } from '@/lib/seo'
 import { formatJalali } from '@/lib/jalali'
 import { JsonLd } from '@/components/json-ld'
+import { getSiteContent } from '@/lib/site-content'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,9 +48,10 @@ const loadPosts = cached(
 )
 
 export async function generateMetadata() {
+  const content = await getSiteContent()
   return buildMetadata({
-    title: 'مجله ارکید',
-    description: 'راهنمای انتخاب سایز، نگهداری لباس زیر و مطالب خواندنی درباره پوشاک زنانه.',
+    title: content.text('blog.title'),
+    description: content.text('blog.metaDescription'),
     path: '/blog',
   })
 }
@@ -60,13 +63,14 @@ export default async function BlogIndexPage({
 }) {
   const { page: rawPage } = await searchParams
   const page = Math.max(1, Number(rawPage ?? 1) || 1)
+  const content = await getSiteContent()
 
   const { posts, total } = await loadPosts(page)
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const breadcrumbItems = [
-    { name: 'خانه', path: '/' },
-    { name: 'مجله', path: '/blog' },
+    { name: content.text('common.home'), path: '/' },
+    { name: content.text('blog.breadcrumb'), path: '/blog' },
   ]
 
   return (
@@ -79,15 +83,15 @@ export default async function BlogIndexPage({
 
       <div className="container-page pb-16">
         <header className="max-w-2xl mb-12">
-          <p className="eyebrow mb-3">مجله ارکید</p>
-          <h1 className="text-3xl md:text-5xl text-ink leading-[1.4]">خواندنی‌ها</h1>
+          <p className="eyebrow mb-3"><SiteStyledText contentKey="blog.title">{content.text('blog.title')}</SiteStyledText></p>
+          <h1 className="text-3xl md:text-5xl text-ink leading-[1.4]"><SiteStyledText contentKey="blog.heading">{content.text('blog.heading')}</SiteStyledText></h1>
           <p className="mt-5 text-ink-muted leading-relaxed">
-            راهنمای انتخاب سایز، نکات نگهداری و آنچه پیش از خرید خوب است بدانید.
+            <SiteStyledText contentKey="blog.description">{content.text('blog.description')}</SiteStyledText>
           </p>
         </header>
 
         {posts.length === 0 ? (
-          <EmptyState title="هنوز نوشته‌ای منتشر نشده است" />
+          <EmptyState title={content.text('blog.empty')} />
         ) : (
           <>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-10">

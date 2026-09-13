@@ -1,10 +1,12 @@
 'use client'
 
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { confirmRegistrationAction, registerAction } from '@/modules/auth/actions'
+import { useSiteText } from '@/components/site-content-provider'
 import {
   FormError,
   OtpField,
@@ -26,6 +28,7 @@ export function RegisterForm({ next }: { next: string }) {
   const [error, setError] = useState<string | null>(null)
   const [cooldown, setCooldown] = useCountdown(0)
   const [pending, startTransition] = useTransition()
+  const t = useSiteText
 
   const detailsValid =
     fullName.trim().length >= 3 && phone.length === 11 && password.length >= 8
@@ -87,8 +90,8 @@ export function RegisterForm({ next }: { next: string }) {
 
         <FormError message={error} />
 
-        <SubmitButton pending={pending} disabled={code.length !== 6} pendingLabel="در حال بررسی…">
-          تأیید و ساخت حساب
+        <SubmitButton pending={pending} disabled={code.length !== 6} pendingLabel={t('auth.checking', 'در حال بررسی…')}>
+          <SiteStyledText contentKey="auth.confirmCreate">{t('auth.confirmCreate', 'تأیید و ساخت حساب')}</SiteStyledText>
         </SubmitButton>
 
         <ResendControl seconds={cooldown} onResend={submitDetails} disabled={pending} />
@@ -109,7 +112,7 @@ export function RegisterForm({ next }: { next: string }) {
 
         <div>
           <label htmlFor="register-name" className="label">
-            نام و نام خانوادگی
+            <SiteStyledText contentKey="auth.fullName">{t('auth.fullName', 'نام و نام خانوادگی')}</SiteStyledText>
           </label>
           <input
             id="register-name"
@@ -121,7 +124,7 @@ export function RegisterForm({ next }: { next: string }) {
             disabled={pending}
             value={fullName}
             onChange={(event) => setFullName(event.target.value)}
-            placeholder="مثلاً شیرین محمدی"
+            placeholder={t('auth.fullNamePlaceholder', 'مثلاً شیرین محمدی')}
             className="field"
             aria-invalid={Boolean(error) || undefined}
           />
@@ -130,38 +133,38 @@ export function RegisterForm({ next }: { next: string }) {
         <PhoneField value={phone} onChange={setPhone} invalid={Boolean(error)} disabled={pending} />
 
         <PasswordField
-          label="رمز عبور"
+          label={t('auth.password', 'رمز عبور')}
           value={password}
           onChange={setPassword}
           autoComplete="new-password"
-          hint="حداقل ۸ کاراکتر."
+          hint={t('auth.passwordHint', 'حداقل ۸ کاراکتر.')}
           invalid={Boolean(error)}
           disabled={pending}
         />
 
         <FormError message={error} />
 
-        <SubmitButton pending={pending} disabled={!detailsValid} pendingLabel="در حال ارسال…">
-          ادامه
+        <SubmitButton pending={pending} disabled={!detailsValid} pendingLabel={t('auth.sending', 'در حال ارسال…')}>
+          <SiteStyledText contentKey="auth.continue">{t('auth.continue', 'ادامه')}</SiteStyledText>
         </SubmitButton>
 
         <p className="text-center text-xs leading-relaxed text-ink-subtle">
-          با ثبت‌نام،{' '}
+          <SiteStyledText contentKey="auth.termsPrefix">{t('auth.termsPrefix', 'با ثبت‌نام،')}</SiteStyledText>{' '}
           <Link href="/p/terms" className="text-accent-2 hover:underline">
-            قوانین و مقررات
+            <SiteStyledText contentKey="auth.terms">{t('auth.terms', 'قوانین و مقررات')}</SiteStyledText>
           </Link>{' '}
-          و{' '}
+          <SiteStyledText contentKey="auth.and">{t('auth.and', 'و')}</SiteStyledText>{' '}
           <Link href="/p/privacy" className="text-accent-2 hover:underline">
-            حریم خصوصی
+            <SiteStyledText contentKey="auth.privacy">{t('auth.privacy', 'حریم خصوصی')}</SiteStyledText>
           </Link>{' '}
-          ارکید را می‌پذیرید.
+          <SiteStyledText contentKey="auth.termsSuffix">{t('auth.termsSuffix', 'ارکید را می‌پذیرید.')}</SiteStyledText>
         </p>
       </form>
 
       <p className="border-t border-line pt-5 text-center text-sm text-ink-muted">
-        قبلاً ثبت‌نام کرده‌اید؟{' '}
+        <SiteStyledText contentKey="auth.alreadyRegistered">{t('auth.alreadyRegistered', 'قبلاً ثبت‌نام کرده‌اید؟')}</SiteStyledText>{' '}
         <Link href="/login" className="font-medium text-accent-2 hover:text-accent">
-          وارد شوید
+          <SiteStyledText contentKey="auth.loginLink">{t('auth.loginLink', 'وارد شوید')}</SiteStyledText>
         </Link>
       </p>
     </div>
@@ -169,13 +172,14 @@ export function RegisterForm({ next }: { next: string }) {
 }
 
 function StepDots({ active }: { active: 1 | 2 }) {
+  const t = useSiteText
   const steps = [
-    { n: 1, label: 'مشخصات' },
-    { n: 2, label: 'تأیید شماره' },
+    { n: 1, label: t('auth.stepDetails', 'مشخصات') },
+    { n: 2, label: t('auth.stepVerify', 'تأیید شماره') },
   ]
 
   return (
-    <ol className="flex items-center gap-3" aria-label={`مرحله ${active} از ۲`}>
+    <ol className="flex items-center gap-3" aria-label={`${t('auth.stepAriaPrefix', 'مرحله')} ${active} از ۲`}>
       {steps.map((step, i) => {
         const state = step.n === active ? 'current' : step.n < active ? 'done' : 'todo'
         return (

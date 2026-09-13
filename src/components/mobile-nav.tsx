@@ -1,5 +1,6 @@
 'use client'
 
+import { SiteStyledText } from '@/components/site-content-provider'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
@@ -9,6 +10,7 @@ import { ImagePlaceholder, ResponsiveImage } from './media'
 import { toPersianDigits } from '@/lib/persian'
 import { SIZE_GUIDE_HREF, SIZE_GUIDE_LABEL } from '@/lib/size-guide'
 import { safePublicHref } from '@/lib/public-url'
+import { useSiteText } from '@/components/site-content-provider'
 
 export interface DrawerCategory {
   name: string
@@ -35,6 +37,7 @@ export function MobileNav({
   }
   moreLinks?: { label: string; href: string }[]
 }) {
+  const t = useSiteText
   const [open, setOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
@@ -95,9 +98,9 @@ export function MobileNav({
   }, [open])
 
   const socialLinks = [
-    { key: 'instagram' as const, label: 'اینستاگرام', url: safePublicHref(social.instagram) },
-    { key: 'telegram' as const, label: 'تلگرام', url: safePublicHref(social.telegram) },
-    { key: 'whatsapp' as const, label: 'واتس‌اپ', url: safePublicHref(social.whatsapp) },
+    { key: 'instagram' as const, label: t('footer.instagram', 'اینستاگرام'), url: safePublicHref(social.instagram) },
+    { key: 'telegram' as const, label: t('footer.telegram', 'تلگرام'), url: safePublicHref(social.telegram) },
+    { key: 'whatsapp' as const, label: t('footer.whatsapp', 'واتس‌اپ'), url: safePublicHref(social.whatsapp) },
   ].filter((s) => Boolean(s.url))
 
   const drawer = (
@@ -114,7 +117,7 @@ export function MobileNav({
         id="mobile-drawer"
         role="dialog"
         aria-modal="true"
-        aria-label="منوی اصلی"
+        aria-label={t('mobile.menu', 'منوی اصلی')}
         tabIndex={-1}
         className={`absolute inset-y-0 start-0 flex w-[88%] max-w-sm flex-col bg-bg shadow-2xl outline-none transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${
           open ? 'translate-x-0' : 'rtl:translate-x-full ltr:-translate-x-full'
@@ -123,7 +126,7 @@ export function MobileNav({
         <div className="flex shrink-0 items-center justify-between border-b border-line px-5 py-4">
           <img
             src="/logo.png"
-            alt="ارکید"
+            alt={t('mobile.logoAlt', 'ارکید')}
             width={110}
             height={35}
             className="h-8 w-auto object-contain object-center"
@@ -132,7 +135,7 @@ export function MobileNav({
             type="button"
             onClick={close}
             className="-me-2 rounded-full p-2 text-ink-muted transition-colors hover:bg-surface-sunken hover:text-ink"
-            aria-label="بستن منو"
+            aria-label={t('mobile.closeMenu', 'بستن منو')}
           >
             <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -160,9 +163,9 @@ export function MobileNav({
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-medium text-ink">
-                    {fullName || 'حساب کاربری'}
+                    {fullName || t('header.account', 'حساب کاربری')}
                   </span>
-                  <span className="block text-sm text-ink-subtle">مشاهده حساب و سفارش‌ها</span>
+                  <span className="block text-sm text-ink-subtle"><SiteStyledText contentKey="mobile.accountDescription">{t('mobile.accountDescription', 'مشاهده حساب و سفارش‌ها')}</SiteStyledText></span>
                 </span>
                 <span aria-hidden="true" className="mirror-rtl text-ink-subtle">
                   →
@@ -170,16 +173,16 @@ export function MobileNav({
               </Link>
             ) : (
               <div className="rounded-md bg-surface p-4">
-                <p className="font-medium text-ink">به ارکید خوش آمدید</p>
+                <p className="font-medium text-ink"><SiteStyledText contentKey="mobile.welcome">{t('mobile.welcome', 'به ارکید خوش آمدید')}</SiteStyledText></p>
                 <p className="mt-1 text-sm leading-relaxed text-ink-muted">
-                  برای ثبت سفارش و ذخیره علاقه‌مندی‌ها وارد شوید.
+                  <SiteStyledText contentKey="mobile.welcomeDescription">{t('mobile.welcomeDescription', 'برای ثبت سفارش و ذخیره علاقه‌مندی‌ها وارد شوید.')}</SiteStyledText>
                 </p>
                 <div className="mt-4 flex gap-2">
                   <Link href="/login" className="btn btn-primary btn-sm flex-1">
-                    ورود
+                    <SiteStyledText contentKey="mobile.login">{t('mobile.login', 'ورود')}</SiteStyledText>
                   </Link>
                   <Link href="/register" className="btn btn-secondary btn-sm flex-1">
-                    ثبت‌نام
+                    <SiteStyledText contentKey="mobile.register">{t('mobile.register', 'ثبت‌نام')}</SiteStyledText>
                   </Link>
                 </div>
               </div>
@@ -189,24 +192,24 @@ export function MobileNav({
           <div className="grid grid-cols-3 gap-2 px-4 pb-5">
             <QuickLink
               href="/cart"
-              label="سبد خرید"
+              label={t('header.cart', 'سبد خرید')}
               badge={cartCount}
               icon="M5 7h14l-1.2 12.1a2 2 0 01-2 1.9H8.2a2 2 0 01-2-1.9L5 7zm4 0V5.5a3 3 0 016 0V7"
             />
             <QuickLink
               href={isSignedIn ? '/account/wishlist' : '/login?next=/account/wishlist'}
-              label="علاقه‌مندی"
+              label={t('account.nav.wishlist', 'علاقه‌مندی')}
               icon="M12 20s-7-4.4-7-9.2A4 4 0 0112 8.6 4 4 0 0119 10.8C19 15.6 12 20 12 20z"
             />
             <QuickLink
               href={isSignedIn ? '/account/orders' : '/login?next=/account/orders'}
-              label="سفارش‌ها"
+              label={t('mobile.orders', 'سفارش‌ها')}
               icon="M7 3h7l5 5v13H7V3zm7 0v5h5M10 13h6M10 17h6"
             />
           </div>
 
           <div className="border-t border-line px-4 pb-2 pt-5">
-            <p className="eyebrow mb-3">دسته‌بندی‌ها</p>
+            <p className="eyebrow mb-3"><SiteStyledText contentKey="mobile.categories">{t('mobile.categories', 'دسته‌بندی‌ها')}</SiteStyledText></p>
             <ul className="space-y-1">
               {categories.map((category) => (
                 <li key={category.slug}>
@@ -242,7 +245,7 @@ export function MobileNav({
           </div>
 
           <div className="px-4 pb-6 pt-4">
-            <p className="eyebrow mb-3">بیشتر</p>
+            <p className="eyebrow mb-3"><SiteStyledText contentKey="mobile.more">{t('mobile.more', 'بیشتر')}</SiteStyledText></p>
             <ul className="space-y-0.5">
               {moreLinks.length > 0 ? (
                 moreLinks.map((link) => (
@@ -253,10 +256,10 @@ export function MobileNav({
               ) : (
                 <>
                   <TextLink href={SIZE_GUIDE_HREF}>{SIZE_GUIDE_LABEL}</TextLink>
-                  <TextLink href="/blog">مجله ارکید</TextLink>
-                  <TextLink href="/p/about">درباره ما</TextLink>
-                  <TextLink href="/p/shipping">شیوه ارسال</TextLink>
-                  <TextLink href="/p/contact">تماس با ما</TextLink>
+                  <TextLink href="/blog"><SiteStyledText contentKey="blog.title">{t('blog.title', 'مجله ارکید')}</SiteStyledText></TextLink>
+                  <TextLink href="/p/about"><SiteStyledText contentKey="about.eyebrow">{t('about.eyebrow', 'درباره ما')}</SiteStyledText></TextLink>
+                  <TextLink href="/p/shipping"><SiteStyledText contentKey="mobile.shipping">{t('mobile.shipping', 'شیوه ارسال')}</SiteStyledText></TextLink>
+                  <TextLink href="/p/contact"><SiteStyledText contentKey="common.contactUs">{t('common.contactUs', 'تماس با ما')}</SiteStyledText></TextLink>
                 </>
               )}
             </ul>
@@ -293,7 +296,7 @@ export function MobileNav({
         type="button"
         onClick={() => setOpen(true)}
         className="-ms-2.5 rounded-full p-2.5 transition-colors hover:bg-surface-sunken"
-        aria-label="باز کردن منو"
+        aria-label={t('mobile.openMenu', 'باز کردن منو')}
         aria-expanded={open}
         aria-controls="mobile-drawer"
       >

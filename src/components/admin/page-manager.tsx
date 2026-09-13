@@ -11,6 +11,7 @@ import {
 } from '@/modules/admin/content-actions'
 import { mediaUrl } from '@/lib/media-url'
 import { SIZE_GUIDE_SLUG } from '@/lib/size-guide'
+import { ContentImageUpload } from '@/components/admin/content-image-upload'
 
 interface CmsPage {
   id: number
@@ -147,9 +148,9 @@ function PageForm({ page, onDone }: { page: CmsPage | null; onDone: () => void }
               className="field resize-y font-mono text-sm"
               dir="auto"
             />
+            <ContentImageUpload kind="page" textareaId="page-body" />
             <p className="hint">
-              می‌توانید از تگ‌های ساده HTML استفاده کنید: پاراگراف، عنوان، فهرست، لینک و تصویر.
-              تگ‌های ناامن به‌صورت خودکار حذف می‌شوند.
+              HTML، تصویر و بلوک‌های &lt;style&gt; مجاز هستند. CSS فقط برای نمایش محلی محتواست؛ کدهای ناامن و بارگذاری بیرونی حذف می‌شوند.
             </p>
           </div>
 

@@ -1,3 +1,4 @@
+import { SiteStyledText } from '@/components/site-content-provider'
 import { notFound, permanentRedirect } from 'next/navigation'
 
 import { ProductGrid } from '@/components/product-card'
@@ -20,6 +21,7 @@ import {
 } from '@/lib/seo'
 import { toPersianDigits } from '@/lib/persian'
 import { JsonLd } from '@/components/json-ld'
+import { getSiteContent } from '@/lib/site-content'
 
 export const revalidate = 600
 
@@ -32,9 +34,10 @@ export async function generateMetadata({ params, searchParams }: Props) {
   const { slug } = await params
   const query = await searchParams
   const category = await getCategoryBySlug(decodeURIComponent(slug))
+  const content = await getSiteContent()
 
   if (!category) {
-    return { title: 'دسته‌بندی یافت نشد', robots: { index: false, follow: false } }
+    return { title: content.text('meta.categoryNotFound'), robots: { index: false, follow: false } }
   }
 
   const page = Number(query.page ?? 1)
@@ -42,7 +45,7 @@ export async function generateMetadata({ params, searchParams }: Props) {
   return buildMetadata({
     title:
       category.seoTitle ||
-      (page > 1 ? `${category.name} — صفحه ${toPersianDigits(page)}` : category.name),
+      (page > 1 ? `${category.name} — ${content.text('common.page')} ${toPersianDigits(page)}` : category.name),
     description: category.seoDescription || category.description,
     path:
       page > 1
@@ -57,6 +60,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   const { slug: rawSlug } = await params
   const slug = decodeURIComponent(rawSlug)
   const query = await searchParams
+  const content = await getSiteContent()
 
   const category = await getCategoryBySlug(slug)
 
@@ -88,7 +92,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
   ])
 
   const breadcrumbItems = [
-    { name: 'خانه', path: '/' },
+    { name: content.text('common.home'), path: '/' },
     ...trail.map((c) => ({ name: c.name, path: `/category/${encodeURIComponent(c.slug)}` })),
   ]
 
@@ -120,7 +124,7 @@ export default async function CategoryPage({ params, searchParams }: Props) {
             )}
           </div>
           <p className="nums shrink-0 text-sm text-ink-subtle">
-            {toPersianDigits(total)} محصول
+            {toPersianDigits(total)} <SiteStyledText contentKey="catalog.productSuffix">{content.text('catalog.productSuffix')}</SiteStyledText>
           </p>
         </header>
 
@@ -133,9 +137,9 @@ export default async function CategoryPage({ params, searchParams }: Props) {
         <div className="mt-10 pb-4">
           {items.length === 0 ? (
             <EmptyState
-              title="محصولی یافت نشد"
-              description="با فیلترهای انتخاب‌شده محصولی موجود نیست. فیلترها را تغییر دهید."
-              action={{ label: 'حذف فیلترها', href: `/category/${encodeURIComponent(category.slug)}` }}
+              title={content.text('catalog.empty')}
+              description={content.text('catalog.emptyDescription')}
+              action={{ label: content.text('catalog.clearFilters'), href: `/category/${encodeURIComponent(category.slug)}` }}
             />
           ) : (
             <>

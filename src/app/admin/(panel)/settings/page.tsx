@@ -5,6 +5,8 @@ import { getCurrentAdmin } from '@/lib/session'
 import { providerStatuses } from '@/modules/payments/registry'
 import { hasPermission } from '@/lib/permissions'
 import { getNamespace, hasSecret } from '@/lib/settings'
+import { ShippingMethodManager } from '@/components/admin/shipping-method-manager'
+import { getAllShippingMethods } from '@/lib/shipping-config'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'تنظیمات' }
@@ -29,6 +31,7 @@ export default async function SettingsPage() {
     torobSecretSet,
     torobPasswordSet,
     bitpayKeySet,
+    shippingMethods,
   ] = await Promise.all([
       getNamespace('site'),
       getNamespace('contact'),
@@ -44,6 +47,7 @@ export default async function SettingsPage() {
       hasSecret('torob', 'clientSecret'),
       hasSecret('torob', 'password'),
       hasSecret('bitpay', 'apiKey'),
+      getAllShippingMethods(),
     ])
 
   const can = (p: Parameters<typeof hasPermission>[1]) => hasPermission(admin, p)
@@ -156,7 +160,6 @@ export default async function SettingsPage() {
                 { key: 'workingHours', label: 'ساعات پاسخگویی', value: contact.workingHours ?? '' },
               ]}
             />
-
             <SettingsSection
               namespace="social"
               title="شبکه‌های اجتماعی"
@@ -167,7 +170,6 @@ export default async function SettingsPage() {
                 { key: 'whatsapp', label: 'واتس‌اپ', value: social.whatsapp ?? '', dir: 'ltr' },
               ]}
             />
-
             <SettingsSection
               namespace="shipping"
               title="ارسال و بازگشت کالا"
@@ -201,6 +203,7 @@ export default async function SettingsPage() {
                 },
               ]}
             />
+            <ShippingMethodManager methods={shippingMethods} />
           </>
         )}
 

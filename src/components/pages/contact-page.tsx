@@ -1,3 +1,4 @@
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 import { and, eq, inArray } from 'drizzle-orm'
 
@@ -7,6 +8,7 @@ import { CACHE_TAGS, cached } from '@/lib/cache'
 import { toPersianDigits } from '@/lib/persian'
 import { sanitizeEnamad, sanitizeHtml } from '@/lib/sanitize'
 import { getNamespace } from '@/lib/settings'
+import { getSiteContent, type CopyKey } from '@/lib/site-content'
 import { splitLead } from '@/lib/rich-text'
 import { safePublicHref } from '@/lib/public-url'
 import { OrchidSpray } from '@/components/ornament'
@@ -29,11 +31,11 @@ interface Channel {
 
 const SHORTCUT_SLUGS = ['faq', 'shipping', 'returns', 'size-guide'] as const
 
-const SHORTCUT_META: Record<string, { icon: IconName; hint: string }> = {
-  faq: { icon: 'question', hint: 'پاسخ پرسش‌های پرتکرار درباره سفارش، سایز و ارسال.' },
-  shipping: { icon: 'truck', hint: 'زمان آماده‌سازی، هزینه ارسال و نحوه بسته‌بندی.' },
-  returns: { icon: 'refresh', hint: 'شرایط تعویض و بازگشت کالا را پیش از خرید بخوانید.' },
-  'size-guide': { icon: 'ruler', hint: 'جدول سایز و روش اندازه‌گیری صحیح.' },
+const SHORTCUT_META: Record<string, { icon: IconName; hintKey: CopyKey }> = {
+  faq: { icon: 'question', hintKey: 'contact.shortcutFaq' },
+  shipping: { icon: 'truck', hintKey: 'contact.shortcutShipping' },
+  returns: { icon: 'refresh', hintKey: 'contact.shortcutReturns' },
+  'size-guide': { icon: 'ruler', hintKey: 'contact.shortcutSize' },
 }
 
 const loadShortcuts = cached(
@@ -56,11 +58,12 @@ export async function ContactPage({
   page: PageRow
   breadcrumbs: { name: string; path: string }[]
 }) {
-  const [contact, social, enamad, shortcuts] = await Promise.all([
+  const [contact, social, enamad, shortcuts, content] = await Promise.all([
     getNamespace('contact'),
     getNamespace('social'),
     getNamespace('enamad'),
     loadShortcuts(),
+    getSiteContent(),
   ])
 
   const body = page.body ? sanitizeHtml(page.body) : ''
@@ -75,11 +78,11 @@ export async function ContactPage({
     channels.push({
       key: 'phone',
       icon: 'phone',
-      label: 'تماس تلفنی',
+      label: content.text('contact.phone'),
       value: contact.phone,
       display: toPersianDigits(contact.phone),
       href: `tel:${contact.phone}`,
-      action: 'شماره‌گیری',
+      action: content.text('contact.call'),
       ltr: true,
     })
   }
@@ -88,11 +91,11 @@ export async function ContactPage({
     channels.push({
       key: 'whatsapp',
       icon: 'whatsapp',
-      label: 'واتس‌اپ',
+      label: content.text('footer.whatsapp'),
       value: whatsapp,
-      display: 'گفت‌وگوی مستقیم',
+      display: content.text('contact.whatsappDisplay'),
       href: whatsapp,
-      action: 'شروع گفت‌وگو',
+      action: content.text('contact.whatsappAction'),
       external: true,
     })
   }
@@ -101,11 +104,11 @@ export async function ContactPage({
     channels.push({
       key: 'telegram',
       icon: 'telegram',
-      label: 'تلگرام',
+      label: content.text('footer.telegram'),
       value: telegram,
-      display: 'پیام در تلگرام',
+      display: content.text('contact.telegramDisplay'),
       href: telegram,
-      action: 'ارسال پیام',
+      action: content.text('contact.sendMessage'),
       external: true,
     })
   }
@@ -114,11 +117,11 @@ export async function ContactPage({
     channels.push({
       key: 'email',
       icon: 'mail',
-      label: 'ایمیل',
+      label: content.text('contact.email'),
       value: contact.email,
       display: contact.email,
       href: `mailto:${contact.email}`,
-      action: 'نوشتن ایمیل',
+      action: content.text('contact.emailAction'),
       ltr: true,
     })
   }
@@ -127,11 +130,11 @@ export async function ContactPage({
     channels.push({
       key: 'instagram',
       icon: 'instagram',
-      label: 'اینستاگرام',
+      label: content.text('footer.instagram'),
       value: instagram,
-      display: 'جدیدترین‌ها را ببینید',
+      display: content.text('contact.instagramDisplay'),
       href: instagram,
-      action: 'دنبال کنید',
+      action: content.text('contact.follow'),
       external: true,
     })
   }
@@ -143,7 +146,7 @@ export async function ContactPage({
       <div className="rounded-[var(--radius-card)] border border-line-strong/70 bg-surface-raised/40 p-7 backdrop-blur-sm">
         {contact.phone && (
           <>
-            <p className="text-sm text-ink-subtle">پاسخگوی شما</p>
+            <p className="text-sm text-ink-subtle"><SiteStyledText contentKey="contact.responder">{content.text('contact.responder')}</SiteStyledText></p>
             <a
               href={`tel:${contact.phone}`}
               dir="ltr"
@@ -166,9 +169,9 @@ export async function ContactPage({
   return (
     <>
       <PageHero
-        eyebrow="پشتیبانی و مشاوره"
+        eyebrow={content.text('contact.eyebrow')}
         title={page.title}
-        lead={lead || 'هر پرسشی درباره سایز، سفارش یا ارسال دارید، از نزدیک‌ترین راه زیر بپرسید.'}
+        lead={lead || content.text('contact.heroLead')}
         imagePath={page.imagePath}
         breadcrumbs={breadcrumbs}
         aside={heroAside}
@@ -178,8 +181,8 @@ export async function ContactPage({
         <Movement>
           <div className="masthead">
             <div className="max-w-xl">
-              <p className="eyebrow">راه‌های ارتباطی</p>
-              <h2 className="section-title mt-6">از هر کدام راحت‌ترید</h2>
+              <p className="eyebrow"><SiteStyledText contentKey="contact.channelsEyebrow">{content.text('contact.channelsEyebrow')}</SiteStyledText></p>
+              <h2 className="section-title mt-6"><SiteStyledText contentKey="contact.channelsTitle">{content.text('contact.channelsTitle')}</SiteStyledText></h2>
             </div>
             <span aria-hidden="true" className="masthead-rule" />
           </div>
@@ -239,7 +242,7 @@ export async function ContactPage({
                     <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-line-strong text-accent-2">
                       <Icon name="pin" className="h-5 w-5" />
                     </span>
-                    <h2 className="mt-6 text-2xl text-ink">نشانی</h2>
+                    <h2 className="mt-6 text-2xl text-ink"><SiteStyledText contentKey="contact.address">{content.text('contact.address')}</SiteStyledText></h2>
                     <p className="mt-4 max-w-sm whitespace-pre-line leading-loose text-ink-muted">
                       {contact.address}
                     </p>
@@ -251,12 +254,12 @@ export async function ContactPage({
                     <span className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-line-strong text-accent-2">
                       <Icon name="clock" className="h-5 w-5" />
                     </span>
-                    <h2 className="mt-6 text-2xl text-ink">ساعات پاسخگویی</h2>
+                    <h2 className="mt-6 text-2xl text-ink"><SiteStyledText contentKey="contact.hours">{content.text('contact.hours')}</SiteStyledText></h2>
                     <p className="mt-4 max-w-sm leading-loose text-ink-muted">
                       {contact.workingHours}
                     </p>
                     <p className="mt-4 max-w-sm text-sm leading-relaxed text-ink-subtle">
-                      پیام‌های خارج از این ساعت را در نخستین فرصت کاری پاسخ می‌دهیم.
+                      <SiteStyledText contentKey="contact.afterHours">{content.text('contact.afterHours')}</SiteStyledText>
                     </p>
                   </div>
                 )}
@@ -264,7 +267,7 @@ export async function ContactPage({
 
               {enamad.embedCode && (
                 <div className="relative mt-12 border-t border-line pt-9">
-                  <p className="eyebrow">نماد اعتماد الکترونیکی</p>
+                  <p className="eyebrow"><SiteStyledText contentKey="contact.enamad">{content.text('contact.enamad')}</SiteStyledText></p>
                   <div
                     className="mt-5 inline-block rounded-lg bg-white p-2 [&_img]:h-auto [&_img]:max-w-[110px]"
                     dangerouslySetInnerHTML={{ __html: sanitizeEnamad(enamad.embedCode) }}
@@ -288,8 +291,8 @@ export async function ContactPage({
       {shortcuts.length > 0 && (
         <Movement tone="raised">
           <div className="max-w-xl">
-            <p className="eyebrow">شاید پاسخ اینجا باشد</p>
-            <h2 className="section-title mt-6">پیش از تماس، یک نگاه</h2>
+            <p className="eyebrow"><SiteStyledText contentKey="contact.shortcutsEyebrow">{content.text('contact.shortcutsEyebrow')}</SiteStyledText></p>
+            <h2 className="section-title mt-6"><SiteStyledText contentKey="contact.shortcutsTitle">{content.text('contact.shortcutsTitle')}</SiteStyledText></h2>
           </div>
 
           <div className="mt-12 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
@@ -312,7 +315,7 @@ export async function ContactPage({
                     {shortcut.title}
                   </h3>
                   {meta && (
-                    <p className="mt-2 text-sm leading-loose text-ink-muted">{meta.hint}</p>
+                    <p className="mt-2 text-sm leading-loose text-ink-muted">{content.text(meta.hintKey)}</p>
                   )}
                 </Link>
               )
@@ -322,12 +325,12 @@ export async function ContactPage({
       )}
 
       <ClosingBand
-        eyebrow="سفارش شما"
-        title="سفارشی در جریان دارید؟"
-        body="وضعیت لحظه‌ای سفارش‌ها، کد رهگیری و فاکتورها در حساب کاربری شما در دسترس است."
+        eyebrow={content.text('contact.yourOrder')}
+        title={content.text('contact.orderTitle')}
+        body={content.text('contact.orderBody')}
         links={[
-          { label: 'پیگیری سفارش', href: '/account/orders', primary: true },
-          { label: 'مشاهده محصولات', href: '/products' },
+          { label: content.text('contact.orderCta'), href: '/account/orders', primary: true },
+          { label: content.text('common.viewProducts'), href: '/products' },
         ]}
       />
     </>

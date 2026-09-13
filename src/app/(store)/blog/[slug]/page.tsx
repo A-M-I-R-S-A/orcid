@@ -7,6 +7,7 @@ import { ResponsiveImage } from '@/components/media'
 import { Breadcrumbs } from '@/components/ui'
 import { findSlugRedirect } from '@/modules/catalog/queries'
 import { getNamespace } from '@/lib/settings'
+import { getSiteContent } from '@/lib/site-content'
 import { articleSchema, breadcrumbSchema, buildMetadata, shouldIndex } from '@/lib/seo'
 import { formatJalali } from '@/lib/jalali'
 import { sanitizeHtml } from '@/lib/sanitize'
@@ -40,9 +41,10 @@ async function loadPost(rawSlug: string) {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params
   const { post } = await loadPost(slug)
+  const content = await getSiteContent()
 
   if (!post) {
-    return { title: 'نوشته یافت نشد', robots: { index: false, follow: false } }
+    return { title: content.text('meta.postNotFound'), robots: { index: false, follow: false } }
   }
 
   return buildMetadata({
@@ -69,11 +71,11 @@ export default async function BlogPostPage({ params }: Props) {
 
   if (!post.post.isPublished) notFound()
 
-  const site = await getNamespace('site')
+  const [site, content] = await Promise.all([getNamespace('site'), getSiteContent()])
 
   const breadcrumbItems = [
-    { name: 'خانه', path: '/' },
-    { name: 'مجله', path: '/blog' },
+    { name: content.text('common.home'), path: '/' },
+    { name: content.text('blog.breadcrumb'), path: '/blog' },
     { name: post.post.title, path: `/blog/${encodeURIComponent(post.post.slug)}` },
   ]
 

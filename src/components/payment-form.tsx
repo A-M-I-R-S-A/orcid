@@ -1,16 +1,22 @@
 'use client'
 
+import { SiteStyledText } from '@/components/site-content-provider'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
 import { submitPaymentReferenceAction } from '@/modules/checkout/actions'
 import { toLatinDigits } from '@/lib/persian'
+import { useSiteText } from '@/components/site-content-provider'
 
 export function PaymentReferenceForm({ orderId }: { orderId: number }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [value, setValue] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const referenceLabel = useSiteText('payment.referenceLabel', 'کد رهگیری / شماره پیگیری پرداخت')
+  const referenceHint = useSiteText('payment.referenceHint', 'این کد را در پیامک بانک یا تاریخچه تراکنش‌های اپلیکیشن بانکی خود پیدا می‌کنید.')
+  const submitting = useSiteText('payment.submitting', 'در حال ثبت…')
+  const submit = useSiteText('payment.submit', 'ثبت پرداخت')
 
   return (
     <form
@@ -36,7 +42,7 @@ export function PaymentReferenceForm({ orderId }: { orderId: number }) {
     >
       <div>
         <label htmlFor="reference" className="label">
-          کد رهگیری / شماره پیگیری پرداخت
+          <SiteStyledText contentKey="payment.referenceLabel">{referenceLabel}</SiteStyledText>
         </label>
         <input
           id="reference"
@@ -56,7 +62,7 @@ export function PaymentReferenceForm({ orderId }: { orderId: number }) {
           aria-describedby={error ? 'reference-error' : 'reference-hint'}
         />
         <p id="reference-hint" className="hint">
-          این کد را در پیامک بانک یا تاریخچه تراکنش‌های اپلیکیشن بانکی خود پیدا می‌کنید.
+          <SiteStyledText contentKey="payment.referenceHint">{referenceHint}</SiteStyledText>
         </p>
       </div>
 
@@ -71,7 +77,7 @@ export function PaymentReferenceForm({ orderId }: { orderId: number }) {
         disabled={pending || value.trim().length < 4}
         className="btn btn-primary btn-block py-3.5"
       >
-        {pending ? 'در حال ثبت…' : 'ثبت پرداخت'}
+        {pending ? submitting : submit}
       </button>
     </form>
   )

@@ -18,6 +18,8 @@ const ACCEPTED_FORMATS = new Set(['jpeg', 'png', 'webp', 'avif'])
 import { IMAGE_WIDTHS, renditionPaths } from './media-url'
 
 export type ImageVariant = 'avif' | 'webp' | 'jpeg'
+type SharpInstance = ReturnType<typeof sharp>
+type SharpMetadata = Awaited<ReturnType<SharpInstance['metadata']>>
 
 export function uploadRoot(): string {
   return path.resolve(process.env.UPLOAD_DIR ?? './storage')
@@ -62,8 +64,8 @@ export async function processUpload(
 
   const buffer = Buffer.from(await file.arrayBuffer())
 
-  let image: sharp.Sharp
-  let metadata: sharp.Metadata
+  let image: SharpInstance
+  let metadata: SharpMetadata
   try {
     image = sharp(buffer, { failOn: 'error' })
     metadata = await image.metadata()

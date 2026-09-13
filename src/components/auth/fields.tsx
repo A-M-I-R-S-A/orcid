@@ -1,8 +1,10 @@
 'use client'
 
+import { SiteStyledText } from '@/components/site-content-provider'
 import { useEffect, useId, useRef, useState } from 'react'
 
 import { maskPhone, toLatinDigits, toPersianDigits } from '@/lib/persian'
+import { useSiteText } from '@/components/site-content-provider'
 
 export function PhoneField({
   value,
@@ -18,11 +20,12 @@ export function PhoneField({
   autoFocus?: boolean
 }) {
   const id = useId()
+  const phoneLabel = useSiteText('auth.phone', 'شماره موبایل')
 
   return (
     <div>
       <label htmlFor={id} className="label">
-        شماره موبایل
+        <SiteStyledText contentKey="auth.phone">{phoneLabel}</SiteStyledText>
       </label>
       <input
         id={id}
@@ -65,6 +68,8 @@ export function PasswordField({
 }) {
   const id = useId()
   const [shown, setShown] = useState(false)
+  const showLabel = useSiteText('auth.showPassword', 'نمایش رمز عبور')
+  const hideLabel = useSiteText('auth.hidePassword', 'پنهان کردن رمز عبور')
 
   return (
     <div>
@@ -91,7 +96,7 @@ export function PasswordField({
           type="button"
           onClick={() => setShown((s) => !s)}
           className="absolute inset-y-0 end-0 flex items-center px-3.5 text-ink-subtle transition-colors hover:text-accent-2"
-          aria-label={shown ? 'پنهان کردن رمز عبور' : 'نمایش رمز عبور'}
+          aria-label={shown ? hideLabel : showLabel}
           aria-pressed={shown}
           tabIndex={-1}
         >
@@ -132,6 +137,7 @@ export function OtpField({
 }) {
   const id = useId()
   const ref = useRef<HTMLInputElement>(null)
+  const otpLabel = useSiteText('auth.otp', 'کد تأیید')
 
   useEffect(() => {
     ref.current?.focus()
@@ -140,7 +146,7 @@ export function OtpField({
   return (
     <div>
       <label htmlFor={id} className="label text-center">
-        کد تأیید
+        <SiteStyledText contentKey="auth.otp">{otpLabel}</SiteStyledText>
       </label>
       <input
         ref={ref}
@@ -167,17 +173,20 @@ export function OtpField({
 }
 
 export function SentToNotice({ phone, onEdit }: { phone: string; onEdit: () => void }) {
+  const prefix = useSiteText('auth.sentPrefix', 'کد تأیید به شماره')
+  const suffix = useSiteText('auth.sentSuffix', 'پیامک شد.')
+  const edit = useSiteText('auth.editPhone', 'تغییر شماره')
   return (
     <div className="rounded-md bg-surface-sunken/70 px-4 py-3 text-center">
       <p className="text-sm text-ink-muted">
-        کد تأیید به شماره <span className="nums text-ink">{maskPhone(phone)}</span> پیامک شد.
+        <SiteStyledText contentKey="auth.sentPrefix">{prefix}</SiteStyledText> <span className="nums text-ink">{maskPhone(phone)}</span> <SiteStyledText contentKey="auth.sentSuffix">{suffix}</SiteStyledText>
       </p>
       <button
         type="button"
         onClick={onEdit}
         className="mt-1 text-xs text-accent-2 transition-colors hover:text-accent"
       >
-        تغییر شماره
+        <SiteStyledText contentKey="auth.editPhone">{edit}</SiteStyledText>
       </button>
     </div>
   )
@@ -201,10 +210,13 @@ export function ResendControl({
   onResend: () => void
   disabled?: boolean
 }) {
+  const resendPrefix = useSiteText('auth.resendPrefix', 'ارسال مجدد کد تا')
+  const resendSuffix = useSiteText('auth.resendSuffix', 'ثانیه دیگر')
+  const resend = useSiteText('auth.resend', 'ارسال مجدد کد')
   if (seconds > 0) {
     return (
       <p className="nums text-center text-sm text-ink-subtle">
-        ارسال مجدد کد تا {toPersianDigits(seconds)} ثانیه دیگر
+        <SiteStyledText contentKey="auth.resendPrefix">{resendPrefix}</SiteStyledText> {toPersianDigits(seconds)} <SiteStyledText contentKey="auth.resendSuffix">{resendSuffix}</SiteStyledText>
       </p>
     )
   }
@@ -217,7 +229,7 @@ export function ResendControl({
         disabled={disabled}
         className="text-sm text-accent-2 transition-colors hover:text-accent disabled:opacity-50"
       >
-        ارسال مجدد کد
+        <SiteStyledText contentKey="auth.resend">{resend}</SiteStyledText>
       </button>
     </div>
   )

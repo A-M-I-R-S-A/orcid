@@ -1,3 +1,4 @@
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 
 import { EmptyState, OrderStatusBadge, Price } from '@/components/ui'
@@ -7,18 +8,20 @@ import { requireUser } from '@/lib/session'
 import { formatJalali } from '@/lib/jalali'
 import { toPersianDigits } from '@/lib/persian'
 import { activeCountForUser, getConfig as getLaterConfig } from '@/modules/get-later/service'
+import { getSiteContent } from '@/lib/site-content'
 
-export const metadata = { title: 'پیشخوان' }
+export async function generateMetadata() { const content = await getSiteContent(); return { title: content.text('account.nav.dashboard') } }
 
 export default async function AccountPage() {
   const user = await requireUser()
 
-  const [orders, wishlist, addresses, getLater, getLaterSettings] = await Promise.all([
+  const [orders, wishlist, addresses, getLater, getLaterSettings, content] = await Promise.all([
     listForUser(user.id, 4),
     wishlistCount(user.id),
     addressCount(user.id),
     activeCountForUser(user.id),
     getLaterConfig(),
+    getSiteContent(),
   ])
 
   const awaiting = orders.filter(
@@ -28,55 +31,55 @@ export default async function AccountPage() {
   return (
     <div className="space-y-10">
       <header>
-        <p className="eyebrow mb-3">حساب کاربری</p>
+        <p className="eyebrow mb-3"><SiteStyledText contentKey="account.eyebrow">{content.text('account.eyebrow')}</SiteStyledText></p>
         <h1 className="section-title">
-          {user.fullName ? `سلام ${user.fullName.split(' ')[0]}` : 'پیشخوان'}
+          {user.fullName ? `${content.text('account.hello')} ${user.fullName.split(' ')[0]}` : content.text('account.nav.dashboard')}
         </h1>
       </header>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
         <Tile
           href="/account/orders"
-          label="سفارش‌ها"
+          label={content.text('account.nav.orders')}
           value={orders.length}
-          hint={awaiting > 0 ? `${toPersianDigits(awaiting)} در انتظار پرداخت` : undefined}
+          hint={awaiting > 0 ? `${toPersianDigits(awaiting)} ${content.text('account.awaitingPayment')}` : undefined}
           tone={awaiting > 0 ? 'attention' : 'plain'}
         />
         {(getLaterSettings.enabled || getLater > 0) && (
           <Tile
             href="/account/get-later"
-            label="سبد پرداخت بعدی"
+            label={content.text('account.payLater')}
             value={getLater}
-            hint={getLater > 0 ? 'منتظر تصمیم شما' : 'سبد فعالی ندارید'}
+            hint={getLater > 0 ? content.text('account.waitingDecision') : content.text('account.noActiveCart')}
             tone={getLater > 0 ? 'attention' : 'plain'}
           />
         )}
-        <Tile href="/account/wishlist" label="علاقه‌مندی‌ها" value={wishlist} />
+        <Tile href="/account/wishlist" label={content.text('account.nav.wishlist')} value={wishlist} />
         <Tile
           href="/account/addresses"
-          label="نشانی‌ها"
+          label={content.text('account.nav.addresses')}
           value={addresses}
-          hint={addresses === 0 ? 'هنوز ثبت نشده' : undefined}
+          hint={addresses === 0 ? content.text('account.notRegistered') : undefined}
         />
       </div>
 
       <section aria-labelledby="recent-orders">
         <div className="mb-5 flex items-center justify-between">
           <h2 id="recent-orders" className="text-lg text-ink">
-            آخرین سفارش‌ها
+            <SiteStyledText contentKey="account.recentOrders">{content.text('account.recentOrders')}</SiteStyledText>
           </h2>
           {orders.length > 0 && (
             <Link href="/account/orders" className="link-rule text-sm">
-              مشاهده همه
+              <SiteStyledText contentKey="account.viewAll">{content.text('account.viewAll')}</SiteStyledText>
             </Link>
           )}
         </div>
 
         {orders.length === 0 ? (
           <EmptyState
-            title="هنوز سفارشی ثبت نکرده‌اید"
-            description="پس از اولین خرید، سفارش‌های شما اینجا نمایش داده می‌شود."
-            action={{ label: 'شروع خرید', href: '/' }}
+            title={content.text('account.orders.empty')}
+            description={content.text('account.emptyOrdersDescription')}
+            action={{ label: content.text('cart.start'), href: '/' }}
           />
         ) : (
           <ul className="space-y-3">
@@ -92,7 +95,7 @@ export default async function AccountPage() {
                     </p>
                     <p className="nums mt-1 text-sm text-ink-subtle">
                       {formatJalali(order.createdAt)} —{' '}
-                      {toPersianDigits(Number(order.itemCount))} کالا
+                      {toPersianDigits(Number(order.itemCount))} <SiteStyledText contentKey="account.item">{content.text('account.item')}</SiteStyledText>
                     </p>
                   </div>
                   <div className="flex items-center gap-4">

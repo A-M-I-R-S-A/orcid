@@ -9,6 +9,7 @@ import { removeCartItemAction, updateCartItemAction } from '@/modules/cart/actio
 import { toPersianDigits } from '@/lib/persian'
 import { ResponsiveImage } from './media'
 import { Price } from './ui'
+import { useSiteText } from './site-content-provider'
 
 export function CartLines({ lines }: { lines: CartLine[] }) {
   return (
@@ -23,6 +24,13 @@ export function CartLines({ lines }: { lines: CartLine[] }) {
 function CartLineRow({ line }: { line: CartLine }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
+  const removePrefix = useSiteText('cart.removePrefix', 'حذف')
+  const removeSuffix = useSiteText('cart.removeSuffix', 'از سبد خرید')
+  const noLongerAvailable = useSiteText('cart.noLongerAvailable', 'این محصول دیگر در دسترس نیست.')
+  const onlyPrefix = useSiteText('cart.onlyPrefix', 'تنها')
+  const onlySuffix = useSiteText('cart.onlySuffix', 'عدد موجود است.')
+  const decrease = useSiteText('cart.decrease', 'کاهش تعداد')
+  const increase = useSiteText('cart.increase', 'افزایش تعداد')
 
   const update = (quantity: number) => {
     startTransition(async () => {
@@ -79,7 +87,7 @@ function CartLineRow({ line }: { line: CartLine }) {
             onClick={remove}
             disabled={pending}
             className="shrink-0 p-2 -m-2 text-ink-subtle hover:text-danger transition-colors self-start"
-            aria-label={`حذف ${line.productName} از سبد خرید`}
+            aria-label={`${removePrefix} ${line.productName} ${removeSuffix}`}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true">
               <path
@@ -95,8 +103,8 @@ function CartLineRow({ line }: { line: CartLine }) {
         {unavailable && (
           <p className="mt-2 text-sm text-danger">
             {!line.isAvailable
-              ? 'این محصول دیگر در دسترس نیست.'
-              : `تنها ${toPersianDigits(line.stockQty)} عدد موجود است.`}
+              ? noLongerAvailable
+              : `${onlyPrefix} ${toPersianDigits(line.stockQty)} ${onlySuffix}`}
           </p>
         )}
 
@@ -107,7 +115,7 @@ function CartLineRow({ line }: { line: CartLine }) {
               onClick={() => update(line.quantity - 1)}
               disabled={pending}
               className="w-9 h-9 flex items-center justify-center hover:bg-surface-sunken rounded-full transition-colors"
-              aria-label="کاهش تعداد"
+              aria-label={decrease}
             >
               −
             </button>
@@ -119,7 +127,7 @@ function CartLineRow({ line }: { line: CartLine }) {
               onClick={() => update(line.quantity + 1)}
               disabled={pending || line.quantity >= line.stockQty}
               className="w-9 h-9 flex items-center justify-center hover:bg-surface-sunken rounded-full transition-colors disabled:opacity-40"
-              aria-label="افزایش تعداد"
+              aria-label={increase}
             >
               +
             </button>

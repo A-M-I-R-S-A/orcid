@@ -11,6 +11,7 @@ import { FaqPage } from '@/components/pages/faq-page'
 import { breadcrumbSchema, buildMetadata, shouldIndex } from '@/lib/seo'
 import { sanitizeHtml } from '@/lib/sanitize'
 import { JsonLd } from '@/components/json-ld'
+import { getSiteContent } from '@/lib/site-content'
 
 export const revalidate = 3600
 
@@ -33,9 +34,10 @@ async function loadPage(rawSlug: string) {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params
   const page = await loadPage(slug)
+  const content = await getSiteContent()
 
   if (!page) {
-    return { title: 'صفحه یافت نشد', robots: { index: false, follow: false } }
+    return { title: content.text('meta.notFound'), robots: { index: false, follow: false } }
   }
 
   return buildMetadata({
@@ -49,11 +51,12 @@ export async function generateMetadata({ params }: Props) {
 export default async function CmsPage({ params }: Props) {
   const { slug } = await params
   const page = await loadPage(slug)
+  const content = await getSiteContent()
 
   if (!page || !page.isPublished) notFound()
 
   const breadcrumbItems = [
-    { name: 'خانه', path: '/' },
+    { name: content.text('common.home'), path: '/' },
     { name: page.title, path: `/p/${encodeURIComponent(page.slug)}` },
   ]
 

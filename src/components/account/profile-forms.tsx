@@ -1,10 +1,12 @@
 'use client'
 
+import { SiteStyledText } from '@/components/site-content-provider'
 import { useState, useTransition } from 'react'
 
 import { changePasswordAction } from '@/modules/auth/actions'
 import { updateProfileAction } from '@/modules/account/actions'
 import { PasswordField } from '@/components/auth/fields'
+import { useSiteText } from '@/components/site-content-provider'
 
 export function ProfileForm({
   defaults,
@@ -15,6 +17,7 @@ export function ProfileForm({
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [pending, startTransition] = useTransition()
+  const t = useSiteText
 
   const submit = (formData: FormData) => {
     setError(null)
@@ -37,11 +40,11 @@ export function ProfileForm({
 
   return (
     <form action={submit} className="card space-y-5 p-6">
-      <h2 className="text-lg text-ink">اطلاعات شخصی</h2>
+      <h2 className="text-lg text-ink"><SiteStyledText contentKey="profile.personal">{t('profile.personal', 'اطلاعات شخصی')}</SiteStyledText></h2>
 
       <div>
         <label htmlFor="p-name" className="label">
-          نام و نام خانوادگی
+          <SiteStyledText contentKey="auth.fullName">{t('auth.fullName', 'نام و نام خانوادگی')}</SiteStyledText>
         </label>
         <input
           id="p-name"
@@ -56,7 +59,7 @@ export function ProfileForm({
 
       <div>
         <label htmlFor="p-email" className="label">
-          ایمیل <span className="font-normal text-ink-subtle">(اختیاری)</span>
+          <SiteStyledText contentKey="profile.email">{t('profile.email', 'ایمیل')}</SiteStyledText> <span className="font-normal text-ink-subtle">(<SiteStyledText contentKey="common.optional">{t('common.optional', 'اختیاری')}</SiteStyledText>)</span>
         </label>
         <input
           id="p-email"
@@ -71,12 +74,12 @@ export function ProfileForm({
       </div>
 
       <div>
-        <span className="label">شماره موبایل</span>
+        <span className="label"><SiteStyledText contentKey="auth.phone">{t('auth.phone', 'شماره موبایل')}</SiteStyledText></span>
         <p className="nums rounded-md bg-surface-sunken px-4 py-3 text-ink" dir="ltr">
           {defaults.phone}
         </p>
         <p className="hint">
-          شماره موبایل شناسه حساب شماست. برای تغییر آن با پشتیبانی تماس بگیرید.
+          <SiteStyledText contentKey="profile.mobileIdentity">{t('profile.mobileIdentity', 'شماره موبایل شناسه حساب شماست. برای تغییر آن با پشتیبانی تماس بگیرید.')}</SiteStyledText>
         </p>
       </div>
 
@@ -87,18 +90,19 @@ export function ProfileForm({
       )}
       {saved && (
         <p role="status" className="rounded-md bg-success-bg px-4 py-3 text-sm text-success">
-          اطلاعات شما ذخیره شد.
+          <SiteStyledText contentKey="profile.saved">{t('profile.saved', 'اطلاعات شما ذخیره شد.')}</SiteStyledText>
         </p>
       )}
 
       <button type="submit" disabled={pending} className="btn btn-primary">
-        {pending ? 'در حال ذخیره…' : 'ذخیره تغییرات'}
+        {pending ? t('common.saving', 'در حال ذخیره…') : t('profile.saveChanges', 'ذخیره تغییرات')}
       </button>
     </form>
   )
 }
 
 export function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
+  const t = useSiteText
   const [current, setCurrent] = useState('')
   const [next, setNext] = useState('')
   const [saved, setSaved] = useState(false)
@@ -134,17 +138,17 @@ export function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
       }}
     >
       <div>
-        <h2 className="text-lg text-ink">{hasPassword ? 'تغییر رمز عبور' : 'انتخاب رمز عبور'}</h2>
+        <h2 className="text-lg text-ink">{hasPassword ? t('profile.changePassword', 'تغییر رمز عبور') : t('profile.choosePassword', 'انتخاب رمز عبور')}</h2>
         {!hasPassword && (
           <p className="mt-2 text-sm leading-relaxed text-ink-muted">
-            حساب شما هنوز رمز عبور ندارد. با انتخاب رمز، می‌توانید بدون کد پیامکی هم وارد شوید.
+            <SiteStyledText contentKey="profile.noPassword">{t('profile.noPassword', 'حساب شما هنوز رمز عبور ندارد. با انتخاب رمز، می‌توانید بدون کد پیامکی هم وارد شوید.')}</SiteStyledText>
           </p>
         )}
       </div>
 
       {hasPassword && (
         <PasswordField
-          label="رمز عبور فعلی"
+          label={t('profile.currentPassword', 'رمز عبور فعلی')}
           value={current}
           onChange={setCurrent}
           autoComplete="current-password"
@@ -154,11 +158,11 @@ export function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
       )}
 
       <PasswordField
-        label="رمز عبور جدید"
+        label={t('auth.newPassword', 'رمز عبور جدید')}
         value={next}
         onChange={setNext}
         autoComplete="new-password"
-        hint="حداقل ۸ کاراکتر."
+        hint={t('auth.passwordHint', 'حداقل ۸ کاراکتر.')}
         invalid={Boolean(error)}
         disabled={pending}
       />
@@ -170,7 +174,7 @@ export function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
       )}
       {saved && (
         <p role="status" className="rounded-md bg-success-bg px-4 py-3 text-sm text-success">
-          رمز عبور تغییر کرد. سایر دستگاه‌ها از حساب خارج شدند.
+          <SiteStyledText contentKey="profile.passwordChanged">{t('profile.passwordChanged', 'رمز عبور تغییر کرد. سایر دستگاه‌ها از حساب خارج شدند.')}</SiteStyledText>
         </p>
       )}
 
@@ -179,7 +183,7 @@ export function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
         disabled={pending || next.length < 8 || (hasPassword && current.length < 1)}
         className="btn btn-primary"
       >
-        {pending ? 'در حال ذخیره…' : hasPassword ? 'تغییر رمز عبور' : 'ثبت رمز عبور'}
+        {pending ? t('common.saving', 'در حال ذخیره…') : hasPassword ? t('profile.changePassword', 'تغییر رمز عبور') : t('profile.setPassword', 'ثبت رمز عبور')}
       </button>
     </form>
   )

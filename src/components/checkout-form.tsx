@@ -1,5 +1,6 @@
 'use client'
 
+import { SiteStyledText } from '@/components/site-content-provider'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 
@@ -7,6 +8,9 @@ import { placeOrderAction } from '@/modules/checkout/actions'
 import type { PaymentMethodInfo } from '@/modules/payments/registry'
 import { toLatinDigits } from '@/lib/persian'
 import { PROVINCES } from '@/lib/provinces'
+import type { ShippingMethod } from '@/lib/shipping-config'
+import { Price } from '@/components/ui'
+import { useSiteText } from '@/components/site-content-provider'
 
 export interface SavedAddress {
   id: number
@@ -21,10 +25,12 @@ export interface SavedAddress {
 
 export function CheckoutForm({
   methods,
+  shippingMethods,
   defaultValues,
   savedAddresses = [],
 }: {
   methods: PaymentMethodInfo[]
+  shippingMethods: ShippingMethod[]
   savedAddresses?: SavedAddress[]
   defaultValues: {
     fullName: string
@@ -39,7 +45,26 @@ export function CheckoutForm({
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
+  const savedLabel = useSiteText('checkout.savedAddresses', 'انتخاب از نشانی‌های ذخیره‌شده')
+  const newAddressLabel = useSiteText('checkout.newAddress', 'نشانی جدید')
+  const recipientLabel = useSiteText('checkout.recipient', 'اطلاعات گیرنده')
+  const fullNameLabel = useSiteText('checkout.fullName', 'نام و نام خانوادگی')
+  const mobileLabel = useSiteText('checkout.mobile', 'شماره موبایل')
+  const provinceLabel = useSiteText('checkout.province', 'استان')
+  const selectLabel = useSiteText('checkout.select', 'انتخاب کنید')
+  const cityLabel = useSiteText('checkout.city', 'شهر')
+  const addressLabel = useSiteText('checkout.address', 'نشانی کامل')
+  const addressPlaceholder = useSiteText('checkout.addressPlaceholder', 'خیابان، کوچه، پلاک، واحد')
+  const postalLabel = useSiteText('checkout.postalCode', 'کد پستی')
+  const postalHint = useSiteText('checkout.postalHint', 'کد پستی ۱۰ رقمی، بدون خط تیره')
+  const noteLabel = useSiteText('checkout.note', 'توضیحات سفارش (اختیاری)')
+  const notePlaceholder = useSiteText('checkout.notePlaceholder', 'مثلاً ساعت مناسب تحویل')
+  const shippingLabel = useSiteText('checkout.shippingMethod', 'روش ارسال')
+  const paymentLabel = useSiteText('checkout.paymentMethod', 'روش پرداخت')
+  const placingLabel = useSiteText('checkout.placing', 'در حال ثبت سفارش…')
+  const placeLabel = useSiteText('checkout.place', 'ثبت سفارش و ادامه')
   const [method, setMethod] = useState(methods[0]?.key ?? '')
+  const [shippingMethodId, setShippingMethodId] = useState(shippingMethods[0]?.id ?? 0)
 
   const [selectedId, setSelectedId] = useState<number | null>(
     savedAddresses.find((a) => a.isDefault)?.id ?? savedAddresses[0]?.id ?? null,
@@ -64,6 +89,7 @@ export function CheckoutForm({
             addressLine: String(formData.get('addressLine') ?? ''),
             postalCode: String(formData.get('postalCode') ?? ''),
             customerNote: String(formData.get('customerNote') ?? ''),
+            shippingMethodId,
             paymentMethod: method,
           })
 
@@ -78,7 +104,7 @@ export function CheckoutForm({
     >
       {savedAddresses.length > 0 && (
         <div className="card p-6">
-          <p className="label mb-3">انتخاب از نشانی‌های ذخیره‌شده</p>
+          <p className="label mb-3"><SiteStyledText contentKey="checkout.savedAddresses">{savedLabel}</SiteStyledText></p>
           <div className="flex flex-wrap gap-2">
             {savedAddresses.map((address) => (
               <button
@@ -110,19 +136,19 @@ export function CheckoutForm({
                   : 'border-line hover:border-accent-3'
               }`}
             >
-              نشانی جدید
+              <SiteStyledText contentKey="checkout.newAddress">{newAddressLabel}</SiteStyledText>
             </button>
           </div>
         </div>
       )}
 
       <fieldset key={selectedId ?? 'new'} className="card p-6 space-y-5">
-        <legend className="text-lg text-ink px-2">اطلاعات گیرنده</legend>
+        <legend className="text-lg text-ink px-2"><SiteStyledText contentKey="checkout.recipient">{recipientLabel}</SiteStyledText></legend>
 
         <div className="grid sm:grid-cols-2 gap-5">
           <Field
             name="fullName"
-            label="نام و نام خانوادگی"
+            label={fullNameLabel}
             defaultValue={values.fullName}
             error={fieldErrors.fullName}
             autoComplete="name"
@@ -130,7 +156,7 @@ export function CheckoutForm({
           />
           <Field
             name="phone"
-            label="شماره موبایل"
+            label={mobileLabel}
             defaultValue={values.phone}
             error={fieldErrors.phone}
             type="tel"
@@ -145,7 +171,7 @@ export function CheckoutForm({
         <div className="grid sm:grid-cols-2 gap-5">
           <div>
             <label htmlFor="province" className="label">
-              استان
+              <SiteStyledText contentKey="checkout.province">{provinceLabel}</SiteStyledText>
             </label>
             <select
               id="province"
@@ -155,7 +181,7 @@ export function CheckoutForm({
               className="field"
               aria-invalid={Boolean(fieldErrors.province)}
             >
-              <option value="">انتخاب کنید</option>
+              <option value="">{selectLabel}</option>
               {PROVINCES.map((province) => (
                 <option key={province} value={province}>
                   {province}
@@ -167,7 +193,7 @@ export function CheckoutForm({
 
           <Field
             name="city"
-            label="شهر"
+            label={cityLabel}
             defaultValue={values.city}
             error={fieldErrors.city}
             autoComplete="address-level2"
@@ -177,7 +203,7 @@ export function CheckoutForm({
 
         <div>
           <label htmlFor="addressLine" className="label">
-            نشانی کامل
+            <SiteStyledText contentKey="checkout.address">{addressLabel}</SiteStyledText>
           </label>
           <textarea
             id="addressLine"
@@ -186,7 +212,7 @@ export function CheckoutForm({
             defaultValue={values.addressLine}
             required
             className="field resize-y"
-            placeholder="خیابان، کوچه، پلاک، واحد"
+            placeholder={addressPlaceholder}
             autoComplete="street-address"
             aria-invalid={Boolean(fieldErrors.addressLine)}
           />
@@ -195,34 +221,50 @@ export function CheckoutForm({
 
         <Field
           name="postalCode"
-          label="کد پستی"
+          label={postalLabel}
           defaultValue={values.postalCode}
           error={fieldErrors.postalCode}
           inputMode="numeric"
           dir="ltr"
           maxLength={12}
           className="nums"
-          hint="کد پستی ۱۰ رقمی، بدون خط تیره"
+          hint={postalHint}
           autoComplete="postal-code"
           required
         />
 
         <div>
           <label htmlFor="customerNote" className="label">
-            توضیحات سفارش (اختیاری)
+            <SiteStyledText contentKey="checkout.note">{noteLabel}</SiteStyledText>
           </label>
           <textarea
             id="customerNote"
             name="customerNote"
             rows={2}
             className="field resize-y"
-            placeholder="مثلاً ساعت مناسب تحویل"
+            placeholder={notePlaceholder}
           />
         </div>
       </fieldset>
 
       <fieldset className="card p-6">
-        <legend className="text-lg text-ink px-2">روش پرداخت</legend>
+        <legend className="text-lg text-ink px-2"><SiteStyledText contentKey="checkout.shippingMethod">{shippingLabel}</SiteStyledText></legend>
+        {shippingMethods.length === 1 ? (
+          <ShippingMethodOption method={shippingMethods[0]!} selected />
+        ) : (
+          <div className="space-y-3 mt-2">
+            {shippingMethods.map((option) => (
+              <label key={option.id} className={`flex cursor-pointer items-start gap-3 rounded-md border p-4 transition-colors ${shippingMethodId === option.id ? 'border-accent bg-surface-sunken' : 'border-line hover:border-accent-3'}`}>
+                <input type="radio" name="shippingMethod" value={option.id} checked={shippingMethodId === option.id} onChange={() => setShippingMethodId(option.id)} className="mt-1.5 accent-[var(--color-accent)]" />
+                <ShippingMethodOption method={option} selected={false} />
+              </label>
+            ))}
+          </div>
+        )}
+      </fieldset>
+
+      <fieldset className="card p-6">
+        <legend className="text-lg text-ink px-2"><SiteStyledText contentKey="checkout.paymentMethod">{paymentLabel}</SiteStyledText></legend>
 
         <div className="space-y-3 mt-2">
           {methods.map((option) => (
@@ -260,10 +302,17 @@ export function CheckoutForm({
       )}
 
       <button type="submit" disabled={pending || !method} className="btn btn-primary btn-block py-4">
-        {pending ? 'در حال ثبت سفارش…' : 'ثبت سفارش و ادامه'}
+        {pending ? placingLabel : placeLabel}
       </button>
     </form>
   )
+}
+
+function ShippingMethodOption({ method, selected }: { method: ShippingMethod; selected: boolean }) {
+  const cost = useSiteText('checkout.shippingCostPrefix', 'هزینه ارسال:')
+  const free = useSiteText('common.free', 'رایگان')
+  const eligible = useSiteText('checkout.freeEligible', 'برای خریدهای واجد شرایط رایگان')
+  return <span className={selected ? 'block mt-2' : ''}><span className="block font-medium text-ink">{method.name}</span>{method.description && <span className="block text-sm text-ink-muted mt-1 leading-relaxed">{method.description}</span>}<span className="block text-sm text-ink-muted mt-1"><SiteStyledText contentKey="checkout.shippingCostPrefix">{cost}</SiteStyledText> {method.fee > 0 ? <Price amount={method.fee} size="sm" /> : free}{method.freeThreshold > 0 && ` (${eligible})`}</span></span>
 }
 
 function Field({

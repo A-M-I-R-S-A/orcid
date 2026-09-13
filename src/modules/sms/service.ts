@@ -4,8 +4,8 @@ import { and, eq, inArray, lt, sql } from 'drizzle-orm'
 
 import { affectedRows, db } from '@/db'
 import { type SMS_EVENTS, orders, smsMessages, smsTemplates } from '@/db/schema'
-import { formatAmountLatin } from '@/lib/money'
 import { errors } from '@/lib/errors'
+import { getSetting } from '@/lib/settings'
 import { getProvider } from './provider'
 
 type SmsEvent = (typeof SMS_EVENTS)[number]
@@ -65,7 +65,7 @@ export async function queueOrderConfirmation(params: {
   phone: string
   orderId: number
   orderNumber: string
-  total: number
+  customerName: string
 }): Promise<number | null> {
   return enqueue({
     event: 'order_created',
@@ -73,7 +73,7 @@ export async function queueOrderConfirmation(params: {
     orderId: params.orderId,
     payload: {
       ORDER: params.orderNumber,
-      AMOUNT: formatAmountLatin(params.total),
+      NAME: params.customerName,
     },
   })
 }
@@ -95,6 +95,7 @@ export async function queueOrderShipped(params: {
   phone: string
   orderId: number
   orderNumber: string
+  customerName: string
   company?: string
   trackingCode?: string
 }): Promise<number | null> {
@@ -104,6 +105,7 @@ export async function queueOrderShipped(params: {
     orderId: params.orderId,
     payload: {
       ORDER: params.orderNumber,
+      NAME: params.customerName,
       SHIPMENT: params.company ?? '',
       TRACK: params.trackingCode ?? '',
     },
@@ -152,6 +154,25 @@ export async function dispatchPending(limit = 20): Promise<{ sent: number; faile
   return { sent, failed }
 }
 
+export async function queueAdminNewOrderNotification(params: {
+  orderId: number
+  orderNumber: string
+  stage: string
+}): Promise<number | null> {
+  const [phone, configuredStage] = await Promise.all([
+    getSetting('sms', 'adminOrderPhone'),
+    getSetting('sms', 'adminOrderTrigger', 'order_created'),
+  ])
+  if (!/^09\d{9}$/.test(phone) || configuredStage !== params.stage) return null
+
+  return enqueue({
+    event: 'admin_new_order',
+    phone,
+    orderId: params.orderId,
+    payload: { ORDER: params.orderNumber },
+  })
+}
+
 export async function dispatchOne(id: number): Promise<'sent' | 'failed' | 'skipped'> {
     const claim = await db
       .update(smsMessages)
@@ -164,7 +185,7 @@ export async function dispatchOne(id: number): Promise<'sent' | 'failed' | 'skip
     const [message] = await db.select().from(smsMessages).where(eq(smsMessages.id, id)).limit(1)
     if (!message) return 'skipped'
 
-    const [template] = await db
+  const [template] = await db
       .select()
       .from(smsTemplates)
       .where(eq(smsTemplates.event, message.event))
@@ -178,11 +199,17 @@ export async function dispatchOne(id: number): Promise<'sent' | 'failed' | 'skip
       return 'failed'
     }
 
+    const canonicalPayload = (message.payload as Record<string, string>) ?? {}
+    const parameterMap = readParameterMap(template.parameters)
+    const providerPayload: Record<string, string> = {}
+    for (const [field, parameterName] of Object.entries(parameterMap)) {
+      providerPayload[parameterName] = canonicalPayload[field] ?? ''
+    }
     const provider = await getProvider()
     const result = await provider.sendTemplate(
       message.phone,
       template.providerTemplateId,
-      (message.payload as Record<string, string>) ?? {},
+      providerPayload,
     )
 
     if (result.success) {
@@ -207,6 +234,19 @@ export async function dispatchOne(id: number): Promise<'sent' | 'failed' | 'skip
         .where(eq(smsMessages.id, id))
       return 'failed'
     }
+}
+
+function readParameterMap(value: unknown): Record<string, string> {
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .filter(([field, name]) => typeof name === 'string' && /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name) && Boolean(field)),
+    ) as Record<string, string>
+  }
+  // Compatibility with templates created before per-field mapping was introduced.
+  return Array.isArray(value)
+    ? Object.fromEntries(value.filter((name): name is string => typeof name === 'string').map((name) => [name, name]))
+    : {}
 }
 
 export async function approveAndDispatchForOrder(messageId: number, orderId: number, adminId: number) {
@@ -246,6 +286,7 @@ export async function sendShipmentForOrder(input: {
     status: orders.status,
     phone: orders.shipPhone,
     orderNumber: orders.orderNumber,
+    customerName: orders.shipFullName,
   }).from(orders).where(eq(orders.id, input.orderId)).limit(1)
   if (!order) throw errors.notFound('سفارش پیدا نشد.')
   if (order.status !== 'processing' && order.status !== 'shipped') {
@@ -265,17 +306,19 @@ export async function sendShipmentForOrder(input: {
     phone: order.phone,
     orderId: order.id,
     orderNumber: order.orderNumber,
+    customerName: order.customerName,
     company,
     trackingCode,
   })
   if (!messageId) throw errors.conflict('قالب پیامک رهگیری غیرفعال یا ناقص است.')
 
   if (existing) {
-    await db.update(smsMessages).set({ payload: { ORDER: order.orderNumber, SHIPMENT: company, TRACK: trackingCode } }).where(eq(smsMessages.id, messageId))
+    await db.update(smsMessages).set({ payload: { ORDER: order.orderNumber, NAME: order.customerName, SHIPMENT: company, TRACK: trackingCode } }).where(eq(smsMessages.id, messageId))
   }
   const result = await approveAndDispatchForOrder(messageId, order.id, input.adminId)
   if (result === 'sent' && order.status === 'processing') {
     await db.update(orders).set({ status: 'shipped', shippedAt: new Date() }).where(and(eq(orders.id, order.id), eq(orders.status, 'processing')))
+    await queueAdminNewOrderNotification({ orderId: order.id, orderNumber: order.orderNumber, stage: 'shipped' })
   }
   return result
 }

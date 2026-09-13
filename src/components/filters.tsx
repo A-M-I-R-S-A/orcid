@@ -1,5 +1,6 @@
 'use client'
 
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
@@ -7,6 +8,7 @@ import { useEffect, useState } from 'react'
 import { formatAmountLatin } from '@/lib/money'
 import { toPersianDigits } from '@/lib/persian'
 import type { SearchParams } from '@/lib/validation'
+import { useSiteText } from '@/components/site-content-provider'
 
 interface Facets {
   colors: { value: string; swatchHex: string | null }[]
@@ -25,6 +27,7 @@ export function FilterBar({
   active: SearchParams
 }) {
   const [sheetOpen, setSheetOpen] = useState(false)
+  const t = useSiteText
 
   useEffect(() => {
     if (!sheetOpen) return
@@ -61,30 +64,30 @@ export function FilterBar({
           >
             <path d="M4 6h16M7 12h10M10 18h4" />
           </svg>
-          فیلترها
+          <SiteStyledText contentKey="filters.title">{t('filters.title', 'فیلترها')}</SiteStyledText>
           {activeCount > 0 && <span className="nums">({toPersianDigits(activeCount)})</span>}
         </button>
 
         <div className="hidden min-w-0 flex-1 flex-wrap items-center gap-x-5 gap-y-3 lg:flex">
           {facets.colors.length > 0 && (
-            <FacetGroup label="رنگ">
+            <FacetGroup label={t('filters.color', 'رنگ')}>
               <ColorChips basePath={basePath} facets={facets} active={active} />
             </FacetGroup>
           )}
 
           {facets.sizes.length > 0 && (
-            <FacetGroup label="سایز">
+            <FacetGroup label={t('filters.size', 'سایز')}>
               <SizeChips basePath={basePath} facets={facets} active={active} />
             </FacetGroup>
           )}
 
-          <FacetGroup label="موجودی">
+          <FacetGroup label={t('filters.stock', 'موجودی')}>
             <StockChip basePath={basePath} active={active} />
           </FacetGroup>
 
           {hasFilters && (
             <Link href={basePath} className="link-rule shrink-0 text-sm">
-              حذف فیلترها
+              <SiteStyledText contentKey="filters.clear">{t('filters.clear', 'حذف فیلترها')}</SiteStyledText>
             </Link>
           )}
         </div>
@@ -106,27 +109,27 @@ export function FilterBar({
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="فیلترها"
+          aria-label={t('filters.title', 'فیلترها')}
           className={`absolute inset-x-0 bottom-0 max-h-[80dvh] overflow-y-auto rounded-t-3xl bg-bg transition-transform duration-400 ease-[cubic-bezier(0.32,0.72,0,1)] ${
             sheetOpen ? 'translate-y-0' : 'translate-y-full'
           }`}
         >
           <div className="sticky top-0 flex items-center justify-between border-b border-line bg-bg p-5">
-            <h2 className="text-lg">فیلترها</h2>
+            <h2 className="text-lg"><SiteStyledText contentKey="filters.title">{t('filters.title', 'فیلترها')}</SiteStyledText></h2>
             <button
               type="button"
               onClick={() => setSheetOpen(false)}
               className="btn btn-ghost btn-sm"
               tabIndex={sheetOpen ? 0 : -1}
             >
-              بستن
+              <SiteStyledText contentKey="common.close">{t('common.close', 'بستن')}</SiteStyledText>
             </button>
           </div>
 
           <div className="space-y-7 p-5 pb-8">
             {facets.colors.length > 0 && (
               <div>
-                <p className="label">رنگ</p>
+                <p className="label"><SiteStyledText contentKey="filters.color">{t('filters.color', 'رنگ')}</SiteStyledText></p>
                 <ColorChips
                   basePath={basePath}
                   facets={facets}
@@ -138,7 +141,7 @@ export function FilterBar({
 
             {facets.sizes.length > 0 && (
               <div>
-                <p className="label">سایز</p>
+                <p className="label"><SiteStyledText contentKey="filters.size">{t('filters.size', 'سایز')}</SiteStyledText></p>
                 <SizeChips
                   basePath={basePath}
                   facets={facets}
@@ -149,7 +152,7 @@ export function FilterBar({
             )}
 
             <div>
-              <p className="label">موجودی</p>
+              <p className="label"><SiteStyledText contentKey="filters.stock">{t('filters.stock', 'موجودی')}</SiteStyledText></p>
               <StockChip
                 basePath={basePath}
                 active={active}
@@ -159,10 +162,10 @@ export function FilterBar({
 
             {facets.priceMax > facets.priceMin && (
               <div>
-                <p className="label">محدوده قیمت</p>
+                <p className="label"><SiteStyledText contentKey="filters.priceRange">{t('filters.priceRange', 'محدوده قیمت')}</SiteStyledText></p>
                 <p className="nums text-sm text-ink-muted">
-                  {toPersianDigits(formatAmountLatin(facets.priceMin))} تا{' '}
-                  {toPersianDigits(formatAmountLatin(facets.priceMax))} تومان
+                  {toPersianDigits(formatAmountLatin(facets.priceMin))} <SiteStyledText contentKey="filters.to">{t('filters.to', 'تا')}</SiteStyledText>{' '}
+                  {toPersianDigits(formatAmountLatin(facets.priceMax))} <SiteStyledText contentKey="filters.currency">{t('filters.currency', 'تومان')}</SiteStyledText>
                 </p>
               </div>
             )}
@@ -173,7 +176,7 @@ export function FilterBar({
                 onClick={() => setSheetOpen(false)}
                 className="btn btn-secondary btn-block"
               >
-                حذف فیلترها
+                <SiteStyledText contentKey="filters.clear">{t('filters.clear', 'حذف فیلترها')}</SiteStyledText>
               </Link>
             )}
           </div>
@@ -301,6 +304,7 @@ function StockChip({
   onNavigate?: () => void
 }) {
   const on = Boolean(active.inStock)
+  const availableOnly = useSiteText('filters.availableOnly', 'فقط کالاهای موجود')
   return (
     <Link
       href={buildHref(basePath, active, { inStock: on ? undefined : '1' })}
@@ -308,25 +312,26 @@ function StockChip({
       aria-pressed={on}
       className={`${CHIP_BASE} ${on ? CHIP_ON : CHIP_OFF}`}
     >
-      فقط کالاهای موجود
+      <SiteStyledText contentKey="filters.availableOnly">{availableOnly}</SiteStyledText>
     </Link>
   )
 }
 
 function SortSelect({ basePath, active }: { basePath: string; active: SearchParams }) {
   const router = useRouter()
+  const t = useSiteText
 
   const options = [
-    { value: 'newest', label: 'جدیدترین' },
-    { value: 'price_asc', label: 'ارزان‌ترین' },
-    { value: 'price_desc', label: 'گران‌ترین' },
-    { value: 'popular', label: 'پرفروش‌ترین' },
+    { value: 'newest', label: t('filters.newest', 'جدیدترین') },
+    { value: 'price_asc', label: t('filters.cheapest', 'ارزان‌ترین') },
+    { value: 'price_desc', label: t('filters.expensive', 'گران‌ترین') },
+    { value: 'popular', label: t('filters.popular', 'پرفروش‌ترین') },
   ]
 
   return (
     <div className="flex shrink-0 items-center gap-2">
       <label htmlFor="sort" className="whitespace-nowrap text-xs font-medium text-ink-subtle">
-        مرتب‌سازی
+        <SiteStyledText contentKey="filters.sort">{t('filters.sort', 'مرتب‌سازی')}</SiteStyledText>
       </label>
       <div className="relative">
         <select

@@ -1,5 +1,6 @@
 'use client'
 
+import { SiteStyledText } from '@/components/site-content-provider'
 import { useState, useTransition } from 'react'
 
 import {
@@ -11,12 +12,14 @@ import {
 import type { Address } from '@/modules/account/service'
 import { toLatinDigits, toPersianDigits } from '@/lib/persian'
 import { PROVINCES } from '@/lib/provinces'
+import { useSiteText } from '@/components/site-content-provider'
 
 export function AddressBook({ addresses }: { addresses: Address[] }) {
   const [editing, setEditing] = useState<Address | 'new' | null>(null)
   const [confirming, setConfirming] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [pending, startTransition] = useTransition()
+  const t = useSiteText
 
   const remove = (id: number) => {
     setError(null)
@@ -59,16 +62,16 @@ export function AddressBook({ addresses }: { addresses: Address[] }) {
               <div className="min-w-0">
                 <p className="flex items-center gap-2 font-medium text-ink">
                   {address.fullName}
-                  {address.isDefault && <span className="badge badge-accent">پیش‌فرض</span>}
+                  {address.isDefault && <span className="badge badge-accent"><SiteStyledText contentKey="address.default">{t('address.default', 'پیش‌فرض')}</SiteStyledText></span>}
                 </p>
                 <p className="mt-2 leading-relaxed text-ink-muted">
                   {address.province}، {address.city}، {address.addressLine}
                 </p>
                 <p className="nums mt-2 text-sm text-ink-subtle">
-                  کد پستی {toPersianDigits(address.postalCode)} — {toPersianDigits(address.phone)}
+                  <SiteStyledText contentKey="address.postalCode">{t('address.postalCode', 'کد پستی')}</SiteStyledText> {toPersianDigits(address.postalCode)} — {toPersianDigits(address.phone)}
                 </p>
                 {address.notes && (
-                  <p className="mt-2 text-sm text-ink-subtle">یادداشت: {address.notes}</p>
+                  <p className="mt-2 text-sm text-ink-subtle"><SiteStyledText contentKey="address.note">{t('address.note', 'یادداشت')}</SiteStyledText>: {address.notes}</p>
                 )}
               </div>
 
@@ -80,7 +83,7 @@ export function AddressBook({ addresses }: { addresses: Address[] }) {
                     disabled={pending}
                     className="rounded-md px-3 py-1.5 text-sm text-ink-muted transition-colors hover:bg-surface-sunken hover:text-ink disabled:opacity-50"
                   >
-                    پیش‌فرض
+                    <SiteStyledText contentKey="address.default">{t('address.default', 'پیش‌فرض')}</SiteStyledText>
                   </button>
                 )}
                 <button
@@ -88,28 +91,28 @@ export function AddressBook({ addresses }: { addresses: Address[] }) {
                   onClick={() => setEditing(address)}
                   className="rounded-md px-3 py-1.5 text-sm text-ink-muted transition-colors hover:bg-surface-sunken hover:text-ink"
                 >
-                  ویرایش
+                  <SiteStyledText contentKey="common.edit">{t('common.edit', 'ویرایش')}</SiteStyledText>
                 </button>
                 <button
                   type="button"
                   onClick={() => setConfirming(address.id)}
                   className="rounded-md px-3 py-1.5 text-sm text-ink-muted transition-colors hover:bg-danger-bg hover:text-danger"
                 >
-                  حذف
+                  <SiteStyledText contentKey="common.delete">{t('common.delete', 'حذف')}</SiteStyledText>
                 </button>
               </div>
             </div>
 
             {confirming === address.id && (
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-md bg-danger-bg px-4 py-3">
-                <p className="text-sm text-danger">این نشانی حذف شود؟</p>
+                <p className="text-sm text-danger"><SiteStyledText contentKey="address.deleteConfirm">{t('address.deleteConfirm', 'این نشانی حذف شود؟')}</SiteStyledText></p>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setConfirming(null)}
                     className="btn btn-ghost btn-sm"
                   >
-                    انصراف
+                    <SiteStyledText contentKey="common.cancel">{t('common.cancel', 'انصراف')}</SiteStyledText>
                   </button>
                   <button
                     type="button"
@@ -117,7 +120,7 @@ export function AddressBook({ addresses }: { addresses: Address[] }) {
                     disabled={pending}
                     className="btn btn-sm bg-danger text-white hover:opacity-90"
                   >
-                    {pending ? 'در حال حذف…' : 'حذف'}
+                    {pending ? t('common.deleting', 'در حال حذف…') : t('common.delete', 'حذف')}
                   </button>
                 </div>
               </div>
@@ -127,13 +130,14 @@ export function AddressBook({ addresses }: { addresses: Address[] }) {
       </ul>
 
       <button type="button" onClick={() => setEditing('new')} className="btn btn-secondary">
-        <span aria-hidden="true">+</span> افزودن نشانی
+        <span aria-hidden="true">+</span> <SiteStyledText contentKey="address.add">{t('address.add', 'افزودن نشانی')}</SiteStyledText>
       </button>
     </div>
   )
 }
 
 function AddressForm({ address, onDone }: { address: Address | null; onDone: () => void }) {
+  const t = useSiteText
   const [error, setError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const [pending, startTransition] = useTransition()
@@ -169,12 +173,12 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
 
   return (
     <form action={submit} className="card space-y-5 p-6">
-      <h2 className="text-lg text-ink">{address ? 'ویرایش نشانی' : 'نشانی جدید'}</h2>
+      <h2 className="text-lg text-ink">{address ? t('address.editTitle', 'ویرایش نشانی') : t('address.newTitle', 'نشانی جدید')}</h2>
 
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <label htmlFor="a-name" className="label">
-            نام گیرنده
+            <SiteStyledText contentKey="address.recipient">{t('address.recipient', 'نام گیرنده')}</SiteStyledText>
           </label>
           <input
             id="a-name"
@@ -189,7 +193,7 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
 
         <div>
           <label htmlFor="a-phone" className="label">
-            شماره تماس گیرنده
+            <SiteStyledText contentKey="address.phone">{t('address.phone', 'شماره تماس گیرنده')}</SiteStyledText>
           </label>
           <input
             id="a-phone"
@@ -207,7 +211,7 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
 
         <div>
           <label htmlFor="a-province" className="label">
-            استان
+            <SiteStyledText contentKey="address.province">{t('address.province', 'استان')}</SiteStyledText>
           </label>
           <select
             id="a-province"
@@ -218,7 +222,7 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
             aria-invalid={Boolean(fieldErrors.province) || undefined}
           >
             <option value="" disabled>
-              انتخاب کنید
+              {t('checkout.select', 'انتخاب کنید')}
             </option>
             {PROVINCES.map((province) => (
               <option key={province} value={province}>
@@ -231,7 +235,7 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
 
         <div>
           <label htmlFor="a-city" className="label">
-            شهر
+            <SiteStyledText contentKey="address.city">{t('address.city', 'شهر')}</SiteStyledText>
           </label>
           <input
             id="a-city"
@@ -247,7 +251,7 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
 
       <div>
         <label htmlFor="a-line" className="label">
-          نشانی کامل
+          <SiteStyledText contentKey="address.full">{t('address.full', 'نشانی کامل')}</SiteStyledText>
         </label>
         <textarea
           id="a-line"
@@ -264,7 +268,7 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
       <div className="grid gap-5 sm:grid-cols-2">
         <div>
           <label htmlFor="a-postal" className="label">
-            کد پستی
+            <SiteStyledText contentKey="address.postalCode">{t('address.postalCode', 'کد پستی')}</SiteStyledText>
           </label>
           <input
             id="a-postal"
@@ -282,14 +286,14 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
 
         <div>
           <label htmlFor="a-notes" className="label">
-            یادداشت برای پیک <span className="font-normal text-ink-subtle">(اختیاری)</span>
+            <SiteStyledText contentKey="address.courierNote">{t('address.courierNote', 'یادداشت برای پیک')}</SiteStyledText> <span className="font-normal text-ink-subtle">(<SiteStyledText contentKey="common.optional">{t('common.optional', 'اختیاری')}</SiteStyledText>)</span>
           </label>
           <input
             id="a-notes"
             name="notes"
             defaultValue={address?.notes ?? ''}
             className="field"
-            placeholder="مثلاً زنگ واحد ۳"
+            placeholder={t('address.notePlaceholder', 'مثلاً زنگ واحد ۳')}
           />
         </div>
       </div>
@@ -301,7 +305,7 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
           defaultChecked={address?.isDefault ?? false}
           className="h-4 w-4 accent-[var(--color-accent)]"
         />
-        نشانی پیش‌فرض من باشد
+        <SiteStyledText contentKey="address.makeDefault">{t('address.makeDefault', 'نشانی پیش‌فرض من باشد')}</SiteStyledText>
       </label>
 
       {error && (
@@ -312,10 +316,10 @@ function AddressForm({ address, onDone }: { address: Address | null; onDone: () 
 
       <div className="flex gap-3">
         <button type="submit" disabled={pending} className="btn btn-primary">
-          {pending ? 'در حال ذخیره…' : 'ذخیره نشانی'}
+          {pending ? t('common.saving', 'در حال ذخیره…') : t('address.save', 'ذخیره نشانی')}
         </button>
         <button type="button" onClick={onDone} className="btn btn-ghost">
-          انصراف
+          <SiteStyledText contentKey="common.cancel">{t('common.cancel', 'انصراف')}</SiteStyledText>
         </button>
       </div>
     </form>

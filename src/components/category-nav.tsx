@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 import { OrchidBloom } from './ornament'
+import { useSiteText } from './site-content-provider'
 
 export interface NavEntry {
   label: string
@@ -20,6 +21,7 @@ export function CategoryNav({
   ornamentAfter: number
 }) {
   const pathname = usePathname()
+  const navLabel = useSiteText('header.mainNav', 'ناوبری اصلی')
 
   const current = safeDecode(pathname)
 
@@ -28,7 +30,7 @@ export function CategoryNav({
   const showOrnament = ornamentAfter > 0 && ornamentAfter < items.length
 
   return (
-    <nav aria-label="ناوبری اصلی" className="header-nav hidden border-y border-line bg-surface lg:block">
+    <nav aria-label={navLabel} className="header-nav hidden border-y border-line bg-surface lg:block">
       <div className="container-page">
         <ul className="flex items-stretch justify-center">
           {items.map((item, index) => (

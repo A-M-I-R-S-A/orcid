@@ -68,6 +68,7 @@ export function SmsTemplateRow({
     providerTemplateId: string
     isEnabled: boolean
     requiresApproval: boolean
+    parameters: Record<string, string>
   }
   canEdit: boolean
 }) {
@@ -76,6 +77,7 @@ export function SmsTemplateRow({
   const [templateId, setTemplateId] = useState(template.providerTemplateId)
   const [enabled, setEnabled] = useState(template.isEnabled)
   const [approval, setApproval] = useState(template.requiresApproval)
+  const [parameters, setParameters] = useState(template.parameters)
   const [saved, setSaved] = useState(false)
 
   const isOtp = template.event === 'otp_login'
@@ -87,6 +89,7 @@ export function SmsTemplateRow({
         providerTemplateId: templateId,
         isEnabled: enabled,
         requiresApproval: isOtp ? false : approval,
+        parameters,
       })
       setSaved(result.ok)
       router.refresh()
@@ -157,16 +160,32 @@ export function SmsTemplateRow({
           </button>
         )}
       </div>
+      <div className="mt-4 grid gap-3 border-t border-line pt-4 sm:grid-cols-2 lg:grid-cols-4">
+        {Object.entries(parameters).map(([field, parameterName]) => (
+          <label key={field} className="text-xs text-ink-muted">
+            {PARAMETER_LABELS[field] ?? field}
+            <input value={parameterName} onChange={(event) => { setParameters({ ...parameters, [field]: event.target.value }); setSaved(false) }} disabled={!canEdit} dir="ltr" className="field mt-1 py-2 text-sm" placeholder="نام پارامتر در SMS.ir" />
+          </label>
+        ))}
+      </div>
     </div>
   )
+}
+
+const PARAMETER_LABELS: Record<string, string> = {
+  CODE: 'کد ورود', ORDER: 'شماره سفارش', NAME: 'نام مشتری', SHIPMENT: 'نام شرکت ارسال', TRACK: 'کد رهگیری',
 }
 
 export function SmsConfigForm({
   apiKeySet,
   credit,
+  adminOrderPhone,
+  adminOrderTrigger,
 }: {
   apiKeySet: boolean
   credit: number | null
+  adminOrderPhone: string
+  adminOrderTrigger: string
 }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
@@ -181,6 +200,8 @@ export function SmsConfigForm({
           const result = await saveSettingsAction('sms', {
             apiKey: String(formData.get('apiKey') ?? ''),
             provider: 'sms_ir',
+            adminOrderPhone: String(formData.get('adminOrderPhone') ?? ''),
+            adminOrderTrigger: String(formData.get('adminOrderTrigger') ?? 'order_created'),
           })
 
           setMessage(
@@ -210,6 +231,10 @@ export function SmsConfigForm({
             ? 'کلید ذخیره شده است. برای حفظ آن، این فیلد را خالی بگذارید.'
             : 'این کلید رمزنگاری‌شده ذخیره می‌شود و هرگز نمایش داده نمی‌شود.'}
         </p>
+      </div>
+      <div className="grid gap-4 border-t border-line pt-5 sm:grid-cols-2">
+        <div><label htmlFor="adminOrderPhone" className="label">شماره مدیر برای اعلان سفارش جدید</label><input id="adminOrderPhone" name="adminOrderPhone" defaultValue={adminOrderPhone} dir="ltr" inputMode="numeric" maxLength={11} className="field nums" placeholder="0912xxxxxxx" /><p className="hint">اگر خالی بماند، اعلان مدیر ارسال نمی‌شود.</p></div>
+        <div><label htmlFor="adminOrderTrigger" className="label">مرحله ارسال اعلان مدیر</label><select id="adminOrderTrigger" name="adminOrderTrigger" defaultValue={adminOrderTrigger} className="field"><option value="order_created">پس از ثبت سفارش</option><option value="paid">پس از پرداخت موفق</option><option value="processing">هنگام آماده‌سازی</option><option value="shipped">هنگام ارسال</option></select><p className="hint">قالب اعلان مدیر فقط شماره سفارش را دریافت می‌کند.</p></div>
       </div>
 
       <div className="flex flex-wrap items-center gap-4 pt-4 border-t border-line">

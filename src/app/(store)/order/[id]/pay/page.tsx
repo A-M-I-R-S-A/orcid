@@ -1,3 +1,4 @@
+import { SiteStyledText } from '@/components/site-content-provider'
 import { notFound, redirect } from 'next/navigation'
 import Link from 'next/link'
 
@@ -10,12 +11,16 @@ import { getCurrentUser } from '@/lib/session'
 import { isPayable } from '@/lib/order-status'
 import { toPersianDigits } from '@/lib/persian'
 import { formatJalaliDateTime } from '@/lib/jalali'
+import { getSiteContent } from '@/lib/site-content'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata = {
-  title: 'پرداخت سفارش',
+export async function generateMetadata() {
+  const content = await getSiteContent()
+  return {
+  title: content.text('order.pay'),
   robots: { index: false, follow: false },
+  }
 }
 
 export default async function PayPage({ params }: { params: Promise<{ id: string }> }) {
@@ -32,6 +37,7 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
 
   const provider = getProvider(order.paymentMethod)
   if (!provider) notFound()
+  const content = await getSiteContent()
 
   if (!isPayable(order.status)) {
     redirect(`/account/orders/${orderId}`)
@@ -44,7 +50,7 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
       <div className="container-page py-10 md:py-16">
         <div className="max-w-2xl mx-auto">
           <header className="mb-8">
-            <p className="eyebrow mb-2">سفارش {toPersianDigits(order.orderNumber)}</p>
+            <p className="eyebrow mb-2"><SiteStyledText contentKey="order.prefix">{content.text('order.prefix')}</SiteStyledText> {toPersianDigits(order.orderNumber)}</p>
             <h1 className="text-3xl text-ink">{provider.info.label}</h1>
             <p className="mt-3 text-sm text-ink-muted leading-relaxed">
               {provider.info.description}
@@ -52,7 +58,7 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
           </header>
 
           <div className="card p-6 mb-6 text-center bg-surface-sunken">
-            <p className="text-sm text-ink-muted mb-2">مبلغ قابل پرداخت</p>
+            <p className="text-sm text-ink-muted mb-2"><SiteStyledText contentKey="order.amountDue">{content.text('order.amountDue')}</SiteStyledText></p>
             <p className="text-3xl">
               <Price amount={order.grandTotal} />
             </p>
@@ -60,16 +66,14 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
 
           <section className="card p-6 space-y-5">
             <p className="text-sm text-ink-muted leading-relaxed">
-              پس از انتقال به درگاه، نتیجه پرداخت فقط با استعلام مستقیم از سرویس پرداخت تأیید
-              می‌شود. اگر پاسخ درگاه قطع شد، پرداخت تازه‌ای ایجاد نکنید و از صفحه سفارش وضعیت را
-              بررسی کنید.
+              <SiteStyledText contentKey="order.gatewayNotice">{content.text('order.gatewayNotice')}</SiteStyledText>
             </p>
             <GatewayPaymentButton orderId={order.id} label={`ادامه و ${provider.info.label}`} />
           </section>
 
           <div className="mt-8 text-center">
             <Link href={`/account/orders/${order.id}`} className="text-sm text-accent-2 hover:underline">
-              بازگشت به جزئیات سفارش
+              <SiteStyledText contentKey="order.backDetails">{content.text('order.backDetails')}</SiteStyledText>
             </Link>
           </div>
         </div>
@@ -89,8 +93,8 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
     <div className="container-page py-10 md:py-16">
       <div className="max-w-2xl mx-auto">
         <header className="mb-8">
-          <p className="eyebrow mb-2">سفارش {toPersianDigits(order.orderNumber)}</p>
-          <h1 className="text-3xl text-ink">پرداخت کارت به کارت</h1>
+          <p className="eyebrow mb-2"><SiteStyledText contentKey="order.prefix">{content.text('order.prefix')}</SiteStyledText> {toPersianDigits(order.orderNumber)}</p>
+          <h1 className="text-3xl text-ink"><SiteStyledText contentKey="order.cardToCard">{content.text('order.cardToCard')}</SiteStyledText></h1>
           <div className="mt-4">
             <OrderStatusBadge status={order.status} />
           </div>
@@ -98,15 +102,15 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
 
         {wasRejected && (
           <div className="mb-6">
-            <Alert tone="negative" title="پرداخت قبلی تأیید نشد">
+            <Alert tone="negative" title={content.text('order.previousRejected')}>
               {order.payment?.rejectionReason ||
-                'کد رهگیری ثبت‌شده تأیید نشد. لطفاً کد صحیح را دوباره وارد کنید.'}
+                content.text('order.invalidTracking')}
             </Alert>
           </div>
         )}
 
         <div className="card p-6 mb-6 text-center bg-surface-sunken">
-          <p className="text-sm text-ink-muted mb-2">مبلغ قابل پرداخت</p>
+          <p className="text-sm text-ink-muted mb-2"><SiteStyledText contentKey="order.amountDue">{content.text('order.amountDue')}</SiteStyledText></p>
           <p className="text-3xl">
             <Price amount={order.grandTotal} />
           </p>
@@ -114,19 +118,19 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
 
         <section className="card p-6 mb-6" aria-labelledby="bank-details">
           <h2 id="bank-details" className="text-lg text-ink mb-5">
-            اطلاعات حساب
+            <SiteStyledText contentKey="order.accountInfo">{content.text('order.accountInfo')}</SiteStyledText>
           </h2>
 
           <dl className="space-y-4">
             {instructions.bankName && (
               <div className="flex justify-between gap-4 items-center">
-                <dt className="text-sm text-ink-muted">بانک</dt>
+                <dt className="text-sm text-ink-muted"><SiteStyledText contentKey="order.bank">{content.text('order.bank')}</SiteStyledText></dt>
                 <dd className="font-medium">{instructions.bankName}</dd>
               </div>
             )}
 
             <div className="flex justify-between gap-4 items-center">
-              <dt className="text-sm text-ink-muted">شماره کارت</dt>
+              <dt className="text-sm text-ink-muted"><SiteStyledText contentKey="order.cardNumber">{content.text('order.cardNumber')}</SiteStyledText></dt>
               <dd
                 dir="ltr"
                 className="font-medium nums tracking-wider text-lg select-all"
@@ -137,7 +141,7 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
 
             {instructions.accountHolder && (
               <div className="flex justify-between gap-4 items-center">
-                <dt className="text-sm text-ink-muted">به نام</dt>
+                <dt className="text-sm text-ink-muted"><SiteStyledText contentKey="order.accountHolder">{content.text('order.accountHolder')}</SiteStyledText></dt>
                 <dd className="font-medium">{instructions.accountHolder}</dd>
               </div>
             )}
@@ -152,11 +156,10 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
 
         <section className="card p-6" aria-labelledby="reference">
           <h2 id="reference" className="text-lg text-ink mb-2">
-            ثبت کد رهگیری
+            <SiteStyledText contentKey="order.submitTracking">{content.text('order.submitTracking')}</SiteStyledText>
           </h2>
           <p className="text-sm text-ink-muted mb-5 leading-relaxed">
-            پس از واریز مبلغ، کد رهگیری یا شماره پیگیری تراکنش را وارد کنید. سفارش شما پس از
-            بررسی و تأیید توسط تیم ارکید پردازش می‌شود.
+            <SiteStyledText contentKey="order.trackingInstructions">{content.text('order.trackingInstructions')}</SiteStyledText>
           </p>
 
           <PaymentReferenceForm orderId={order.id} />
@@ -164,12 +167,12 @@ export default async function PayPage({ params }: { params: Promise<{ id: string
 
         <div className="mt-8 text-center">
           <Link href={`/account/orders/${order.id}`} className="text-sm text-accent-2 hover:underline">
-            مشاهده جزئیات سفارش
+            <SiteStyledText contentKey="order.viewDetails">{content.text('order.viewDetails')}</SiteStyledText>
           </Link>
         </div>
 
         <p className="mt-6 text-xs text-ink-subtle text-center nums">
-          ثبت سفارش: {formatJalaliDateTime(order.createdAt)}
+          <SiteStyledText contentKey="order.createdAt">{content.text('order.createdAt')}</SiteStyledText>: {formatJalaliDateTime(order.createdAt)}
         </p>
       </div>
     </div>

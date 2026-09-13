@@ -1,5 +1,6 @@
 'use client'
 
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
@@ -8,6 +9,7 @@ import type { PublicReview } from '@/modules/reviews/service'
 import { submitReviewAction } from '@/modules/reviews/actions'
 import { formatJalali } from '@/lib/jalali'
 import { toPersianDigits } from '@/lib/persian'
+import { useSiteText } from '@/components/site-content-provider'
 
 export function ReviewSection({
   productId,
@@ -27,14 +29,15 @@ export function ReviewSection({
   isSignedIn: boolean
 }) {
   const [showForm, setShowForm] = useState(false)
+  const t = useSiteText
 
   return (
     <div>
       <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
         <div>
-          <p className="eyebrow mb-2">نظر مشتریان</p>
+          <p className="eyebrow mb-2"><SiteStyledText contentKey="reviews.customers">{t('reviews.customers', 'نظر مشتریان')}</SiteStyledText></p>
           <h2 className="text-2xl md:text-3xl text-ink">
-            دیدگاه‌ها
+            <SiteStyledText contentKey="reviews.title">{t('reviews.title', 'دیدگاه‌ها')}</SiteStyledText>
             {reviews.length > 0 && (
               <span className="text-ink-subtle text-lg nums"> ({toPersianDigits(reviews.length)})</span>
             )}
@@ -47,18 +50,18 @@ export function ReviewSection({
             onClick={() => setShowForm((v) => !v)}
             className="btn btn-secondary btn-sm"
           >
-            {ownReview ? 'ویرایش دیدگاه من' : 'ثبت دیدگاه'}
+            {ownReview ? t('reviews.editMine', 'ویرایش دیدگاه من') : t('reviews.submit', 'ثبت دیدگاه')}
           </button>
         ) : (
           <Link href="/login" className="btn btn-secondary btn-sm">
-            برای ثبت دیدگاه وارد شوید
+            <SiteStyledText contentKey="reviews.login">{t('reviews.login', 'برای ثبت دیدگاه وارد شوید')}</SiteStyledText>
           </Link>
         )}
       </div>
 
       {ownReview && ownReview.status === 'pending' && (
         <div className="mb-6 rounded-md bg-warning-bg p-4 text-sm text-warning">
-          دیدگاه شما ثبت شد و پس از بررسی و تأیید نمایش داده می‌شود.
+          <SiteStyledText contentKey="reviews.success">{t('reviews.success', 'دیدگاه شما ثبت شد و پس از بررسی و تأیید نمایش داده می‌شود.')}</SiteStyledText>
         </div>
       )}
 
@@ -72,7 +75,7 @@ export function ReviewSection({
 
       {reviews.length === 0 ? (
         <p className="text-ink-muted py-8">
-          هنوز دیدگاهی ثبت نشده است. اولین نفری باشید که نظر می‌دهد.
+          <SiteStyledText contentKey="reviews.none">{t('reviews.none', 'هنوز دیدگاهی ثبت نشده است. اولین نفری باشید که نظر می‌دهد.')}</SiteStyledText>
         </p>
       ) : (
         <ul className="space-y-8 mt-8">
@@ -82,7 +85,7 @@ export function ReviewSection({
                 <Stars value={review.rating} />
                 <span className="text-sm font-medium text-ink">{review.authorName}</span>
                 {review.isVerifiedPurchase && (
-                  <span className="badge badge-positive">خرید تأییدشده</span>
+                  <span className="badge badge-positive"><SiteStyledText contentKey="reviews.verified">{t('reviews.verified', 'خرید تأییدشده')}</SiteStyledText></span>
                 )}
                 <time
                   dateTime={review.createdAt.toISOString()}
@@ -98,7 +101,7 @@ export function ReviewSection({
               {review.reply && (
                 <div className="mt-4 ms-4 ps-4 border-s-2 border-accent-3 bg-surface-sunken/60 rounded-e-xl p-4">
                   <p className="text-xs font-semibold text-accent-2 mb-1.5">
-                    پاسخ ارکید — {review.reply.authorName}
+                    <SiteStyledText contentKey="reviews.replyPrefix">{t('reviews.replyPrefix', 'پاسخ ارکید')}</SiteStyledText> — {review.reply.authorName}
                   </p>
                   <p className="text-sm text-ink-muted leading-relaxed whitespace-pre-line">
                     {review.reply.body}
@@ -143,6 +146,7 @@ function ReviewForm({
   existing: { rating: number; title: string | null; body: string } | null
   onDone: () => void
 }) {
+  const t = useSiteText
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [rating, setRating] = useState(existing?.rating ?? 5)
@@ -171,7 +175,7 @@ function ReviewForm({
       }}
     >
       <fieldset>
-        <legend className="label">امتیاز شما</legend>
+        <legend className="label"><SiteStyledText contentKey="reviews.rating">{t('reviews.rating', 'امتیاز شما')}</SiteStyledText></legend>
         <div className="flex gap-1.5">
           {[1, 2, 3, 4, 5].map((value) => (
             <button
@@ -200,7 +204,7 @@ function ReviewForm({
 
       <div>
         <label htmlFor="review-title" className="label">
-          عنوان (اختیاری)
+          <SiteStyledText contentKey="reviews.subject">{t('reviews.subject', 'عنوان')}</SiteStyledText> (<SiteStyledText contentKey="common.optional">{t('common.optional', 'اختیاری')}</SiteStyledText>)
         </label>
         <input
           id="review-title"
@@ -214,7 +218,7 @@ function ReviewForm({
 
       <div>
         <label htmlFor="review-body" className="label">
-          متن دیدگاه
+          <SiteStyledText contentKey="reviews.body">{t('reviews.body', 'متن دیدگاه')}</SiteStyledText>
         </label>
         <textarea
           id="review-body"
@@ -225,9 +229,9 @@ function ReviewForm({
           maxLength={2000}
           defaultValue={existing?.body ?? ''}
           className="field resize-y"
-          placeholder="تجربه خود را از این محصول بنویسید…"
+          placeholder={t('reviews.placeholder', 'تجربه خود را از این محصول بنویسید…')}
         />
-        <p className="hint">دیدگاه شما پس از بررسی توسط تیم ارکید منتشر می‌شود.</p>
+        <p className="hint"><SiteStyledText contentKey="reviews.moderation">{t('reviews.moderation', 'دیدگاه شما پس از بررسی توسط تیم ارکید منتشر می‌شود.')}</SiteStyledText></p>
       </div>
 
       {error && (
@@ -238,10 +242,10 @@ function ReviewForm({
 
       <div className="flex gap-3">
         <button type="submit" disabled={pending} className="btn btn-primary">
-          {pending ? 'در حال ثبت…' : existing ? 'به‌روزرسانی دیدگاه' : 'ثبت دیدگاه'}
+          {pending ? t('payment.submitting', 'در حال ثبت…') : existing ? t('reviews.updating', 'به‌روزرسانی دیدگاه') : t('reviews.submit', 'ثبت دیدگاه')}
         </button>
         <button type="button" onClick={onDone} className="btn btn-ghost">
-          انصراف
+          <SiteStyledText contentKey="common.cancel">{t('common.cancel', 'انصراف')}</SiteStyledText>
         </button>
       </div>
     </form>

@@ -1,3 +1,4 @@
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 
 import type { ProductCard as ProductCardData } from '@/modules/catalog/queries'
@@ -7,6 +8,7 @@ import { ResponsiveImage } from './media'
 import { Rail } from './rail'
 import { WishlistButton } from './wishlist-button'
 import { PriceRange, StarRating } from './ui'
+import { useSiteText } from './site-content-provider'
 
 export function ProductCard({
   product,
@@ -19,6 +21,8 @@ export function ProductCard({
   saved?: boolean
   sizes?: string
 }) {
+  const newLabel = useSiteText('product.new', 'تازه رسیده')
+  const unavailableLabel = useSiteText('product.outOfStock', 'فعلاً ناموجود')
   const percent = product.originalPrice
     ? discountPercent(product.originalPrice, product.minPrice)
     : 0
@@ -50,7 +54,7 @@ export function ProductCard({
             )}
             {product.isNewArrival && percent === 0 && (
               <span className="border-b border-s border-line bg-bg/90 px-2.5 py-1.5 text-[11px] font-medium leading-none text-ink backdrop-blur-sm">
-                تازه رسیده
+                <SiteStyledText contentKey="product.new">{newLabel}</SiteStyledText>
               </span>
             )}
           </div>
@@ -58,7 +62,7 @@ export function ProductCard({
           {!product.inStock && (
             <div className="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-ink/55 via-ink/5 to-transparent p-4">
               <span className="bg-surface/95 px-3.5 py-1.5 text-xs font-medium text-ink">
-                فعلاً ناموجود
+                <SiteStyledText contentKey="product.outOfStock">{unavailableLabel}</SiteStyledText>
               </span>
             </div>
           )}

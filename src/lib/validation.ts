@@ -169,6 +169,7 @@ export const checkoutSchema = z.object({
   addressLine: z.string().trim().min(10, { message: 'نشانی را کامل وارد کنید.' }).max(500),
   postalCode: postalCodeSchema,
   customerNote: z.string().trim().max(500).optional().or(z.literal('')),
+  shippingMethodId: idSchema.optional(),
   paymentMethod: z.enum(['card_to_card', 'torob_pay', 'bitpay'], {
     errorMap: () => ({ message: 'روش پرداخت را انتخاب کنید.' }),
   }),

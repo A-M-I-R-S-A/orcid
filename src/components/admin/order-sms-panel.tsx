@@ -39,13 +39,13 @@ export function OrderSmsPanel({ orderId, orderStatus, company, trackingCode, mes
         <a href="/admin/sms" className="text-xs text-accent-2 hover:underline">تنظیم قالب‌ها</a>
       </div>
       <div className="divide-y divide-line">
-        {messages.filter((m) => m.event !== 'order_shipped').map((message) => (
+        {messages.filter((m) => !['order_shipped', 'admin_new_order'].includes(m.event)).map((message) => (
           <div key={message.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
             <div><p className="text-sm font-medium text-ink">{eventLabels[message.event] ?? message.event}</p><p className="mt-1 text-xs text-ink-muted">{statusLabels[message.status] ?? message.status}{message.last_error ? ` — ${message.last_error}` : ''}</p></div>
             {canSend && !['sent', 'sending', 'cancelled'].includes(message.status) && <button type="button" disabled={pending} onClick={() => run(() => sendOrderSmsAction({ orderId, messageId: message.id }), 'پیامک ارسال شد.')} className="btn btn-secondary btn-sm">{message.status === 'failed' ? 'تلاش دوباره' : 'تأیید و ارسال'}</button>}
           </div>
         ))}
-        {messages.filter((m) => m.event !== 'order_shipped').length === 0 && <p className="p-4 text-sm text-ink-subtle">هنوز پیامک تأیید برای این سفارش در صف قرار نگرفته است.</p>}
+        {messages.filter((m) => !['order_shipped', 'admin_new_order'].includes(m.event)).length === 0 && <p className="p-4 text-sm text-ink-subtle">هنوز پیامک تأیید برای این سفارش در صف قرار نگرفته است.</p>}
         <form className="grid gap-3 p-4 sm:grid-cols-2" action={(formData) => run(() => sendShipmentSmsAction({ orderId, company: String(formData.get('company') ?? ''), trackingCode: String(formData.get('trackingCode') ?? '') }), 'اطلاعات ارسال ذخیره و پیامک رهگیری ارسال شد.')}>
           <div className="sm:col-span-2"><p className="text-sm font-medium text-ink">پیامک رهگیری مرسوله</p><p className="mt-1 text-xs text-ink-muted">اطلاعات ابتدا در سفارش ذخیره می‌شود و پس از ارسال موفق، وضعیت سفارش «ارسال شده» خواهد شد.</p></div>
           <div><label className="label" htmlFor="shipment-company">شرکت حمل</label><input id="shipment-company" name="company" defaultValue={company ?? ''} maxLength={80} required className="field" placeholder="مثلاً پست پیشتاز" /></div>

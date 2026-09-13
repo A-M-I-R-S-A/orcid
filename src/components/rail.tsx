@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
 import { SectionHeading } from './ui'
+import { useSiteText } from './site-content-provider'
 
 export function Rail({
   children,
@@ -20,6 +21,8 @@ export function Rail({
   const ref = useRef<HTMLDivElement>(null)
   const [atStart, setAtStart] = useState(true)
   const [atEnd, setAtEnd] = useState(true)
+  const previousPrefix = useSiteText('rail.previousPrefix', 'قبلی در')
+  const nextPrefix = useSiteText('rail.nextPrefix', 'بعدی در')
 
   const measure = useCallback(() => {
     const el = ref.current
@@ -68,13 +71,13 @@ export function Rail({
         {scrollable && (
           <div className="hidden gap-2 md:flex">
             <RailButton
-              label={`قبلی در ${label}`}
+              label={`${previousPrefix} ${label}`}
               disabled={atStart}
               onClick={() => step(false)}
               direction="start"
             />
             <RailButton
-              label={`بعدی در ${label}`}
+              label={`${nextPrefix} ${label}`}
               disabled={atEnd}
               onClick={() => step(true)}
               direction="end"

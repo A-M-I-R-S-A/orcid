@@ -141,6 +141,7 @@ export async function approve(
       orderId: payment.orderId,
       orderNumber: order.orderNumber,
     })
+    await sms.queueAdminNewOrderNotification({ orderId: payment.orderId, orderNumber: order.orderNumber, stage: 'paid' })
   }
 
   await audit.log({
@@ -378,6 +379,7 @@ export async function updateOrderStatus(
     metadata: { from: order.status, to: nextStatus },
     ip: meta.ip,
   })
+  await sms.queueAdminNewOrderNotification({ orderId, orderNumber: order.orderNumber, stage: nextStatus })
 }
 
 export async function pendingPaymentCount(): Promise<number> {

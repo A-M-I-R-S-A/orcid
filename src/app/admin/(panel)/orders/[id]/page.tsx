@@ -158,6 +158,12 @@ export default async function AdminOrderDetailPage({
                   <dd className="nums">{formatPrice(order.shippingTotal)}</dd>
                 </div>
               )}
+              {order.shippingMethodName && (
+                <div className="flex justify-between">
+                  <dt className="text-ink-muted">روش ارسال</dt>
+                  <dd>{order.shippingMethodName}</dd>
+                </div>
+              )}
               <div className="flex justify-between pt-2 mt-2 border-t border-line font-semibold">
                 <dt>مبلغ کل</dt>
                 <dd className="nums">{formatPrice(order.grandTotal)}</dd>

@@ -57,6 +57,7 @@ export async function getForUser(userId: number, orderId: number) {
       subtotal: orders.subtotal,
       discountTotal: orders.discountTotal,
       shippingTotal: orders.shippingTotal,
+      shippingMethodName: orders.shippingMethodName,
       grandTotal: orders.grandTotal,
       shipFullName: orders.shipFullName,
       shipPhone: orders.shipPhone,

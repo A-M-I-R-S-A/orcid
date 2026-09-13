@@ -1,3 +1,4 @@
+import { SiteStyledText } from '@/components/site-content-provider'
 import { notFound, permanentRedirect } from 'next/navigation'
 import Link from 'next/link'
 
@@ -15,6 +16,7 @@ import {
 import * as reviewService from '@/modules/reviews/service'
 import { getCurrentUser } from '@/lib/session'
 import { getConfig as getLaterConfig } from '@/modules/get-later/service'
+import { getSiteContent } from '@/lib/site-content'
 import { JsonLd } from '@/components/json-ld'
 import {
   breadcrumbSchema,
@@ -44,9 +46,10 @@ async function resolve(rawSlug: string) {
 export async function generateMetadata({ params }: Props) {
   const { slug } = await params
   const product = await getProductBySlug(decodeURIComponent(slug))
+  const content = await getSiteContent()
 
   if (!product) {
-    return { title: 'محصول یافت نشد', robots: { index: false, follow: false } }
+    return { title: content.text('meta.productNotFound'), robots: { index: false, follow: false } }
   }
 
   const primaryImage = product.images.find((i) => i.isPrimary) ?? product.images[0]
@@ -69,19 +72,20 @@ export default async function ProductPage({ params }: Props) {
 
   if (product.isArchived || !product.isActive) notFound()
 
-  const [trail, related, reviews, user, guide, getLater] = await Promise.all([
+  const [trail, related, reviews, user, guide, getLater, content] = await Promise.all([
     product.primaryCategoryId ? categoryTrail(product.primaryCategoryId) : Promise.resolve([]),
     relatedProducts(product.id, product.primaryCategoryId, 4),
     reviewService.listForProduct(product.id),
     getCurrentUser(),
     sizeGuide(),
     getLaterConfig(),
+    getSiteContent(),
   ])
 
   const ownReview = user ? await reviewService.getOwnReview(user.id, product.id) : null
 
   const breadcrumbItems = [
-    { name: 'خانه', path: '/' },
+    { name: content.text('common.home'), path: '/' },
     ...trail.map((c) => ({ name: c.name, path: `/category/${encodeURIComponent(c.slug)}` })),
     { name: product.name, path: `/product/${encodeURIComponent(product.slug)}` },
   ]
@@ -152,7 +156,7 @@ export default async function ProductPage({ params }: Props) {
         {product.description && (
           <section className="mt-20 pt-12 border-t border-line" aria-labelledby="description">
             <h2 id="description" className="text-2xl text-ink mb-6">
-              توضیحات محصول
+              <SiteStyledText contentKey="product.description">{content.text('product.description')}</SiteStyledText>
             </h2>
             <div className="prose text-ink-muted whitespace-pre-line">{product.description}</div>
           </section>
@@ -179,7 +183,7 @@ export default async function ProductPage({ params }: Props) {
 
         {related.length > 0 && (
           <section className="mt-20 pt-12 border-t border-line">
-            <SectionHeading title="محصولات مرتبط" />
+            <SectionHeading title={content.text('product.related')} />
             <ProductGrid products={related} priorityCount={0} />
           </section>
         )}

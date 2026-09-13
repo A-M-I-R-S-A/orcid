@@ -1,3 +1,4 @@
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
@@ -10,8 +11,9 @@ import { isPayable } from '@/lib/order-status'
 import { PAYMENT_STATUS_LABELS } from '@/lib/order-status'
 import { formatJalaliDateTime } from '@/lib/jalali'
 import { toPersianDigits } from '@/lib/persian'
+import { getSiteContent } from '@/lib/site-content'
 
-export const metadata = { title: 'جزئیات سفارش' }
+export async function generateMetadata() { const content = await getSiteContent(); return { title: content.text('order.details') } }
 
 export default async function OrderDetailPage({
   params,
@@ -29,16 +31,17 @@ export default async function OrderDetailPage({
 
   const order = await getForUser(user.id, orderId)
   if (!order) notFound()
+  const content = await getSiteContent()
 
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <Link href="/account/orders" className="text-sm text-accent-2 hover:underline">
-            ← سفارش‌های من
+            ← <SiteStyledText contentKey="order.mine">{content.text('order.mine')}</SiteStyledText>
           </Link>
           <h1 className="text-2xl md:text-3xl text-ink mt-2 nums">
-            سفارش {toPersianDigits(order.orderNumber)}
+            <SiteStyledText contentKey="order.prefix">{content.text('order.prefix')}</SiteStyledText> {toPersianDigits(order.orderNumber)}
           </h1>
           <p className="text-sm text-ink-subtle nums mt-1">
             {formatJalaliDateTime(order.createdAt)}
@@ -48,45 +51,43 @@ export default async function OrderDetailPage({
       </div>
 
       {submitted === '1' && (
-        <Alert tone="positive" title="کد رهگیری ثبت شد">
-          پرداخت شما در انتظار بررسی است. پس از تأیید، وضعیت سفارش به‌روزرسانی می‌شود و برای شما
-          پیامک ارسال خواهد شد.
+        <Alert tone="positive" title={content.text('order.trackingSaved')}>
+          <SiteStyledText contentKey="order.trackingPending">{content.text('order.trackingPending')}</SiteStyledText>
         </Alert>
       )}
 
       {payment === 'verified' && (
-        <Alert tone="positive" title="پرداخت تأیید شد">
-          تراکنش از درگاه استعلام شد و سفارش شما با موفقیت پرداخت شد.
+        <Alert tone="positive" title={content.text('order.paymentConfirmed')}>
+          <SiteStyledText contentKey="order.paymentConfirmedBody">{content.text('order.paymentConfirmedBody')}</SiteStyledText>
         </Alert>
       )}
 
       {payment === 'pending' && order.paymentStatus !== 'approved' && (
-        <Alert tone="negative" title="پرداخت هنوز تأیید نشده است">
-          اگر مبلغ از حساب شما کسر شده، وضعیت را دوباره بررسی کنید و از ایجاد پرداخت تازه خودداری
-          کنید.
+        <Alert tone="negative" title={content.text('order.paymentNotConfirmed')}>
+          <SiteStyledText contentKey="order.paymentNotConfirmedBody">{content.text('order.paymentNotConfirmedBody')}</SiteStyledText>
         </Alert>
       )}
 
       {order.payment?.status === 'rejected' && (
-        <Alert tone="negative" title="پرداخت تأیید نشد">
+        <Alert tone="negative" title={content.text('order.paymentRejected')}>
           {order.payment.rejectionReason ||
-            'کد رهگیری ثبت‌شده تأیید نشد. لطفاً دوباره تلاش کنید.'}
+            content.text('order.paymentRejectedBody')}
         </Alert>
       )}
 
       {isPayable(order.status) && (
         <div className="card p-5 flex flex-wrap items-center justify-between gap-4 bg-warning-bg">
-          <p className="text-sm text-warning">این سفارش در انتظار پرداخت است.</p>
+          <p className="text-sm text-warning"><SiteStyledText contentKey="order.awaitingPayment">{content.text('order.awaitingPayment')}</SiteStyledText></p>
           {order.paymentMethod === 'torob_pay' || order.paymentMethod === 'bitpay' ? (
             <div className="flex flex-wrap gap-2">
               <Link href={`/order/${order.id}/pay`} className="btn btn-primary btn-sm">
-                ادامه پرداخت
+                <SiteStyledText contentKey="order.continuePayment">{content.text('order.continuePayment')}</SiteStyledText>
               </Link>
               <GatewayPaymentStatus orderId={order.id} />
             </div>
           ) : (
             <Link href={`/order/${order.id}/pay`} className="btn btn-primary btn-sm">
-              پرداخت سفارش
+              <SiteStyledText contentKey="order.pay">{content.text('order.pay')}</SiteStyledText>
             </Link>
           )}
         </div>
@@ -94,7 +95,7 @@ export default async function OrderDetailPage({
 
       <section className="card p-6" aria-labelledby="items">
         <h2 id="items" className="text-lg text-ink mb-5">
-          اقلام سفارش
+          <SiteStyledText contentKey="order.items">{content.text('order.items')}</SiteStyledText>
         </h2>
 
         <ul className="space-y-5">
@@ -136,14 +137,14 @@ export default async function OrderDetailPage({
 
         <dl className="mt-6 pt-5 border-t border-line space-y-3 text-sm">
           <div className="flex justify-between gap-4">
-            <dt className="text-ink-muted">جمع کالاها</dt>
+            <dt className="text-ink-muted"><SiteStyledText contentKey="order.itemsTotal">{content.text('order.itemsTotal')}</SiteStyledText></dt>
             <dd>
               <Price amount={order.subtotal} size="sm" />
             </dd>
           </div>
           {order.discountTotal > 0 && (
             <div className="flex justify-between gap-4 text-success">
-              <dt>تخفیف</dt>
+              <dt><SiteStyledText contentKey="order.discount">{content.text('order.discount')}</SiteStyledText></dt>
               <dd>
                 − <Price amount={order.discountTotal} size="sm" />
               </dd>
@@ -151,14 +152,20 @@ export default async function OrderDetailPage({
           )}
           {order.shippingTotal > 0 && (
             <div className="flex justify-between gap-4">
-              <dt className="text-ink-muted">هزینه ارسال</dt>
+              <dt className="text-ink-muted"><SiteStyledText contentKey="order.shippingCost">{content.text('order.shippingCost')}</SiteStyledText></dt>
               <dd>
                 <Price amount={order.shippingTotal} size="sm" />
               </dd>
             </div>
           )}
+          {order.shippingMethodName && (
+            <div className="flex justify-between gap-4">
+              <dt className="text-ink-muted"><SiteStyledText contentKey="order.shippingMethod">{content.text('order.shippingMethod')}</SiteStyledText></dt>
+              <dd>{order.shippingMethodName}</dd>
+            </div>
+          )}
           <div className="flex justify-between gap-4 pt-3 mt-3 border-t border-line">
-            <dt className="font-semibold">مبلغ کل</dt>
+            <dt className="font-semibold"><SiteStyledText contentKey="order.total">{content.text('order.total')}</SiteStyledText></dt>
             <dd>
               <Price amount={order.grandTotal} />
             </dd>
@@ -169,7 +176,7 @@ export default async function OrderDetailPage({
       <div className="grid sm:grid-cols-2 gap-4">
         <section className="card p-6" aria-labelledby="shipping">
           <h2 id="shipping" className="text-lg text-ink mb-4">
-            نشانی تحویل
+            <SiteStyledText contentKey="order.deliveryAddress">{content.text('order.deliveryAddress')}</SiteStyledText>
           </h2>
           <address className="not-italic text-sm text-ink-muted leading-relaxed space-y-1">
             <p className="text-ink">{order.shipFullName}</p>
@@ -180,45 +187,45 @@ export default async function OrderDetailPage({
               {order.shipProvince}، {order.shipCity}
             </p>
             <p>{order.shipAddressLine}</p>
-            <p className="nums">کد پستی: {toPersianDigits(order.shipPostalCode)}</p>
+            <p className="nums"><SiteStyledText contentKey="address.postalCode">{content.text('address.postalCode')}</SiteStyledText>: {toPersianDigits(order.shipPostalCode)}</p>
           </address>
           {order.shipmentTrackingCode && (
             <dl className="mt-4 space-y-2 border-t border-line pt-4 text-sm">
-              <div className="flex justify-between gap-4"><dt className="text-ink-muted">شرکت حمل</dt><dd>{order.shipmentCompany || '—'}</dd></div>
-              <div className="flex justify-between gap-4"><dt className="text-ink-muted">کد رهگیری مرسوله</dt><dd className="nums" dir="ltr">{order.shipmentTrackingCode}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-ink-muted"><SiteStyledText contentKey="order.shippingCompany">{content.text('order.shippingCompany')}</SiteStyledText></dt><dd>{order.shipmentCompany || '—'}</dd></div>
+              <div className="flex justify-between gap-4"><dt className="text-ink-muted"><SiteStyledText contentKey="order.shipmentTracking">{content.text('order.shipmentTracking')}</SiteStyledText></dt><dd className="nums" dir="ltr">{order.shipmentTrackingCode}</dd></div>
             </dl>
           )}
           {order.customerNote && (
             <p className="mt-4 pt-4 border-t border-line text-sm text-ink-muted">
-              یادداشت شما: {order.customerNote}
+              <SiteStyledText contentKey="order.customerNote">{content.text('order.customerNote')}</SiteStyledText>: {order.customerNote}
             </p>
           )}
         </section>
 
         <section className="card p-6" aria-labelledby="payment">
           <h2 id="payment" className="text-lg text-ink mb-4">
-            وضعیت پرداخت
+            <SiteStyledText contentKey="order.paymentStatus">{content.text('order.paymentStatus')}</SiteStyledText>
           </h2>
           <dl className="text-sm space-y-3">
             <div className="flex justify-between gap-4">
-              <dt className="text-ink-muted">روش پرداخت</dt>
+              <dt className="text-ink-muted"><SiteStyledText contentKey="order.paymentMethod">{content.text('order.paymentMethod')}</SiteStyledText></dt>
               <dd>
                 {order.paymentMethod === 'card_to_card'
-                  ? 'کارت به کارت'
+                  ? content.text('order.cardToCard')
                   : order.paymentMethod === 'torob_pay'
-                    ? 'ترب‌پی'
+                    ? content.text('order.torobPay')
                     : order.paymentMethod === 'bitpay'
-                      ? 'بیت‌پی'
+                      ? content.text('order.bitPay')
                       : order.paymentMethod}
               </dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-ink-muted">وضعیت</dt>
+              <dt className="text-ink-muted"><SiteStyledText contentKey="order.status">{content.text('order.status')}</SiteStyledText></dt>
               <dd>{PAYMENT_STATUS_LABELS[order.paymentStatus]}</dd>
             </div>
             {order.payment?.referenceCode && (
               <div className="flex justify-between gap-4">
-                <dt className="text-ink-muted">کد رهگیری</dt>
+                <dt className="text-ink-muted"><SiteStyledText contentKey="order.trackingCode">{content.text('order.trackingCode')}</SiteStyledText></dt>
                 <dd className="nums" dir="ltr">
                   {order.payment.referenceCode}
                 </dd>
@@ -226,7 +233,7 @@ export default async function OrderDetailPage({
             )}
             {order.paidAt && (
               <div className="flex justify-between gap-4">
-                <dt className="text-ink-muted">تاریخ تأیید</dt>
+                <dt className="text-ink-muted"><SiteStyledText contentKey="order.confirmedAt">{content.text('order.confirmedAt')}</SiteStyledText></dt>
                 <dd className="nums">{formatJalaliDateTime(order.paidAt)}</dd>
               </div>
             )}

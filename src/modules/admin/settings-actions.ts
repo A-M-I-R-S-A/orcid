@@ -13,6 +13,7 @@ import { getSecret, type Namespace, setMany } from '@/lib/settings'
 import { DEFAULT_THEME, isValidHex } from '@/lib/theme'
 import { AVAILABLE_FONTS, findFont } from '@/lib/typography'
 import { resetProvider } from '@/modules/sms/provider'
+import { COPY_CATALOG } from '@/lib/site-content'
 import { requirePermission } from './auth'
 
 export async function saveThemeAction(
@@ -143,6 +144,7 @@ const NAMESPACE_PERMISSIONS = {
   bitpay: 'settings.payment',
   sms: 'sms.configure',
   get_later: 'settings.manage',
+  content: 'appearance.brand',
 } as const
 
 const SECRET_KEYS: Partial<Record<Namespace, readonly string[]>> = {
@@ -170,8 +172,9 @@ const ALLOWED_SETTING_KEYS: Record<Exclude<Namespace, 'theme' | 'typography'>, r
   payment_card: ['bankName', 'cardNumber', 'accountHolder', 'instructions', 'enabled'],
   torob: ['clientId', 'clientSecret', 'username', 'password', 'enabled'],
   bitpay: ['apiKey', 'enabled'],
-  sms: ['apiKey', 'provider'],
+  sms: ['apiKey', 'provider', 'adminOrderPhone', 'adminOrderTrigger'],
   get_later: ['title', 'description', 'deadlineDays', 'submitLabel', 'enabled'],
+  content: ['copy', 'styles'],
 }
 
 function validPublicUrl(value: string, allowRelative = false): boolean {
@@ -216,7 +219,36 @@ function validateSettings(namespace: Exclude<Namespace, 'theme' | 'typography'>,
   if (namespace === 'payment_card' && values.cardNumber?.trim() && !/^\d{16}$/.test(values.cardNumber.trim())) {
     throw errors.validation('شماره کارت باید دقیقاً ۱۶ رقم باشد.')
   }
-  if (namespace === 'sms' && values.provider !== 'sms_ir') throw errors.validation('ارائه‌دهنده پیامک معتبر نیست.')
+  if (namespace === 'sms') {
+    if (values.provider !== 'sms_ir') throw errors.validation('ارائه‌دهنده پیامک معتبر نیست.')
+    if (values.adminOrderPhone?.trim() && !/^09\d{9}$/.test(values.adminOrderPhone.trim())) {
+      throw errors.validation('شماره دریافت‌کننده اعلان مدیر باید یک شماره موبایل ۱۱ رقمی ایران باشد.')
+    }
+    if (!['order_created', 'paid', 'processing', 'shipped'].includes(values.adminOrderTrigger ?? '')) {
+      throw errors.validation('مرحله اعلان سفارش مدیر معتبر نیست.')
+    }
+  }
+  if (namespace === 'content') {
+    try {
+      const copy = JSON.parse(values.copy || '{}') as unknown
+      const styles = JSON.parse(values.styles || '{}') as unknown
+      if (!copy || typeof copy !== 'object' || Array.isArray(copy) || !styles || typeof styles !== 'object' || Array.isArray(styles)) throw new Error('shape')
+      const validKeys = new Set(Object.keys(COPY_CATALOG))
+      for (const [key, value] of Object.entries(copy)) {
+        if (!validKeys.has(key) || typeof value !== 'string' || value.length > 5000) throw new Error('copy')
+      }
+      for (const [key, value] of Object.entries(styles)) {
+        if (!validKeys.has(key) || !value || typeof value !== 'object' || Array.isArray(value)) throw new Error('style')
+        const style = value as Record<string, unknown>
+        if (Object.keys(style).some((name) => !['tone', 'align', 'hidden'].includes(name))) throw new Error('style-key')
+        if (style.tone !== undefined && !['plain', 'raised', 'dark'].includes(String(style.tone))) throw new Error('tone')
+        if (style.align !== undefined && !['start', 'center', 'end'].includes(String(style.align))) throw new Error('align')
+        if (style.hidden !== undefined && typeof style.hidden !== 'boolean') throw new Error('hidden')
+      }
+    } catch {
+      throw errors.validation('ساختار محتوای قابل تنظیم معتبر نیست.')
+    }
+  }
 }
 
 export async function saveSettingsAction(
@@ -245,7 +277,7 @@ export async function saveSettingsAction(
     if (namespace === 'bitpay' && (values.apiKey?.length ?? 0) > 2000) {
       throw errors.validation('کلید API بیت‌پی بیش از حد طولانی است.')
     }
-    if (namespace === 'get_later') {
+  if (namespace === 'get_later') {
       const days = Number(values.deadlineDays)
       if (!Number.isInteger(days) || days < 1 || days > 30) {
         throw errors.validation('مهلت پیش‌فرض باید عددی بین ۱ تا ۳۰ روز باشد.')
@@ -317,10 +349,18 @@ export async function saveSmsTemplateAction(input: {
   providerTemplateId: string
   isEnabled: boolean
   requiresApproval: boolean
+  parameters: Record<string, string>
 }): Promise<ActionResult<void>> {
   try {
     const admin = await requirePermission('sms.configure')
     const headerList = await headers()
+    const parameters = Object.fromEntries(Object.entries(input.parameters).map(([field, name]) => [field, name.trim()]))
+    if (Object.values(parameters).some((name) => !/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(name))) {
+      throw errors.validation('نام هر پارامتر باید با حرف انگلیسی شروع شود و فقط شامل حروف، عدد یا _ باشد.')
+    }
+    if (new Set(Object.values(parameters)).size !== Object.keys(parameters).length) {
+      throw errors.validation('نام پارامترها در یک قالب نمی‌تواند تکراری باشد.')
+    }
 
     await db
       .update(smsTemplates)
@@ -328,6 +368,7 @@ export async function saveSmsTemplateAction(input: {
         providerTemplateId: input.providerTemplateId.trim() || null,
         isEnabled: input.isEnabled,
         requiresApproval: input.requiresApproval,
+        parameters,
       })
       .where(eq(smsTemplates.id, input.id))
 

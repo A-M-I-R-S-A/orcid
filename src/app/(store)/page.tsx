@@ -11,6 +11,7 @@ import { SectionHeading } from '@/components/ui'
 import { listCategories, listProducts } from '@/modules/catalog/queries'
 import { CACHE_TAGS, cached } from '@/lib/cache'
 import { getNamespace } from '@/lib/settings'
+import { getSiteContent, type CopyKey } from '@/lib/site-content'
 import { buildMetadata } from '@/lib/seo'
 import { formatJalali } from '@/lib/jalali'
 import { safePublicHref } from '@/lib/public-url'
@@ -49,12 +50,12 @@ export async function generateMetadata() {
 }
 
 export default async function HomePage() {
-  const sections = await loadSections()
+  const [sections, content] = await Promise.all([loadSections(), getSiteContent()])
 
   return (
     <>
       {sections.map((section) => (
-        <HomeSection key={section.id} section={section} />
+        <HomeSection key={section.id} section={section} text={content.text} styleClass={content.styleClass} />
       ))}
     </>
   )
@@ -62,28 +63,28 @@ export default async function HomePage() {
 
 type Section = typeof homepageSections.$inferSelect
 
-async function HomeSection({ section }: { section: Section }) {
+async function HomeSection({ section, text, styleClass }: { section: Section; text: (key: CopyKey) => string; styleClass: (key: string) => string }) {
   const config = (section.config ?? {}) as { limit?: number; categoryId?: number }
   const limit = config.limit ?? 12
 
   switch (section.kind) {
     case 'hero':
-      return <Hero section={section} />
+      return <Hero section={section} contentClass={styleClass('home.hero.title')} defaults={{ title: text('home.hero.title'), href: '/products', label: text('home.hero.cta') }} />
 
     case 'categories':
-      return <Categories section={section} />
+      return <Categories section={section} title={text('home.categories.title')} contentClass={styleClass('home.categories.title')} />
 
     case 'featured_products': {
       const { items } = await listProducts({ featuredOnly: true, limit })
       if (items.length === 0) return null
       return (
-        <Shelf tone="dark">
+        <Shelf tone="dark" contentClass={styleClass('home.featured.title')}>
           <ProductRail
             products={items}
-            label="محصولات منتخب"
-            title={section.title || 'محصولات منتخب'}
+            label={text('home.featured.eyebrow')}
+            title={section.title || text('home.featured.title')}
             subtitle={section.subtitle}
-            action={{ label: 'مشاهده همه', href: '/products' }}
+            action={{ label: text('home.featured.cta'), href: '/products' }}
           />
         </Shelf>
       )
@@ -93,13 +94,13 @@ async function HomeSection({ section }: { section: Section }) {
       const { items } = await listProducts({ newOnly: true, limit, sort: 'newest' })
       if (items.length === 0) return null
       return (
-        <Shelf>
+        <Shelf contentClass={styleClass('home.new.title')}>
           <ProductRail
             products={items}
-            label="جدیدترین‌ها"
-            title={section.title || 'جدیدترین‌ها'}
+            label={text('home.new.eyebrow')}
+            title={section.title || text('home.new.title')}
             subtitle={section.subtitle}
-            action={{ label: 'همه محصولات', href: '/products?sort=newest' }}
+            action={{ label: text('home.new.cta'), href: '/products?sort=newest' }}
           />
         </Shelf>
       )
@@ -109,26 +110,26 @@ async function HomeSection({ section }: { section: Section }) {
       const { items } = await listProducts({ bestsellerOnly: true, limit, sort: 'popular' })
       if (items.length === 0) return null
       return (
-        <Shelf tone="raised">
+        <Shelf tone="raised" contentClass={styleClass('home.best.title')}>
           <ProductRail
             products={items}
-            label="پرفروش‌ترین‌ها"
-            title={section.title || 'انتخاب مشتریان'}
+            label={text('home.best.eyebrow')}
+            title={section.title || text('home.best.title')}
             subtitle={section.subtitle}
-            action={{ label: 'همه محصولات', href: '/products?sort=popular' }}
+            action={{ label: text('home.best.cta'), href: '/products?sort=popular' }}
           />
         </Shelf>
       )
     }
 
     case 'promo_banner':
-      return <PromoBanner section={section} />
+      return <PromoBanner section={section} contentClass={styleClass('home.promo.title')} defaults={{ title: text('home.promo.title'), href: '/products', label: text('home.promo.cta') }} />
 
     case 'brand_story':
-      return <BrandStory section={section} />
+      return <BrandStory section={section} fallbackCta={text('home.story.cta')} />
 
     case 'blog_teaser':
-      return <BlogTeaser section={section} limit={config.limit ?? 3} />
+      return <BlogTeaser section={section} contentClass={styleClass('home.blog.title')} limit={config.limit ?? 3} defaults={{ title: text('home.blog.title'), cta: text('home.blog.cta') }} />
 
     default:
       return null
@@ -138,9 +139,11 @@ async function HomeSection({ section }: { section: Section }) {
 function Shelf({
   children,
   tone = 'plain',
+  contentClass = '',
 }: {
   children: React.ReactNode
   tone?: 'plain' | 'raised' | 'dark'
+  contentClass?: string
 }) {
   const ground =
     tone === 'dark'
@@ -150,7 +153,7 @@ function Shelf({
         : 'movement'
 
   return (
-    <section className={ground}>
+    <section className={`${ground} ${contentClass}`}>
       <div className="container-page">{children}</div>
     </section>
   )
@@ -163,6 +166,7 @@ interface BannerProps {
   priority?: boolean
   defaults: { title: string; href: string; label: string }
   canOverlayHeader?: boolean
+  contentClass?: string
 }
 
 function BannerFrame(props: BannerProps) {
@@ -172,7 +176,7 @@ function BannerFrame(props: BannerProps) {
 
   return (
     <section
-      className={`relative isolate flex w-full flex-col overflow-hidden ${overlay} ${BANNER_VEIL_CLASS[design.veil]} ${BANNER_HEIGHT_CLASS[design.height]} ${BANNER_POSITION_CLASS[design.position]}`}
+      className={`relative isolate flex w-full flex-col overflow-hidden ${overlay} ${props.contentClass ?? ''} ${BANNER_VEIL_CLASS[design.veil]} ${BANNER_HEIGHT_CLASS[design.height]} ${BANNER_POSITION_CLASS[design.position]}`}
       data-banner-tone={design.tone}
       data-banner-position={design.position}
       style={{ '--scrim': `${design.overlay}%` } as React.CSSProperties}
@@ -201,17 +205,12 @@ function BannerFrame(props: BannerProps) {
   )
 }
 
-function Hero({ section }: { section: Section }) {
+function Hero({ section, defaults, contentClass }: { section: Section; defaults: BannerProps['defaults']; contentClass?: string }) {
   const design = parseBannerSettings(section.config)
 
-  const defaults = {
-    title: 'ظرافت، در هر جزئیات',
-    href: '/products',
-    label: 'مشاهده همه محصولات',
-  }
 
   if (!section.imagePath) {
-    return <HeroPlain section={section} design={design} defaults={defaults} />
+    return <HeroPlain section={section} design={design} defaults={defaults} contentClass={contentClass} />
   }
 
   return (
@@ -222,6 +221,7 @@ function Hero({ section }: { section: Section }) {
       priority
       canOverlayHeader
       defaults={defaults}
+      contentClass={contentClass}
     />
   )
 }
@@ -230,14 +230,16 @@ function HeroPlain({
   section,
   design,
   defaults,
+  contentClass,
 }: {
   section: Section
   design: BannerSettings
   defaults: BannerProps['defaults']
+  contentClass?: string
 }) {
   return (
     <section
-      className={`relative flex flex-col overflow-hidden border-b border-line bg-bg-secondary ${
+      className={`relative flex flex-col overflow-hidden border-b border-line bg-bg-secondary ${contentClass ?? ''} ${
         design.header === 'overlay' ? 'hero-overlay' : ''
       } ${BANNER_HEIGHT_CLASS[design.height]} ${BANNER_POSITION_CLASS[design.position]}`}
       data-banner-tone="dark"
@@ -366,12 +368,12 @@ function BannerCta({
   )
 }
 
-async function Categories({ section }: { section: Section }) {
+async function Categories({ section, title, contentClass = '' }: { section: Section; title: string; contentClass?: string }) {
   const categories = (await listCategories()).filter((c) => c.parentId === null).slice(0, 6)
   if (categories.length === 0) return null
 
   return (
-    <section className="movement container-page">
+    <section className={`movement container-page ${contentClass}`}>
       <svg width="0" height="0" aria-hidden="true" className="absolute">
         <defs>
           <clipPath id="orchid-arch" clipPathUnits="objectBoundingBox">
@@ -381,7 +383,7 @@ async function Categories({ section }: { section: Section }) {
       </svg>
 
       <SectionHeading
-        title={section.title || 'خرید بر اساس دسته'}
+        title={section.title || title}
         subtitle={section.subtitle}
       />
 
@@ -430,18 +432,13 @@ async function Categories({ section }: { section: Section }) {
   )
 }
 
-function PromoBanner({ section }: { section: Section }) {
+function PromoBanner({ section, defaults, contentClass }: { section: Section; defaults: BannerProps['defaults']; contentClass?: string }) {
   const design = parseBannerSettings(section.config)
 
-  const defaults = {
-    title: 'ارسال محرمانه به سراسر ایران',
-    href: '/products',
-    label: 'مشاهده',
-  }
 
   if (section.imagePath) {
     return (
-      <BannerFrame section={section} design={design} heading="h2" defaults={defaults} />
+      <BannerFrame section={section} design={design} heading="h2" defaults={defaults} contentClass={contentClass} />
     )
   }
 
@@ -450,7 +447,7 @@ function PromoBanner({ section }: { section: Section }) {
   const blockAlign = design.align === 'center' ? 'mx-auto' : design.align === 'end' ? 'ms-auto' : ''
 
   return (
-    <section className="band">
+    <section className={`band ${contentClass ?? ''}`}>
       <div className="movement container-page">
         <div className={`flex flex-col ${BANNER_ALIGN_CLASS[design.align]}`}>
           <div className="max-w-xl">
@@ -483,7 +480,7 @@ function PromoBanner({ section }: { section: Section }) {
   )
 }
 
-function BrandStory({ section }: { section: Section }) {
+function BrandStory({ section, fallbackCta }: { section: Section; fallbackCta: string }) {
   const href = safePublicHref(section.linkUrl, true)
   return (
     <section className="movement-open container-page">
@@ -499,7 +496,7 @@ function BrandStory({ section }: { section: Section }) {
           )}
           {href && (
             <Link href={href} className="link-rule mt-9">
-              {section.linkLabel || 'بیشتر بخوانید'}
+              {section.linkLabel || fallbackCta}
               <span aria-hidden="true" className="mirror-rtl">
                 →
               </span>
@@ -511,7 +508,7 @@ function BrandStory({ section }: { section: Section }) {
   )
 }
 
-async function BlogTeaser({ section, limit }: { section: Section; limit: number }) {
+async function BlogTeaser({ section, limit, defaults, contentClass = '' }: { section: Section; limit: number; defaults: { title: string; cta: string }; contentClass?: string }) {
   const posts = await db
     .select({
       id: blogPosts.id,
@@ -530,11 +527,11 @@ async function BlogTeaser({ section, limit }: { section: Section; limit: number 
   if (posts.length === 0) return null
 
   return (
-    <section className="movement container-page">
+    <section className={`movement container-page ${contentClass}`}>
       <SectionHeading
-        title={section.title || 'خواندنی‌ها'}
+        title={section.title || defaults.title}
         subtitle={section.subtitle}
-        action={{ label: 'همه نوشته‌ها', href: '/blog' }}
+        action={{ label: defaults.cta, href: '/blog' }}
       />
 
       <div className="rail rail-bleed md:mx-0 md:grid md:grid-cols-3 md:gap-8 md:overflow-visible md:px-0">

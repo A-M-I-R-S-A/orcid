@@ -6,6 +6,7 @@ import { maskPhone } from '@/lib/persian'
 import { addressCount, wishlistCount } from '@/modules/account/service'
 import { countForUser } from '@/modules/orders/queries'
 import { activeCountForUser, getConfig as getLaterConfig } from '@/modules/get-later/service'
+import { getSiteContent } from '@/lib/site-content'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,12 +18,13 @@ export default async function AccountLayout({ children }: { children: React.Reac
   const user = await getCurrentUser()
   if (!user) redirect('/login?next=/account')
 
-  const [orders, wishlist, addresses, getLater, getLaterSettings] = await Promise.all([
+  const [orders, wishlist, addresses, getLater, getLaterSettings, content] = await Promise.all([
     countForUser(user.id),
     wishlistCount(user.id),
     addressCount(user.id),
     activeCountForUser(user.id),
     getLaterConfig(),
+    getSiteContent(),
   ])
 
   return (
@@ -37,7 +39,7 @@ export default async function AccountLayout({ children }: { children: React.Reac
               {(user.fullName ?? 'ا').trim().charAt(0)}
             </span>
             <div className="min-w-0">
-              <p className="truncate font-medium text-ink">{user.fullName || 'کاربر ارکید'}</p>
+              <p className="truncate font-medium text-ink">{user.fullName || content.text('account.defaultUser')}</p>
               <p className="nums truncate text-sm text-ink-subtle" dir="ltr">
                 {maskPhone(user.phone)}
               </p>

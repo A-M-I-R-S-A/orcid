@@ -5,6 +5,7 @@ import { useEffect, useState, useTransition } from 'react'
 
 import { toggleWishlistAction } from '@/modules/account/actions'
 import { useWishlist } from './wishlist-provider'
+import { useSiteText } from './site-content-provider'
 
 export function WishlistButton({
   productId,
@@ -23,6 +24,10 @@ export function WishlistButton({
   const wishlist = useWishlist()
   const [optimistic, setOptimistic] = useState<boolean | null>(null)
   const [pending, startTransition] = useTransition()
+  const removePrefix = useSiteText('wishlist.removePrefix', 'حذف')
+  const addPrefix = useSiteText('wishlist.addPrefix', 'افزودن')
+  const fromSuffix = useSiteText('wishlist.fromSuffix', 'از علاقه‌مندی‌ها')
+  const toSuffix = useSiteText('wishlist.toSuffix', 'به علاقه‌مندی‌ها')
 
   const saved = optimistic ?? (wishlist.ready ? wishlist.has(productId) : initialSaved)
 
@@ -67,7 +72,7 @@ export function WishlistButton({
       onClick={toggle}
       disabled={pending}
       aria-pressed={saved}
-      aria-label={saved ? `حذف ${productName} از علاقه‌مندی‌ها` : `افزودن ${productName} به علاقه‌مندی‌ها`}
+      aria-label={saved ? `${removePrefix} ${productName} ${fromSuffix}` : `${addPrefix} ${productName} ${toSuffix}`}
       className={`flex items-center justify-center rounded-full backdrop-blur-sm transition-all duration-300 ${
         size === 'sm' ? 'h-8 w-8' : 'h-9 w-9'
       } ${

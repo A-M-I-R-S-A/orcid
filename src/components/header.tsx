@@ -8,18 +8,20 @@ import { getCurrentUser } from '@/lib/session'
 import { getNamespace } from '@/lib/settings'
 import { toPersianDigits } from '@/lib/persian'
 import { safePublicHref } from '@/lib/public-url'
+import { getSiteContent } from '@/lib/site-content'
 import { CategoryNav } from './category-nav'
 import { MobileNav } from './mobile-nav'
 import { SearchField } from './search-field'
 
 export async function Header() {
-  const [categories, site, social, user, headerLinks, moreLinks] = await Promise.all([
+  const [categories, site, social, user, headerLinks, moreLinks, content] = await Promise.all([
     listCategories(),
     getNamespace('site'),
     getNamespace('social'),
     getCurrentUser(),
     navLinksFor('header'),
     navLinksFor('footer_help'),
+    getSiteContent(),
   ])
 
   const count = await cartCount(user?.id ?? null)
@@ -36,7 +38,7 @@ export async function Header() {
             href: `/category/${encodeURIComponent(c.slug)}`,
           })),
           { label: SIZE_GUIDE_LABEL, href: SIZE_GUIDE_HREF },
-          { label: 'مجله', href: '/blog' },
+          { label: content.text('header.blog'), href: '/blog' },
         ]
 
   const ornamentAfter = headerLinks.length > 0 ? 0 : topLevel.length
@@ -82,7 +84,7 @@ export async function Header() {
             />
           </div>
 
-          <Link href="/" className="shrink-0" aria-label={`${siteName} — صفحه اصلی`}>
+          <Link href="/" className="shrink-0" aria-label={`${siteName} — ${content.text('header.homeAria')}`}>
             <img
               src={site.logoPath ? `/api/media/${site.logoPath}` : '/logo.png'}
               alt={siteName}
@@ -103,7 +105,7 @@ export async function Header() {
           <div className="flex items-center gap-1 md:border-s md:border-line md:ps-2">
             <IconLink
               href={user ? '/account' : '/login'}
-              label={user ? 'حساب کاربری' : 'ورود به حساب'}
+              label={user ? content.text('header.account') : content.text('header.login')}
             >
               <path d="M12 12a4 4 0 100-8 4 4 0 000 8z" />
               <path d="M4 21c0-3.6 3.6-6 8-6s8 2.4 8 6" />
@@ -111,7 +113,7 @@ export async function Header() {
 
             <IconLink
               href={user ? '/account/wishlist' : '/login?next=/account/wishlist'}
-              label="علاقه‌مندی‌ها"
+              label={content.text('header.wishlist')}
               className="hidden sm:inline-flex"
             >
               <path d="M12 20s-7-4.4-7-9.2A4 4 0 0112 8.6 4 4 0 0119 10.8C19 15.6 12 20 12 20z" />
@@ -120,7 +122,7 @@ export async function Header() {
             <Link
               href="/cart"
               className="relative rounded-full p-2.5 transition-colors hover:bg-surface-sunken"
-              aria-label={count > 0 ? `سبد خرید، ${count} کالا` : 'سبد خرید'}
+              aria-label={count > 0 ? `${content.text('header.cart')}، ${count} ${content.text('account.item')}` : content.text('header.cart')}
             >
               <svg
                 width="21"

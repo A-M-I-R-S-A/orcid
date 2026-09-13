@@ -1,3 +1,4 @@
+import { SiteStyledText } from '@/components/site-content-provider'
 import { ProductGrid } from '@/components/product-card'
 import { Breadcrumbs, EmptyState, Pagination } from '@/components/ui'
 import { FilterBar } from '@/components/filters'
@@ -6,6 +7,7 @@ import { searchParamsSchema } from '@/lib/validation'
 import { breadcrumbSchema, buildMetadata, facetsAreIndexable } from '@/lib/seo'
 import { toPersianDigits } from '@/lib/persian'
 import { JsonLd } from '@/components/json-ld'
+import { getSiteContent } from '@/lib/site-content'
 
 export const revalidate = 600
 
@@ -16,11 +18,11 @@ interface Props {
 export async function generateMetadata({ searchParams }: Props) {
   const query = await searchParams
   const page = Number(query.page ?? 1)
+  const content = await getSiteContent()
 
   return buildMetadata({
-    title: page > 1 ? `همه محصولات — صفحه ${toPersianDigits(page)}` : 'همه محصولات',
-    description:
-      'همه محصولات ارکید در یک صفحه؛ سوتین، شورت، ست و لباس خواب با امکان فیلتر بر اساس رنگ، سایز و موجودی.',
+    title: page > 1 ? `${content.text('catalog.products')} — ${content.text('common.page')} ${toPersianDigits(page)}` : content.text('catalog.products'),
+    description: content.text('catalog.description'),
     path: page > 1 ? `/products?page=${page}` : '/products',
     index: facetsAreIndexable(query),
   })
@@ -28,6 +30,7 @@ export async function generateMetadata({ searchParams }: Props) {
 
 export default async function AllProductsPage({ searchParams }: Props) {
   const query = await searchParams
+  const content = await getSiteContent()
 
   const parsed = searchParamsSchema.safeParse(query)
   const filters = parsed.success ? parsed.data : searchParamsSchema.parse({})
@@ -47,8 +50,8 @@ export default async function AllProductsPage({ searchParams }: Props) {
   ])
 
   const breadcrumbItems = [
-    { name: 'خانه', path: '/' },
-    { name: 'همه محصولات', path: '/products' },
+    { name: content.text('common.home'), path: '/' },
+    { name: content.text('catalog.products'), path: '/products' },
   ]
 
   const activeParams: Record<string, string | undefined> = {
@@ -71,13 +74,13 @@ export default async function AllProductsPage({ searchParams }: Props) {
       <div className="container-page">
         <header className="mb-9 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-2">
           <div className="max-w-3xl">
-            <p className="eyebrow mb-3">مجموعه کامل</p>
-            <h1 className="section-title">همه محصولات</h1>
+            <p className="eyebrow mb-3"><SiteStyledText contentKey="catalog.eyebrow">{content.text('catalog.eyebrow')}</SiteStyledText></p>
+            <h1 className="section-title"><SiteStyledText contentKey="catalog.products">{content.text('catalog.products')}</SiteStyledText></h1>
             <p className="mt-4 max-w-2xl leading-relaxed text-ink-muted">
-              همه چیزهایی که در ارکید موجود است، بدون دسته‌بندی. با رنگ، سایز و موجودی فیلتر کنید.
+              <SiteStyledText contentKey="catalog.description">{content.text('catalog.description')}</SiteStyledText>
             </p>
           </div>
-          <p className="nums shrink-0 text-sm text-ink-subtle">{toPersianDigits(total)} محصول</p>
+          <p className="nums shrink-0 text-sm text-ink-subtle">{toPersianDigits(total)} <SiteStyledText contentKey="catalog.productSuffix">{content.text('catalog.productSuffix')}</SiteStyledText></p>
         </header>
 
         <FilterBar basePath="/products" facets={facets} active={filters} />
@@ -85,9 +88,9 @@ export default async function AllProductsPage({ searchParams }: Props) {
         <div className="mt-10 pb-4">
           {items.length === 0 ? (
             <EmptyState
-              title="محصولی یافت نشد"
-              description="با فیلترهای انتخاب‌شده محصولی موجود نیست. فیلترها را تغییر دهید."
-              action={{ label: 'حذف فیلترها', href: '/products' }}
+              title={content.text('catalog.empty')}
+              description={content.text('catalog.emptyDescription')}
+              action={{ label: content.text('catalog.clearFilters'), href: '/products' }}
             />
           ) : (
             <>

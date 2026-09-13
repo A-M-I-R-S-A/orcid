@@ -455,6 +455,23 @@ export async function uploadBlogCoverAction(formData: FormData): Promise<ActionR
   }
 }
 
+export async function uploadContentImageAction(
+  formData: FormData,
+): Promise<ActionResult<{ path: string; html: string }>> {
+  try {
+    const kind = String(formData.get('kind') ?? '')
+    if (kind === 'blog') await requirePermission('blog.manage')
+    else if (kind === 'page') await requirePermission('content.pages')
+    else throw errors.validation('نوع محتوا معتبر نیست.')
+    const file = formData.get('file')
+    if (!(file instanceof File)) throw errors.validation('فایلی انتخاب نشده است.')
+    const processed = await processUpload(file, { folder: kind === 'blog' ? 'blog' : 'pages' })
+    return ok({ path: processed.path, html: `<img src="/api/media/${processed.path}" alt="" loading="lazy">` })
+  } catch (error) {
+    return fail(error, { action: 'uploadContentImage' })
+  }
+}
+
 export async function deleteBlogPostAction(postId: number): Promise<ActionResult<void>> {
   try {
     await requirePermission('blog.manage')

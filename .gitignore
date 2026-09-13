@@ -19,3 +19,23 @@ test-results/
 playwright-report/
 tmp/
 .env.deploy
+# Local Codex artifacts
+.codex-*/
+
+# Deployment archives and patches
+*.zip
+*.patch
+
+# Environment files
+.env.*
+!.env.example
+
+# Database/export backups
+*.sql.gz
+*.dump
+*.bak
+
+# Local certificates and private keys
+*.pem
+*.key
+*.crt

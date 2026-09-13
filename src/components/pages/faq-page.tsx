@@ -1,3 +1,4 @@
+import { SiteStyledText } from '@/components/site-content-provider'
 import Link from 'next/link'
 import { and, eq, inArray } from 'drizzle-orm'
 
@@ -9,6 +10,7 @@ import { sanitizeHtml } from '@/lib/sanitize'
 import { getNamespace } from '@/lib/settings'
 import { excerpt, parseFaq, toPlainText } from '@/lib/rich-text'
 import { faqSchema } from '@/lib/seo'
+import { getSiteContent } from '@/lib/site-content'
 import { JsonLd } from '@/components/json-ld'
 import { Icon } from './icons'
 import { ClosingBand, Movement, PageHero } from './shell'
@@ -39,7 +41,7 @@ export async function FaqPage({
   page: PageRow
   breadcrumbs: { name: string; path: string }[]
 }) {
-  const [contact, helpPages] = await Promise.all([getNamespace('contact'), loadHelpPages()])
+  const [contact, helpPages, content] = await Promise.all([getNamespace('contact'), loadHelpPages(), getSiteContent()])
 
   const body = page.body ? sanitizeHtml(page.body) : ''
   const { intro, groups } = parseFaq(body)
@@ -59,12 +61,12 @@ export async function FaqPage({
       {schemaItems.length > 0 && <JsonLd data={faqSchema(schemaItems)} />}
 
       <PageHero
-        eyebrow="راهنمای خرید"
+        eyebrow={content.text('faq.eyebrow')}
         title={page.title}
         lead={
           intro
             ? excerpt(intro, 200)
-            : 'پرتکرارترین پرسش‌های مشتریان درباره سایز، سفارش، ارسال و بازگشت کالا.'
+            : content.text('faq.description')
         }
         breadcrumbs={breadcrumbs}
         aside={
@@ -73,13 +75,13 @@ export async function FaqPage({
               <p className="nums font-[family-name:var(--font-heading)] text-5xl text-ink">
                 {toPersianDigits(total)}
               </p>
-              <p className="mt-3 text-sm text-ink-muted">پرسش پاسخ داده‌شده در این صفحه</p>
+              <p className="mt-3 text-sm text-ink-muted"><SiteStyledText contentKey="faq.answered">{content.text('faq.answered')}</SiteStyledText></p>
 
               {contact.phone && (
                 <p className="mt-6 flex items-start gap-3 border-t border-line pt-6 text-sm leading-relaxed text-ink-muted">
                   <Icon name="phone" className="mt-0.5 h-4 w-4 shrink-0 text-accent-2" />
                   <span>
-                    پاسخ خود را پیدا نکردید؟ با{' '}
+                    <SiteStyledText contentKey="faq.notFound">{content.text('faq.notFound')}</SiteStyledText>{' '}
                     <a
                       href={`tel:${contact.phone}`}
                       dir="ltr"
@@ -87,7 +89,7 @@ export async function FaqPage({
                     >
                       {toPersianDigits(contact.phone)}
                     </a>{' '}
-                    تماس بگیرید.
+                    <SiteStyledText contentKey="faq.call">{content.text('faq.call')}</SiteStyledText>
                   </span>
                 </p>
               )}
@@ -105,7 +107,7 @@ export async function FaqPage({
             />
           ) : (
             <p className="mx-auto max-w-xl text-center leading-loose text-ink-muted">
-              هنوز پرسشی در این صفحه ثبت نشده است. برای هر سوالی می‌توانید با پشتیبانی تماس بگیرید.
+              <SiteStyledText contentKey="faq.empty">{content.text('faq.empty')}</SiteStyledText>
             </p>
           )}
         </Movement>
@@ -113,9 +115,9 @@ export async function FaqPage({
         <Movement>
           <div className={showIndex ? 'grid gap-12 lg:grid-cols-12 lg:gap-16' : ''}>
             {showIndex && (
-              <nav aria-label="فهرست موضوع‌ها" className="lg:col-span-3">
+              <nav aria-label={content.text('faq.topicsAria')} className="lg:col-span-3">
                 <div className="lg:sticky lg:top-32">
-                  <p className="eyebrow">موضوع‌ها</p>
+                  <p className="eyebrow"><SiteStyledText contentKey="faq.topics">{content.text('faq.topics')}</SiteStyledText></p>
                   <ul className="mt-6 space-y-1">
                     {groups.map((group, index) => (
                       <li key={groupId(index)}>
@@ -203,7 +205,7 @@ export async function FaqPage({
 
       {helpPages.length > 0 && (
         <Movement tone="raised">
-          <p className="eyebrow">راهنماهای مرتبط</p>
+          <p className="eyebrow"><SiteStyledText contentKey="faq.related">{content.text('faq.related')}</SiteStyledText></p>
 
           <div className="mt-9 flex flex-wrap gap-px overflow-hidden rounded-[var(--radius-card)] border border-line bg-line">
             {helpPages.map((helpPage) => (
@@ -228,12 +230,12 @@ export async function FaqPage({
       )}
 
       <ClosingBand
-        eyebrow="هنوز سوالی هست؟"
-        title="بپرسید، پاسخ می‌دهیم"
-        body="اگر پاسخ پرسش شما در این صفحه نبود، از راه‌های ارتباطی زیر با پشتیبانی در تماس باشید."
+        eyebrow={content.text('faq.closingEyebrow')}
+        title={content.text('faq.closingTitle')}
+        body={content.text('faq.closingBody')}
         links={[
-          { label: 'تماس با ما', href: '/p/contact', primary: true },
-          { label: 'پیگیری سفارش', href: '/account/orders' },
+          { label: content.text('common.contactUs'), href: '/p/contact', primary: true },
+          { label: content.text('footer.tracking'), href: '/account/orders' },
         ]}
       />
     </>

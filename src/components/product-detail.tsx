@@ -1,5 +1,6 @@
 'use client'
 
+import { SiteStyledText } from '@/components/site-content-provider'
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 
 import { SizeGuideDialog } from '@/components/size-guide-dialog'
@@ -15,6 +16,7 @@ import { toPersianDigits } from '@/lib/persian'
 import { ResponsiveImage } from './media'
 import { Price } from './ui'
 import { WishlistSaveButton } from './wishlist-save-button'
+import { useSiteText } from './site-content-provider'
 
 export function ProductPurchasePanel({
   product,
@@ -28,6 +30,20 @@ export function ProductPurchasePanel({
   signedIn: boolean
 }) {
   const router = useRouter()
+  const addedText = useSiteText('product.added', 'به سبد خرید اضافه شد.')
+  const payLaterAddedText = useSiteText('product.payLaterAdded', 'به سبد پرداخت بعدی اضافه شد.')
+  const variantUnavailableText = useSiteText('product.variantUnavailable', 'ترکیب انتخاب‌شده موجود نیست')
+  const unavailableText = useSiteText('product.unavailable', 'ناموجود')
+  const inStockText = useSiteText('product.inStock', 'موجود در انبار')
+  const addingText = useSiteText('product.adding', 'در حال افزودن…')
+  const addToCartText = useSiteText('product.addToCart', 'افزودن به سبد خرید')
+  const addToPayLaterText = useSiteText('product.addToPayLater', 'افزودن به سبد پرداخت بعدی')
+  const skuText = useSiteText('product.sku', 'کد کالا')
+  const optionUnavailableText = useSiteText('product.optionUnavailable', 'ناموجود')
+  const currentCombinationUnavailableText = useSiteText('product.currentCombinationUnavailable', 'این ترکیب در حال حاضر موجود نیست.')
+  const onlyText = useSiteText('product.onlyPrefix', 'تنها')
+  const remainingText = useSiteText('product.remainingSuffix', 'عدد باقی مانده است.')
+  const addText = useSiteText('product.add', 'افزودن')
   const [pending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null)
 
@@ -78,7 +94,7 @@ export function ProductPurchasePanel({
       const result = await addToCartAction({ variantId: activeVariant.id, quantity: 1 })
 
       if (result.ok) {
-        setMessage({ tone: 'ok', text: 'به سبد خرید اضافه شد.' })
+        setMessage({ tone: 'ok', text: addedText })
         router.refresh()
       } else {
         setMessage({ tone: 'error', text: result.error })
@@ -95,7 +111,7 @@ export function ProductPurchasePanel({
     startTransition(async () => {
       const result = await addToGetLaterAction({ variantId: activeVariant.id, quantity: 1 })
       if (result.ok) {
-        setMessage({ tone: 'ok', text: 'به سبد پرداخت بعدی اضافه شد.' })
+        setMessage({ tone: 'ok', text: payLaterAddedText })
         router.refresh()
       } else setMessage({ tone: 'error', text: result.error })
     })
@@ -116,7 +132,7 @@ export function ProductPurchasePanel({
             size="lg"
           />
         ) : (
-          <p className="text-ink-muted">ترکیب انتخاب‌شده موجود نیست</p>
+          <p className="text-ink-muted"><SiteStyledText contentKey="product.variantUnavailable">{variantUnavailableText}</SiteStyledText></p>
         )}
       </div>
 
@@ -156,7 +172,7 @@ export function ProductPurchasePanel({
                   >
                     <span className="sr-only">
                       {value.value}
-                      {!available ? ' (ناموجود)' : ''}
+                      {!available ? ` (${optionUnavailableText})` : ''}
                     </span>
                   </button>
                 )
@@ -175,7 +191,7 @@ export function ProductPurchasePanel({
                   } ${!available ? 'opacity-40 line-through' : ''}`}
                 >
                   {value.value}
-                  {!available && <span className="sr-only"> (ناموجود)</span>}
+                  {!available && <span className="sr-only"> (<SiteStyledText contentKey="product.optionUnavailable">{optionUnavailableText}</SiteStyledText>)</span>}
                 </button>
               )
             })}
@@ -185,13 +201,13 @@ export function ProductPurchasePanel({
 
       <div aria-live="polite" className="min-h-[1.5rem]">
         {outOfStock ? (
-          <p className="text-sm text-danger">این ترکیب در حال حاضر موجود نیست.</p>
+          <p className="text-sm text-danger"><SiteStyledText contentKey="product.currentCombinationUnavailable">{currentCombinationUnavailableText}</SiteStyledText></p>
         ) : lowStock ? (
           <p className="text-sm text-warning nums">
-            تنها {toPersianDigits(activeVariant!.stockQty)} عدد باقی مانده است.
+            <SiteStyledText contentKey="product.onlyPrefix">{onlyText}</SiteStyledText> {toPersianDigits(activeVariant!.stockQty)} <SiteStyledText contentKey="product.remainingSuffix">{remainingText}</SiteStyledText>
           </p>
         ) : (
-          <p className="text-sm text-success">موجود در انبار</p>
+          <p className="text-sm text-success"><SiteStyledText contentKey="product.inStock">{inStockText}</SiteStyledText></p>
         )}
       </div>
 
@@ -203,7 +219,7 @@ export function ProductPurchasePanel({
             disabled={outOfStock || pending}
             className="btn btn-primary flex-1 py-4 text-base"
           >
-            {pending ? 'در حال افزودن…' : outOfStock ? 'ناموجود' : 'افزودن به سبد خرید'}
+            {pending ? addingText : outOfStock ? unavailableText : addToCartText}
           </button>
 
           <WishlistSaveButton productId={product.id} productName={product.name} />
@@ -211,7 +227,7 @@ export function ProductPurchasePanel({
 
         {payLaterEnabled && (
           <button type="button" onClick={handleAddLater} disabled={outOfStock || pending} className="btn btn-secondary w-full py-3.5">
-            افزودن به سبد پرداخت بعدی
+            <SiteStyledText contentKey="product.addToPayLater">{addToPayLaterText}</SiteStyledText>
           </button>
         )}
 
@@ -229,7 +245,7 @@ export function ProductPurchasePanel({
 
       {activeVariant && (
         <p className="text-xs text-ink-subtle">
-          کد کالا: <span dir="ltr" className="nums">{activeVariant.sku}</span>
+          <SiteStyledText contentKey="product.sku">{skuText}</SiteStyledText>: <span dir="ltr" className="nums">{activeVariant.sku}</span>
         </p>
       )}
 
@@ -250,7 +266,7 @@ export function ProductPurchasePanel({
                 </strong>
               </>
             ) : (
-              <p className="text-sm text-ink-muted">ترکیب انتخاب‌شده موجود نیست</p>
+              <p className="text-sm text-ink-muted"><SiteStyledText contentKey="product.variantUnavailable">{variantUnavailableText}</SiteStyledText></p>
             )}
           </div>
 
@@ -261,7 +277,7 @@ export function ProductPurchasePanel({
             tabIndex={ctaVisible ? -1 : 0}
             className="btn btn-primary shrink-0 px-6 py-3"
           >
-            {pending ? '…' : outOfStock ? 'ناموجود' : 'افزودن'}
+            {pending ? '…' : outOfStock ? unavailableText : addText}
           </button>
         </div>
       </div>
@@ -276,6 +292,7 @@ export function ProductGallery({
   images: ProductDetail['images']
   productName: string
 }) {
+  const imagesAria = useSiteText('product.imagesAria', 'تصاویر محصول')
   const [active, setActive] = useState(0)
   const current = images[active] ?? images[0]
 
@@ -301,7 +318,7 @@ export function ProductGallery({
         <div
           className="flex gap-2.5 overflow-x-auto scrollbar-none pb-1"
           role="tablist"
-          aria-label="تصاویر محصول"
+          aria-label={imagesAria}
         >
           {images.map((image, i) => (
             <button

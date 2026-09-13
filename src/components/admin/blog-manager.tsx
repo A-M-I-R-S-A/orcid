@@ -11,6 +11,7 @@ import {
 } from '@/modules/admin/content-actions'
 import { formatJalali } from '@/lib/jalali'
 import { mediaUrl } from '@/lib/media-url'
+import { ContentImageUpload } from '@/components/admin/content-image-upload'
 
 interface Post {
   id: number
@@ -206,6 +207,7 @@ function PostForm({
               className="field resize-y font-mono text-sm"
               dir="auto"
             />
+            <ContentImageUpload kind="blog" textareaId="blog-body" />
           </div>
 
           <div>

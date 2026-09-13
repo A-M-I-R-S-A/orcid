@@ -93,6 +93,26 @@ export const cartItems = mysqlTable(
   ],
 )
 
+export const shippingMethods = mysqlTable(
+  'shipping_methods',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    name: varchar('name', { length: 120 }).notNull(),
+    description: varchar('description', { length: 500 }),
+    fee: bigint('fee', { mode: 'number', unsigned: true }).notNull().default(0),
+    freeThreshold: bigint('free_threshold', { mode: 'number', unsigned: true }).notNull().default(0),
+    isEnabled: mysqlEnum('is_enabled', ['0', '1']).notNull().default('1'),
+    isDefault: mysqlEnum('is_default', ['0', '1']).notNull().default('0'),
+    sortOrder: int('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => [
+    index('shipping_methods_enabled_sort_idx').on(t.isEnabled, t.sortOrder),
+    index('shipping_methods_default_idx').on(t.isDefault),
+  ],
+)
+
 export const orders = mysqlTable(
   'orders',
   {
@@ -115,6 +135,11 @@ export const orders = mysqlTable(
     shippingTotal: bigint('shipping_total', { mode: 'number', unsigned: true })
       .notNull()
       .default(0),
+    shippingMethodId: bigint('shipping_method_id', { mode: 'number', unsigned: true }).references(
+      () => shippingMethods.id,
+      { onDelete: 'set null' },
+    ),
+    shippingMethodName: varchar('shipping_method_name', { length: 120 }),
     grandTotal: bigint('grand_total', { mode: 'number', unsigned: true }).notNull(),
 
     shipFullName: varchar('ship_full_name', { length: 120 }).notNull(),

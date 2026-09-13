@@ -11,6 +11,7 @@ const ALLOWED_TAGS = [
   'a', 'img',
   'table', 'thead', 'tbody', 'tr', 'th', 'td',
   'span', 'div',
+  'style',
 ]
 
 const ALLOWED_ATTR = [
@@ -22,14 +23,24 @@ const ALLOWED_ATTR = [
 ]
 
 export function sanitizeHtml(dirty: string): string {
-  return DOMPurify.sanitize(dirty, {
+  const styles: string[] = []
+  const content = dirty.replace(/<style\b[^>]*>([\s\S]*?)<\/style>/gi, (_whole, css: string) => {
+    if (!/@import|@namespace|expression\s*\(|behavior\s*:|binding\s*:|url\s*\(/i.test(css)) {
+      styles.push(`<style>${css}</style>`)
+    }
+    return ''
+  })
+
+  const clean = DOMPurify.sanitize(content, {
     ALLOWED_TAGS,
     ALLOWED_ATTR,
-    FORBID_TAGS: ['script', 'style', 'iframe', 'object', 'embed', 'form', 'input'],
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'form', 'input'],
     FORBID_ATTR: ['onerror', 'onload', 'onclick', 'style'],
     ALLOW_DATA_ATTR: false,
     ALLOWED_URI_REGEXP: /^(?:https?:|mailto:|tel:|\/)/i,
   })
+
+  return styles.join('') + clean
 }
 
 export function sanitizeEnamad(dirty: string): string {

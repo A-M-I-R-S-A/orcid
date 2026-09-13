@@ -39,6 +39,8 @@ async function main() {
   })
 
   try {
+    await connection.query("SET SESSION default_storage_engine = 'InnoDB'")
+
     const [[versionRow]] = await connection.query('SELECT VERSION() AS version')
     console.log(`→ Connected to ${versionRow.version}`)
 

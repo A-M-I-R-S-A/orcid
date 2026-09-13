@@ -20,7 +20,7 @@ import { MESSAGES, errors } from '@/lib/errors'
 import { jalaliYear } from '@/lib/jalali'
 import { effectivePrice } from '@/lib/money'
 import { toPersianDigits } from '@/lib/persian'
-import { getShippingConfig } from '@/lib/shipping-config'
+import { resolveShippingMethod } from '@/lib/shipping-config'
 import { calculateShipping, type ShippingConfig } from '@/lib/shipping'
 import { enforce } from '@/lib/rate-limit'
 import * as sms from '@/modules/sms/service'
@@ -34,6 +34,7 @@ export interface CheckoutInput {
   addressLine: string
   postalCode: string
   customerNote?: string
+  shippingMethodId?: number
   paymentMethod: string
 }
 
@@ -78,7 +79,7 @@ export async function placeOrder(
 ): Promise<CheckoutResult> {
   await enforce(`user:${userId}`, 'checkout')
 
-  const shippingConfig = await getShippingConfig()
+  const shippingMethod = await resolveShippingMethod(input.shippingMethodId)
   const enabled = await getEnabledMethods({ amount: quotedGrandTotal })
   if (!enabled.some((m) => m.key === input.paymentMethod)) {
     throw errors.payment(MESSAGES.paymentMethodUnavailable)
@@ -86,7 +87,7 @@ export async function placeOrder(
 
   for (let attempt = 1; ; attempt++) {
     try {
-      return await placeOrderOnce(userId, cartId, input, shippingConfig, quotedGrandTotal)
+      return await placeOrderOnce(userId, cartId, input, shippingMethod, quotedGrandTotal)
     } catch (error) {
       if (attempt >= ORDER_NUMBER_ATTEMPTS || !isDuplicateOrderNumber(error)) throw error
     }
@@ -97,7 +98,7 @@ async function placeOrderOnce(
   userId: number,
   cartId: number,
   input: CheckoutInput,
-  shippingConfig: ShippingConfig,
+  shippingMethod: ShippingConfig & { id: number; name: string },
   quotedGrandTotal?: number,
 ): Promise<CheckoutResult> {
   return db.transaction(async (tx) => {
@@ -197,7 +198,7 @@ async function placeOrderOnce(
     }
 
     const merchandiseTotal = subtotal - discountTotal
-    const shippingTotal = calculateShipping(merchandiseTotal, shippingConfig)
+    const shippingTotal = calculateShipping(merchandiseTotal, shippingMethod)
     const grandTotal = merchandiseTotal + shippingTotal
 
     if (quotedGrandTotal != null && grandTotal !== quotedGrandTotal) {
@@ -229,6 +230,8 @@ async function placeOrderOnce(
       subtotal,
       discountTotal,
       shippingTotal,
+      shippingMethodId: shippingMethod.id,
+      shippingMethodName: shippingMethod.name,
       grandTotal,
       shipFullName: input.fullName,
       shipPhone: input.phone,
@@ -329,6 +332,7 @@ export async function notifyOrderPlaced(orderId: number): Promise<void> {
       orderNumber: orders.orderNumber,
       grandTotal: orders.grandTotal,
       phone: orders.shipPhone,
+      customerName: orders.shipFullName,
     })
     .from(orders)
     .where(eq(orders.id, orderId))
@@ -340,8 +344,9 @@ export async function notifyOrderPlaced(orderId: number): Promise<void> {
     phone: order.phone,
     orderId,
     orderNumber: order.orderNumber,
-    total: order.grandTotal,
+    customerName: order.customerName,
   })
+  await sms.queueAdminNewOrderNotification({ orderId, orderNumber: order.orderNumber, stage: 'order_created' })
 }
 
 export async function lastUsedAddress(userId: number) {
