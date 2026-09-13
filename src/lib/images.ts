@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { randomBytes } from 'node:crypto'
-import { mkdir, unlink, writeFile } from 'node:fs/promises'
+import { mkdir, unlink } from 'node:fs/promises'
 import path from 'node:path'
 
 import sharp from 'sharp'
@@ -108,30 +108,35 @@ export async function processUpload(
 
   try {
     for (const targetWidth of widths) {
-      const base = sharp(buffer, { failOn: 'error' })
-        .rotate()
-        .resize({ width: targetWidth, withoutEnlargement: true })
-
-      const avif = await base.clone().avif({ quality: 55, effort: 4 }).toBuffer()
-      const webp = await base.clone().webp({ quality: 78 }).toBuffer()
-
       const avifRel = path.posix.join(options.folder, `${name}-${targetWidth}.avif`)
       const webpRel = path.posix.join(options.folder, `${name}-${targetWidth}.webp`)
-
-      await writeFile(path.join(uploadRoot(), avifRel), avif)
       written.push(avifRel)
-      await writeFile(path.join(uploadRoot(), webpRel), webp)
       written.push(webpRel)
+
+      // AVIF's default/high effort is disproportionately slow on constrained hosts.
+      // Both renditions are independent, so encode them concurrently and stream
+      // directly to disk instead of retaining two additional output buffers.
+      await Promise.all([
+        sharp(buffer, { failOn: 'error' })
+          .rotate()
+          .resize({ width: targetWidth, withoutEnlargement: true })
+          .avif({ quality: 55, effort: 0 })
+          .toFile(path.join(uploadRoot(), avifRel)),
+        sharp(buffer, { failOn: 'error' })
+          .rotate()
+          .resize({ width: targetWidth, withoutEnlargement: true })
+          .webp({ quality: 78 })
+          .toFile(path.join(uploadRoot(), webpRel)),
+      ])
     }
 
     const jpegRel = path.posix.join(options.folder, `${name}.jpg`)
-    const jpeg = await sharp(buffer, { failOn: 'error' })
+    written.push(jpegRel)
+    await sharp(buffer, { failOn: 'error' })
       .rotate()
       .resize({ width: Math.min(width, 1280), withoutEnlargement: true })
-      .jpeg({ quality: 82, mozjpeg: true })
-      .toBuffer()
-    await writeFile(path.join(uploadRoot(), jpegRel), jpeg)
-    written.push(jpegRel)
+      .jpeg({ quality: 82 })
+      .toFile(path.join(uploadRoot(), jpegRel))
 
     const primaryWidth = widths[widths.length - 1] ?? width
     const scale = Math.min(1, primaryWidth / width)
