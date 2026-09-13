@@ -1,4 +1,4 @@
-import { buildSrcSet, jpegFallbackUrl, mediaUrl } from '@/lib/media-url'
+import { mediaUrl } from '@/lib/media-url'
 import { OrchidSpray } from './ornament'
 
 export function ImagePlaceholder({
@@ -70,21 +70,18 @@ export function ResponsiveImage({
   }
 
   return (
-    <picture className="contents">
-      <source type="image/avif" srcSet={buildSrcSet(path, width, 'avif')} sizes={sizes} />
-      <source type="image/webp" srcSet={buildSrcSet(path, width, 'webp')} sizes={sizes} />
-      <img
-        src={jpegFallbackUrl(path)}
-        alt={alt}
-        width={width}
-        height={height}
-        loading={priority ? 'eager' : 'lazy'}
-        fetchPriority={priority ? 'high' : 'auto'}
-        decoding={priority ? 'sync' : 'async'}
-        className={className}
-        style={style}
-      />
-    </picture>
+    <img
+      src={mediaUrl(path)}
+      alt={alt}
+      width={width}
+      height={height}
+      sizes={sizes}
+      loading={priority ? 'eager' : 'lazy'}
+      fetchPriority={priority ? 'high' : 'auto'}
+      decoding={priority ? 'sync' : 'async'}
+      className={className}
+      style={style}
+    />
   )
 }
 

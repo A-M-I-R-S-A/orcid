@@ -105,44 +105,24 @@ export async function processUpload(
     : fitting.length > 0
       ? [...fitting]
       : [width]
+  const primaryWidth = widths[widths.length - 1] ?? width
 
   try {
-    for (const targetWidth of widths) {
-      const avifRel = path.posix.join(options.folder, `${name}-${targetWidth}.avif`)
-      const webpRel = path.posix.join(options.folder, `${name}-${targetWidth}.webp`)
-      written.push(avifRel)
-      written.push(webpRel)
+    const webpRel = path.posix.join(options.folder, `${name}-${primaryWidth}.webp`)
+    written.push(webpRel)
 
-      // AVIF's default/high effort is disproportionately slow on constrained hosts.
-      // Both renditions are independent, so encode them concurrently and stream
-      // directly to disk instead of retaining two additional output buffers.
-      await Promise.all([
-        sharp(buffer, { failOn: 'error' })
-          .rotate()
-          .resize({ width: targetWidth, withoutEnlargement: true })
-          .avif({ quality: 55, effort: 0 })
-          .toFile(path.join(uploadRoot(), avifRel)),
-        sharp(buffer, { failOn: 'error' })
-          .rotate()
-          .resize({ width: targetWidth, withoutEnlargement: true })
-          .webp({ quality: 78 })
-          .toFile(path.join(uploadRoot(), webpRel)),
-      ])
-    }
-
-    const jpegRel = path.posix.join(options.folder, `${name}.jpg`)
-    written.push(jpegRel)
+    // Upload latency matters more than pre-generating ten alternate renditions.
+    // A single bounded WebP is supported by all browsers targeted by this app.
     await sharp(buffer, { failOn: 'error' })
       .rotate()
-      .resize({ width: Math.min(width, 1280), withoutEnlargement: true })
-      .jpeg({ quality: 82 })
-      .toFile(path.join(uploadRoot(), jpegRel))
+      .resize({ width: primaryWidth, withoutEnlargement: true })
+      .webp({ quality: 80, effort: 2 })
+      .toFile(path.join(uploadRoot(), webpRel))
 
-    const primaryWidth = widths[widths.length - 1] ?? width
     const scale = Math.min(1, primaryWidth / width)
 
     return {
-      path: path.posix.join(options.folder, `${name}-${primaryWidth}.webp`),
+      path: webpRel,
       width: Math.round(width * scale),
       height: Math.round(height * scale),
       files: written,
