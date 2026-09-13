@@ -79,6 +79,7 @@ export interface ProductDetail {
     discountPrice: number | null
     effectivePrice: number
     stockQty: number
+    lowStockThreshold: number
     isActive: boolean
     imageId: number | null
     selection: Record<number, number>
@@ -519,6 +520,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       discountPrice: v.discountPrice,
       effectivePrice: effectivePrice(v.price, v.discountPrice),
       stockQty: v.stockQty,
+      lowStockThreshold: v.lowStockThreshold,
       isActive: v.isActive,
       imageId: v.imageId,
       selection: selectionBy.get(v.id) ?? {},

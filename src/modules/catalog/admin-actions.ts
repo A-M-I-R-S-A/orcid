@@ -102,7 +102,11 @@ export async function saveVariantAction(
   input: service.VariantInput,
 ): Promise<ActionResult<{ id: number }>> {
   try {
-    const admin = await requirePermission(input.id ? 'products.price' : 'products.update')
+    const admin = await requirePermission('products.update')
+    if (input.id) {
+      await requirePermission('products.price')
+      await requirePermission('products.inventory')
+    }
 
     if (!input.sku?.trim()) throw errors.validation('کد کالا (SKU) الزامی است.')
 

@@ -446,6 +446,8 @@ function VariantsPanel({ product }: { product: ProductDetail }) {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const editing = product.variants.find((variant) => variant.id === editingId) ?? null
 
   const label = (selection: Record<number, number>) =>
     product.options
@@ -468,7 +470,7 @@ function VariantsPanel({ product }: { product: ProductDetail }) {
         {product.options.length > 0 && (
           <button
             type="button"
-            onClick={() => setAdding((v) => !v)}
+            onClick={() => { setEditingId(null); setAdding((v) => !v) }}
             className="btn btn-secondary btn-sm"
           >
             {adding ? 'انصراف' : 'تنوع جدید'}
@@ -483,6 +485,7 @@ function VariantsPanel({ product }: { product: ProductDetail }) {
       )}
 
       {adding && <VariantForm product={product} onDone={() => setAdding(false)} />}
+      {editing && <VariantForm key={editing.id} product={product} variant={editing} onDone={() => setEditingId(null)} />}
 
       {product.variants.length > 0 && (
         <div className="overflow-x-auto mt-4">
@@ -526,6 +529,14 @@ function VariantsPanel({ product }: { product: ProductDetail }) {
                   <td className="px-3 py-2.5">
                     <button
                       type="button"
+                      onClick={() => { setAdding(false); setEditingId(variant.id) }}
+                      disabled={pending}
+                      className="me-3 text-xs text-accent-2 hover:underline"
+                    >
+                      ویرایش
+                    </button>
+                    <button
+                      type="button"
                       onClick={() =>
                         startTransition(async () => {
                           const result = await deleteVariantAction(product.id, variant.id)
@@ -551,11 +562,19 @@ function VariantsPanel({ product }: { product: ProductDetail }) {
   )
 }
 
-function VariantForm({ product, onDone }: { product: ProductDetail; onDone: () => void }) {
+function VariantForm({
+  product,
+  variant,
+  onDone,
+}: {
+  product: ProductDetail
+  variant?: ProductDetail['variants'][number]
+  onDone: () => void
+}) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
-  const [selection, setSelection] = useState<Record<number, number>>({})
+  const [selection, setSelection] = useState<Record<number, number>>(variant?.selection ?? {})
 
   return (
     <form
@@ -571,13 +590,15 @@ function VariantForm({ product, onDone }: { product: ProductDetail; onDone: () =
 
         startTransition(async () => {
           const result = await saveVariantAction(product.id, {
+            id: variant?.id,
             sku: String(formData.get('sku') ?? ''),
             price: Number(toLatinDigits(String(formData.get('price') ?? '0')).replace(/\D/g, '')),
             discountPrice: formData.get('discountPrice')
               ? Number(toLatinDigits(String(formData.get('discountPrice'))).replace(/\D/g, ''))
               : null,
             stockQty: Number(toLatinDigits(String(formData.get('stockQty') ?? '0')).replace(/\D/g, '')),
-            isActive: true,
+            lowStockThreshold: Number(toLatinDigits(String(formData.get('lowStockThreshold') ?? '3')).replace(/\D/g, '')),
+            isActive: formData.get('isActive') === 'on',
             selection,
           })
 
@@ -617,7 +638,7 @@ function VariantForm({ product, onDone }: { product: ProductDetail; onDone: () =
           <label htmlFor="v-sku" className="label text-xs">
             کد کالا (SKU)
           </label>
-          <input id="v-sku" name="sku" required dir="ltr" className="field py-2 text-sm w-36" />
+          <input id="v-sku" name="sku" required dir="ltr" defaultValue={variant?.sku ?? ''} className="field py-2 text-sm w-36" />
         </div>
         <div>
           <label htmlFor="v-price" className="label text-xs">
@@ -630,6 +651,7 @@ function VariantForm({ product, onDone }: { product: ProductDetail; onDone: () =
             inputMode="numeric"
             dir="ltr"
             className="field py-2 text-sm nums w-36"
+            defaultValue={variant?.price ?? ''}
           />
         </div>
         <div>
@@ -643,6 +665,7 @@ function VariantForm({ product, onDone }: { product: ProductDetail; onDone: () =
             dir="ltr"
             className="field py-2 text-sm nums w-36"
             placeholder="اختیاری"
+            defaultValue={variant?.discountPrice ?? ''}
           />
         </div>
         <div>
@@ -655,17 +678,25 @@ function VariantForm({ product, onDone }: { product: ProductDetail; onDone: () =
             required
             inputMode="numeric"
             dir="ltr"
-            defaultValue="0"
+            defaultValue={variant?.stockQty ?? 0}
             className="field py-2 text-sm nums w-28"
           />
         </div>
+        <div>
+          <label htmlFor="v-low-stock" className="label text-xs">هشدار کم‌موجودی</label>
+          <input id="v-low-stock" name="lowStockThreshold" required inputMode="numeric" dir="ltr" defaultValue={variant?.lowStockThreshold ?? 3} className="field py-2 text-sm nums w-28" />
+        </div>
+        <label className="flex items-end gap-2 pb-2 text-sm text-ink-muted">
+          <input name="isActive" type="checkbox" defaultChecked={variant?.isActive ?? true} />
+          تنوع فعال باشد
+        </label>
       </div>
 
       {error && <p className="text-sm text-danger">{error}</p>}
 
       <div className="flex gap-2">
         <button type="submit" disabled={pending} className="btn btn-primary btn-sm">
-          {pending ? 'در حال ذخیره…' : 'ذخیره تنوع'}
+          {pending ? 'در حال ذخیره…' : variant ? 'ذخیره تغییرات' : 'ذخیره تنوع'}
         </button>
         <button type="button" onClick={onDone} className="btn btn-ghost btn-sm">
           انصراف

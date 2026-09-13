@@ -220,8 +220,29 @@ export async function saveVariant(
   if (input.stockQty < 0) {
     throw errors.validation('موجودی نمی‌تواند منفی باشد.')
   }
+  if (!Number.isSafeInteger(input.price) || input.price <= 0 || !Number.isInteger(input.stockQty) || input.stockQty > 1_000_000_000) {
+    throw errors.validation('قیمت و موجودی باید عدد صحیح معتبر باشند.')
+  }
+  if (input.discountPrice != null && (!Number.isSafeInteger(input.discountPrice) || input.discountPrice < 0)) {
+    throw errors.validation('قیمت تخفیف معتبر نیست.')
+  }
+  if (!Number.isInteger(input.lowStockThreshold ?? 3) || (input.lowStockThreshold ?? 3) < 0) {
+    throw errors.validation('آستانه کم‌موجودی معتبر نیست.')
+  }
 
   return db.transaction(async (tx) => {
+    const optionRows = await tx.select({ id: productOptions.id }).from(productOptions).where(eq(productOptions.productId, productId))
+    const optionIds = optionRows.map((option) => option.id)
+    const selectedEntries = Object.entries(input.selection).map(([optionId, valueId]) => ({ optionId: Number(optionId), valueId: Number(valueId) }))
+    if (optionIds.length === 0 || selectedEntries.length !== optionIds.length || selectedEntries.some((entry) => !optionIds.includes(entry.optionId))) {
+      throw errors.validation('برای تمام ویژگی‌های محصول یک مقدار معتبر انتخاب کنید.')
+    }
+    const selectedValues = await tx.select({ id: productOptionValues.id, optionId: productOptionValues.optionId })
+      .from(productOptionValues).where(inArray(productOptionValues.id, selectedEntries.map((entry) => entry.valueId)))
+    if (selectedValues.length !== selectedEntries.length || selectedEntries.some((entry) => !selectedValues.some((value) => value.id === entry.valueId && value.optionId === entry.optionId))) {
+      throw errors.validation('ترکیب انتخاب‌شده برای این محصول معتبر نیست.')
+    }
+
     let variantId = input.id
     let previous: typeof productVariants.$inferSelect | undefined
 
