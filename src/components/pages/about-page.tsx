@@ -73,7 +73,6 @@ export async function AboutPage({
     getSiteContent(),
   ])
 
-  const siteName = site.siteName || 'ارکید'
   const pillars: { icon: IconName; title: string; body: string }[] = [
     { icon: 'sparkle', title: content.text('about.pillar.fabricTitle'), body: content.text('about.pillar.fabricBody') },
     { icon: 'ruler', title: content.text('about.pillar.sizeTitle'), body: content.text('about.pillar.sizeBody') },
@@ -98,8 +97,9 @@ export async function AboutPage({
     <>
       <PageHero
         eyebrow={content.text('about.eyebrow')}
-        title={page.title}
+        title={content.text('about.title')}
         lead={lead || site.tagline || undefined}
+        contentKeys={{ eyebrow: 'about.eyebrow', title: 'about.title' }}
         imagePath={page.imagePath}
         breadcrumbs={breadcrumbs}
         links={[
@@ -206,7 +206,7 @@ export async function AboutPage({
 
       <ClosingBand
         eyebrow={content.text('about.start')}
-        title={`مجموعه ${siteName} را ببینید`}
+        title={content.text('about.closingTitle')}
         body={content.text('about.closingBody')}
         links={[
           { label: content.text('common.viewProducts'), href: '/products', primary: true },

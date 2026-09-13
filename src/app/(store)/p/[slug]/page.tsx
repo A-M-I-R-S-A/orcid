@@ -21,6 +21,12 @@ const TEMPLATES = {
   faq: FaqPage,
 } as const
 
+const TEMPLATE_TITLE_KEYS = {
+  about: 'about.title',
+  contact: 'contact.title',
+  faq: 'faq.title',
+} as const
+
 interface Props {
   params: Promise<{ slug: string }>
 }
@@ -41,7 +47,11 @@ export async function generateMetadata({ params }: Props) {
   }
 
   return buildMetadata({
-    title: page.seoTitle || page.title,
+    title:
+      page.seoTitle ||
+      (page.slug in TEMPLATE_TITLE_KEYS
+        ? content.text(TEMPLATE_TITLE_KEYS[page.slug as keyof typeof TEMPLATE_TITLE_KEYS])
+        : page.title),
     description: page.seoDescription,
     path: `/p/${encodeURIComponent(page.slug)}`,
     index: shouldIndex(page),
@@ -55,9 +65,12 @@ export default async function CmsPage({ params }: Props) {
 
   if (!page || !page.isPublished) notFound()
 
+  const titleKey = TEMPLATE_TITLE_KEYS[page.slug as keyof typeof TEMPLATE_TITLE_KEYS]
+  const displayTitle = titleKey ? content.text(titleKey) : page.title
+
   const breadcrumbItems = [
     { name: content.text('common.home'), path: '/' },
-    { name: page.title, path: `/p/${encodeURIComponent(page.slug)}` },
+    { name: displayTitle, path: `/p/${encodeURIComponent(page.slug)}` },
   ]
 
   const Template = TEMPLATES[page.slug as keyof typeof TEMPLATES]

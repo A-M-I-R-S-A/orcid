@@ -170,8 +170,9 @@ export async function ContactPage({
     <>
       <PageHero
         eyebrow={content.text('contact.eyebrow')}
-        title={page.title}
+        title={content.text('contact.title')}
         lead={lead || content.text('contact.heroLead')}
+        contentKeys={{ eyebrow: 'contact.eyebrow', title: 'contact.title', lead: 'contact.heroLead' }}
         imagePath={page.imagePath}
         breadcrumbs={breadcrumbs}
         aside={heroAside}

@@ -62,12 +62,13 @@ export async function FaqPage({
 
       <PageHero
         eyebrow={content.text('faq.eyebrow')}
-        title={page.title}
+        title={content.text('faq.title')}
         lead={
           intro
             ? excerpt(intro, 200)
             : content.text('faq.description')
         }
+        contentKeys={{ eyebrow: 'faq.eyebrow', title: 'faq.title', lead: 'faq.description' }}
         breadcrumbs={breadcrumbs}
         aside={
           total > 0 ? (

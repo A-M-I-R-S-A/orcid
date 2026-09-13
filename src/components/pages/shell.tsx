@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ResponsiveImage } from '@/components/media'
 import { OrchidSpray } from '@/components/ornament'
 import { Breadcrumbs } from '@/components/ui'
+import { SiteStyledText } from '@/components/site-content-provider'
 
 export function ArchClip() {
   return (
@@ -61,6 +62,7 @@ export function PageHero({
   breadcrumbs,
   aside,
   links,
+  contentKeys,
 }: {
   eyebrow: string
   title: string
@@ -69,6 +71,7 @@ export function PageHero({
   breadcrumbs: { name: string; path: string }[]
   aside?: React.ReactNode
   links?: BandLink[]
+  contentKeys?: { eyebrow?: string; title?: string; lead?: string }
 }) {
   const hasVisual = Boolean(imagePath) || Boolean(aside)
 
@@ -92,15 +95,17 @@ export function PageHero({
           className={`mt-14 grid gap-12 md:mt-20 ${hasVisual ? 'lg:grid-cols-12 lg:items-end lg:gap-16' : ''}`}
         >
           <div className={hasVisual ? 'lg:col-span-7' : 'max-w-3xl'}>
-            <p className="eyebrow animate-rise">{eyebrow}</p>
+            <p className="eyebrow animate-rise">
+              {contentKeys?.eyebrow ? <SiteStyledText contentKey={contentKeys.eyebrow}>{eyebrow}</SiteStyledText> : eyebrow}
+            </p>
 
             <h1 className="display-title mt-6 animate-rise text-ink [animation-delay:80ms]">
-              {title}
+              {contentKeys?.title ? <SiteStyledText contentKey={contentKeys.title}>{title}</SiteStyledText> : title}
             </h1>
 
             {lead && (
               <p className="mt-8 max-w-xl animate-rise text-lg leading-loose text-ink-muted [animation-delay:160ms]">
-                {lead}
+                {contentKeys?.lead ? <SiteStyledText contentKey={contentKeys.lead}>{lead}</SiteStyledText> : lead}
               </p>
             )}
 
