@@ -12,6 +12,8 @@ import {
 import { mediaUrl } from '@/lib/media-url'
 import { SIZE_GUIDE_SLUG } from '@/lib/size-guide'
 import { ContentImageUpload } from '@/components/admin/content-image-upload'
+import { PageSectionManager } from '@/components/admin/page-section-manager'
+import type { PageSectionRecord } from '@/lib/page-sections'
 
 interface CmsPage {
   id: number
@@ -24,6 +26,7 @@ interface CmsPage {
   seoTitle: string | null
   seoDescription: string | null
   imagePath: string | null
+  sections: PageSectionRecord[]
 }
 
 export function PageManager({ pages }: { pages: CmsPage[] }) {
@@ -313,6 +316,7 @@ function PageForm({ page, onDone }: { page: CmsPage | null; onDone: () => void }
           )}
         </div>
       )}
+      {page && <PageSectionManager pageId={page.id} sections={page.sections} />}
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { eq } from 'drizzle-orm'
 
 import { affectedRows, db } from '@/db'
-import { blogPosts, homepageSections, pages, slugRedirects } from '@/db/schema'
+import { blogPosts, homepageSections, pageSections, pages, slugRedirects } from '@/db/schema'
 import * as audit from '@/lib/audit'
 import { CACHE_TAGS, invalidate } from '@/lib/cache'
 import { type ActionResult, errors, fail, ok } from '@/lib/errors'
@@ -12,6 +12,7 @@ import { isBannerKind, parseBannerSettings } from '@/lib/banner'
 import { deleteImageSet, deleteStored, processUpload } from '@/lib/images'
 import { sanitizeHtml } from '@/lib/sanitize'
 import { slugify, uniqueSlug } from '@/lib/slug'
+import { PAGE_SECTION_BACKGROUNDS, PAGE_SECTION_KINDS, PAGE_SECTION_SPACING, type PageSectionConfig } from '@/lib/page-sections'
 import { requirePermission } from './auth'
 
 function validContentLink(value: string): boolean {
@@ -452,6 +453,98 @@ export async function uploadBlogCoverAction(formData: FormData): Promise<ActionR
     return ok(undefined)
   } catch (error) {
     return fail(error, { action: 'uploadBlogCover' })
+  }
+}
+
+export async function savePageSectionAction(input: {
+  id?: number
+  pageId: number
+  kind: string
+  name: string
+  eyebrow?: string
+  title?: string
+  subtitle?: string
+  body?: string
+  imagePath?: string
+  linkLabel?: string
+  linkUrl?: string
+  config?: PageSectionConfig
+  background: string
+  spacing: string
+  isVisible: boolean
+  sortOrder: number
+}): Promise<ActionResult<{ id: number }>> {
+  try {
+    const admin = await requirePermission('content.pages')
+    if (!Number.isInteger(input.pageId) || input.pageId <= 0) throw errors.validation('صفحه معتبر نیست.')
+    if (!PAGE_SECTION_KINDS.includes(input.kind as never)) throw errors.validation('نوع بخش معتبر نیست.')
+    if (!PAGE_SECTION_BACKGROUNDS.includes(input.background as never)) throw errors.validation('پس‌زمینه معتبر نیست.')
+    if (!PAGE_SECTION_SPACING.includes(input.spacing as never)) throw errors.validation('فاصله بخش معتبر نیست.')
+    if (!input.name.trim() || input.name.length > 120) throw errors.validation('نام بخش معتبر نیست.')
+    if (!Number.isInteger(input.sortOrder) || input.sortOrder < 0 || input.sortOrder > 10_000) throw errors.validation('ترتیب بخش معتبر نیست.')
+    if ((input.title?.length ?? 0) > 300 || (input.subtitle?.length ?? 0) > 1000 || (input.body?.length ?? 0) > 50_000) throw errors.validation('محتوای بخش بیش از حد طولانی است.')
+    if (!validContentLink(input.linkUrl?.trim() ?? '')) throw errors.validation('پیوند باید داخلی یا HTTPS باشد.')
+
+    const values = {
+      pageId: input.pageId,
+      kind: input.kind as (typeof PAGE_SECTION_KINDS)[number],
+      name: input.name.trim(),
+      eyebrow: input.eyebrow?.trim() || null,
+      title: input.title?.trim() || null,
+      subtitle: input.subtitle?.trim() || null,
+      body: input.body ? sanitizeHtml(input.body) : null,
+      imagePath: input.imagePath?.trim() || null,
+      linkLabel: input.linkLabel?.trim() || null,
+      linkUrl: input.linkUrl?.trim() || null,
+      config: input.config ?? {},
+      background: input.background as (typeof PAGE_SECTION_BACKGROUNDS)[number],
+      spacing: input.spacing as (typeof PAGE_SECTION_SPACING)[number],
+      isVisible: input.isVisible,
+      sortOrder: input.sortOrder,
+    }
+
+    let id = input.id
+    if (id) {
+      const changed = await db.update(pageSections).set(values).where(eq(pageSections.id, id))
+      if (affectedRows(changed) === 0) throw errors.notFound()
+    } else {
+      const [inserted] = await db.insert(pageSections).values(values)
+      id = (inserted as unknown as { insertId: number }).insertId
+    }
+
+    await audit.log({ actor: admin, action: 'content.page_update', entityType: 'page_section', entityId: id, metadata: { pageId: input.pageId, kind: input.kind } })
+    invalidate(CACHE_TAGS.pages)
+    revalidatePath('/p/[slug]', 'page')
+    revalidatePath('/admin/pages')
+    return ok({ id })
+  } catch (error) {
+    return fail(error, { action: 'savePageSection', pageId: input.pageId, id: input.id })
+  }
+}
+
+export async function deletePageSectionAction(id: number): Promise<ActionResult<void>> {
+  try {
+    await requirePermission('content.pages')
+    if (!Number.isInteger(id) || id <= 0) throw errors.validation('بخش معتبر نیست.')
+    await db.delete(pageSections).where(eq(pageSections.id, id))
+    invalidate(CACHE_TAGS.pages)
+    revalidatePath('/p/[slug]', 'page')
+    revalidatePath('/admin/pages')
+    return ok(undefined)
+  } catch (error) {
+    return fail(error, { action: 'deletePageSection', id })
+  }
+}
+
+export async function uploadPageSectionImageAction(formData: FormData): Promise<ActionResult<{ path: string }>> {
+  try {
+    await requirePermission('content.pages')
+    const file = formData.get('file')
+    if (!(file instanceof File)) throw errors.validation('فایلی انتخاب نشده است.')
+    const processed = await processUpload(file, { folder: 'pages' })
+    return ok({ path: processed.path })
+  } catch (error) {
+    return fail(error, { action: 'uploadPageSectionImage' })
   }
 }
 

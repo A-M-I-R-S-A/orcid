@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation'
-import { eq } from 'drizzle-orm'
+import { asc, eq } from 'drizzle-orm'
 
 import { db } from '@/db'
-import { pages } from '@/db/schema'
+import { pageSections, pages } from '@/db/schema'
 import { ResponsiveImage } from '@/components/media'
 import { Breadcrumbs } from '@/components/ui'
 import { AboutPage } from '@/components/pages/about-page'
@@ -12,6 +12,8 @@ import { breadcrumbSchema, buildMetadata, shouldIndex } from '@/lib/seo'
 import { sanitizeHtml } from '@/lib/sanitize'
 import { JsonLd } from '@/components/json-ld'
 import { getSiteContent } from '@/lib/site-content'
+import { PageSectionRenderer } from '@/components/pages/page-section-renderer'
+import type { PageSectionRecord } from '@/lib/page-sections'
 
 export const revalidate = 3600
 
@@ -64,6 +66,7 @@ export default async function CmsPage({ params }: Props) {
   const content = await getSiteContent()
 
   if (!page || !page.isPublished) notFound()
+  const sections = await db.select().from(pageSections).where(eq(pageSections.pageId, page.id)).orderBy(asc(pageSections.sortOrder)) as PageSectionRecord[]
 
   const titleKey = TEMPLATE_TITLE_KEYS[page.slug as keyof typeof TEMPLATE_TITLE_KEYS]
   const displayTitle = titleKey ? content.text(titleKey) : page.title
@@ -80,6 +83,7 @@ export default async function CmsPage({ params }: Props) {
       <>
         <JsonLd data={breadcrumbSchema(breadcrumbItems)} />
         <Template page={page} breadcrumbs={breadcrumbItems} />
+        <PageSectionRenderer sections={sections} />
       </>
     )
   }
@@ -119,6 +123,7 @@ export default async function CmsPage({ params }: Props) {
           />
         )}
       </article>
+      <PageSectionRenderer sections={sections} />
     </>
   )
 }

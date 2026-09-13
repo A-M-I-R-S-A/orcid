@@ -1,10 +1,11 @@
 import { asc } from 'drizzle-orm'
 
 import { db } from '@/db'
-import { pages } from '@/db/schema'
+import { pageSections, pages } from '@/db/schema'
 import { PageHeader } from '@/components/admin/ui'
 import { PageManager } from '@/components/admin/page-manager'
 import { requirePermission } from '@/modules/admin/auth'
+import type { PageSectionRecord } from '@/lib/page-sections'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'صفحات' }
@@ -12,7 +13,10 @@ export const metadata = { title: 'صفحات' }
 export default async function AdminPagesPage() {
   await requirePermission('content.pages')
 
-  const rows = await db.select().from(pages).orderBy(asc(pages.sortOrder), asc(pages.title))
+  const [rows, sections] = await Promise.all([
+    db.select().from(pages).orderBy(asc(pages.sortOrder), asc(pages.title)),
+    db.select().from(pageSections).orderBy(asc(pageSections.pageId), asc(pageSections.sortOrder)),
+  ])
 
   return (
     <>
@@ -33,6 +37,7 @@ export default async function AdminPagesPage() {
           seoTitle: page.seoTitle,
           seoDescription: page.seoDescription,
           imagePath: page.imagePath,
+          sections: sections.filter((section) => section.pageId === page.id) as PageSectionRecord[],
         }))}
       />
     </>

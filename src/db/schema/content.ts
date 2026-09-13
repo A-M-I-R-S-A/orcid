@@ -291,3 +291,32 @@ export const navLinks = mysqlTable(
   },
   (t) => [index('nav_links_placement_idx').on(t.placement, t.isVisible, t.sortOrder)],
 )
+
+export const PAGE_SECTION_KINDS = ['hero', 'rich_text', 'text_image', 'cards', 'features', 'cta'] as const
+export const PAGE_SECTION_BACKGROUNDS = ['plain', 'raised', 'sunken', 'dark', 'accent'] as const
+export const PAGE_SECTION_SPACING = ['none', 'sm', 'md', 'lg'] as const
+
+export const pageSections = mysqlTable(
+  'page_sections',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    pageId: bigint('page_id', { mode: 'number', unsigned: true }).notNull().references(() => pages.id, { onDelete: 'cascade' }),
+    kind: mysqlEnum('kind', PAGE_SECTION_KINDS).notNull(),
+    name: varchar('name', { length: 120 }).notNull(),
+    eyebrow: varchar('eyebrow', { length: 190 }),
+    title: varchar('title', { length: 300 }),
+    subtitle: varchar('subtitle', { length: 1000 }),
+    body: text('body'),
+    imagePath: varchar('image_path', { length: 255 }),
+    linkLabel: varchar('link_label', { length: 120 }),
+    linkUrl: varchar('link_url', { length: 500 }),
+    config: json('config'),
+    background: mysqlEnum('background', PAGE_SECTION_BACKGROUNDS).notNull().default('plain'),
+    spacing: mysqlEnum('spacing', PAGE_SECTION_SPACING).notNull().default('md'),
+    isVisible: boolean('is_visible').notNull().default(true),
+    sortOrder: int('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => [index('page_sections_page_order_idx').on(t.pageId, t.isVisible, t.sortOrder)],
+)

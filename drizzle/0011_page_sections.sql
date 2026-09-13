@@ -1,0 +1,23 @@
+CREATE TABLE `page_sections` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `page_id` BIGINT UNSIGNED NOT NULL,
+  `kind` ENUM('hero','rich_text','text_image','cards','features','cta') NOT NULL,
+  `name` VARCHAR(120) NOT NULL,
+  `eyebrow` VARCHAR(190) NULL,
+  `title` VARCHAR(300) NULL,
+  `subtitle` VARCHAR(1000) NULL,
+  `body` TEXT NULL,
+  `image_path` VARCHAR(255) NULL,
+  `link_label` VARCHAR(120) NULL,
+  `link_url` VARCHAR(500) NULL,
+  `config` JSON NULL,
+  `background` ENUM('plain','raised','sunken','dark','accent') NOT NULL DEFAULT 'plain',
+  `spacing` ENUM('none','sm','md','lg') NOT NULL DEFAULT 'md',
+  `is_visible` ENUM('0','1') NOT NULL DEFAULT '1',
+  `sort_order` INT NOT NULL DEFAULT 0,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `page_sections_page_order_idx` (`page_id`, `is_visible`, `sort_order`),
+  CONSTRAINT `page_sections_page_fk` FOREIGN KEY (`page_id`) REFERENCES `pages` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
