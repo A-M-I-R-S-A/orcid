@@ -189,6 +189,62 @@ export async function saveOptionAction(
   }
 }
 
+export async function attachOptionAction(productId: number, definitionId: number, sortOrder: number): Promise<ActionResult<{ id: number }>> {
+  try {
+    await requirePermission('products.update')
+    const id = await service.attachOption(productId, definitionId, sortOrder)
+    await service.rebuildSearchText(productId)
+    await revalidateProduct(productId)
+    return ok({ id })
+  } catch (error) {
+    if ((error as { code?: string }).code === 'ER_DUP_ENTRY') return fail(errors.conflict('این ویژگی قبلاً به محصول اضافه شده است.'))
+    return fail(error, { action: 'attachOption', productId, definitionId })
+  }
+}
+
+export async function updateOptionDefinitionAction(
+  productId: number,
+  definitionId: number,
+  input: { name: string; kind: 'size' | 'color' | 'other'; sortOrder: number },
+): Promise<ActionResult<void>> {
+  try {
+    await requirePermission('products.update')
+    await service.updateOptionDefinition(definitionId, input)
+    await service.rebuildSearchText(productId)
+    await revalidateProduct(productId)
+    return ok(undefined)
+  } catch (error) { return fail(error, { action: 'updateOptionDefinition', definitionId }) }
+}
+
+export async function deleteOptionDefinitionAction(productId: number, definitionId: number): Promise<ActionResult<void>> {
+  try {
+    await requirePermission('products.update')
+    await service.deleteOptionDefinition(definitionId)
+    await revalidateProduct(productId)
+    return ok(undefined)
+  } catch (error) { return fail(error, { action: 'deleteOptionDefinition', definitionId }) }
+}
+
+export async function updateOptionNoteAction(productId: number, optionId: number, note: string): Promise<ActionResult<void>> {
+  try {
+    await requirePermission('products.update')
+    if (note.length > 500) throw errors.validation('نوت ویژگی حداکثر ۵۰۰ کاراکتر است.')
+    await service.updateOptionNote(productId, optionId, note)
+    await revalidateProduct(productId)
+    return ok(undefined)
+  } catch (error) { return fail(error, { action: 'updateOptionNote', productId, optionId }) }
+}
+
+export async function deleteOptionAction(productId: number, optionId: number): Promise<ActionResult<void>> {
+  try {
+    await requirePermission('products.update')
+    await service.deleteOption(productId, optionId)
+    await service.rebuildSearchText(productId)
+    await revalidateProduct(productId)
+    return ok(undefined)
+  } catch (error) { return fail(error, { action: 'deleteOption', productId, optionId }) }
+}
+
 export async function saveOptionValueAction(
   productId: number,
   optionId: number,
@@ -206,6 +262,16 @@ export async function saveOptionValueAction(
   } catch (error) {
     return fail(error, { action: 'saveOptionValue', optionId })
   }
+}
+
+export async function deleteOptionValueAction(productId: number, optionId: number, valueId: number): Promise<ActionResult<void>> {
+  try {
+    await requirePermission('products.update')
+    await service.deleteOptionValue(optionId, valueId)
+    await service.rebuildSearchText(productId)
+    await revalidateProduct(productId)
+    return ok(undefined)
+  } catch (error) { return fail(error, { action: 'deleteOptionValue', productId, optionId, valueId }) }
 }
 
 export async function uploadProductImageAction(

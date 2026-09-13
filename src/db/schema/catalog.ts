@@ -99,6 +99,33 @@ export const productCategories = mysqlTable(
   ],
 )
 
+export const optionDefinitions = mysqlTable(
+  'option_definitions',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    name: varchar('name', { length: 60 }).notNull(),
+    kind: mysqlEnum('kind', ['size', 'color', 'other']).notNull().default('other'),
+    sortOrder: int('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow().onUpdateNow(),
+  },
+  (t) => [uniqueIndex('option_definitions_name_kind_unq').on(t.name, t.kind)],
+)
+
+export const optionDefinitionValues = mysqlTable(
+  'option_definition_values',
+  {
+    id: bigint('id', { mode: 'number', unsigned: true }).autoincrement().primaryKey(),
+    definitionId: bigint('definition_id', { mode: 'number', unsigned: true })
+      .notNull()
+      .references(() => optionDefinitions.id, { onDelete: 'cascade' }),
+    value: varchar('value', { length: 80 }).notNull(),
+    swatchHex: varchar('swatch_hex', { length: 7 }),
+    sortOrder: int('sort_order').notNull().default(0),
+  },
+  (t) => [uniqueIndex('option_definition_value_unq').on(t.definitionId, t.value)],
+)
+
 export const productOptions = mysqlTable(
   'product_options',
   {
@@ -106,12 +133,18 @@ export const productOptions = mysqlTable(
     productId: bigint('product_id', { mode: 'number', unsigned: true })
       .notNull()
       .references(() => products.id, { onDelete: 'cascade' }),
+    definitionId: bigint('definition_id', { mode: 'number', unsigned: true })
+      .references(() => optionDefinitions.id, { onDelete: 'restrict' }),
 
     name: varchar('name', { length: 60 }).notNull(),
     kind: mysqlEnum('kind', ['size', 'color', 'other']).notNull().default('other'),
+    note: varchar('note', { length: 500 }),
     sortOrder: int('sort_order').notNull().default(0),
   },
-  (t) => [index('product_options_product_idx').on(t.productId)],
+  (t) => [
+    index('product_options_product_idx').on(t.productId),
+    index('product_options_definition_idx').on(t.productId, t.definitionId),
+  ],
 )
 
 export const productOptionValues = mysqlTable(
@@ -121,6 +154,8 @@ export const productOptionValues = mysqlTable(
     optionId: bigint('option_id', { mode: 'number', unsigned: true })
       .notNull()
       .references(() => productOptions.id, { onDelete: 'cascade' }),
+    definitionValueId: bigint('definition_value_id', { mode: 'number', unsigned: true })
+      .references(() => optionDefinitionValues.id, { onDelete: 'restrict' }),
 
     value: varchar('value', { length: 80 }).notNull(),
     swatchHex: varchar('swatch_hex', { length: 7 }),

@@ -5,6 +5,8 @@ import { and, asc, desc, eq, gte, inArray, lte, ne, or, sql } from 'drizzle-orm'
 import { db } from '@/db'
 import {
   categories,
+  optionDefinitions,
+  optionDefinitionValues,
   productCategories,
   productImages,
   productOptionValues,
@@ -64,9 +66,11 @@ export interface ProductDetail {
   }[]
   options: {
     id: number
+    definitionId: number | null
     name: string
     kind: 'size' | 'color' | 'other'
-    values: { id: number; value: string; swatchHex: string | null }[]
+    note: string | null
+    values: { id: number; definitionValueId: number | null; value: string; swatchHex: string | null }[]
   }[]
   variants: {
     id: number
@@ -440,6 +444,7 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
       .select({
         id: productOptionValues.id,
         optionId: productOptionValues.optionId,
+        definitionValueId: productOptionValues.definitionValueId,
         value: productOptionValues.value,
         swatchHex: productOptionValues.swatchHex,
         sortOrder: productOptionValues.sortOrder,
@@ -499,11 +504,13 @@ export async function getProductBySlug(slug: string): Promise<ProductDetail | nu
     })),
     options: options.map((o) => ({
       id: o.id,
+      definitionId: o.definitionId,
       name: o.name,
       kind: o.kind,
+      note: o.note,
       values: optionValues
         .filter((v) => v.optionId === o.id)
-        .map((v) => ({ id: v.id, value: v.value, swatchHex: v.swatchHex })),
+        .map((v) => ({ id: v.id, definitionValueId: v.definitionValueId, value: v.value, swatchHex: v.swatchHex })),
     })),
     variants: variants.map((v) => ({
       id: v.id,
@@ -590,6 +597,17 @@ export async function categoryTrail(categoryId: number) {
   }
 
   return trail
+}
+
+export async function listOptionLibrary() {
+  const [definitions, values] = await Promise.all([
+    db.select().from(optionDefinitions).orderBy(asc(optionDefinitions.sortOrder), asc(optionDefinitions.name)),
+    db.select().from(optionDefinitionValues).orderBy(asc(optionDefinitionValues.sortOrder)),
+  ])
+  return definitions.map((definition) => ({
+    ...definition,
+    values: values.filter((value) => value.definitionId === definition.id),
+  }))
 }
 
 export async function categoryFacets(categoryId?: number) {

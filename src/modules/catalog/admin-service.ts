@@ -1,10 +1,12 @@
 import 'server-only'
 
-import { and, eq, ne, sql } from 'drizzle-orm'
+import { and, eq, inArray, ne, sql } from 'drizzle-orm'
 
 import { db } from '@/db'
 import {
   categories,
+  optionDefinitions,
+  optionDefinitionValues,
   productImages,
   productOptionValues,
   productOptions,
@@ -325,21 +327,65 @@ export async function saveOption(
   input: { id?: number; name: string; kind: 'size' | 'color' | 'other'; sortOrder: number },
 ): Promise<number> {
   if (input.id) {
-    await db
-      .update(productOptions)
-      .set({ name: input.name, kind: input.kind, sortOrder: input.sortOrder })
-      .where(and(eq(productOptions.id, input.id), eq(productOptions.productId, productId)))
+    const [option] = await db.select().from(productOptions).where(and(eq(productOptions.id, input.id), eq(productOptions.productId, productId))).limit(1)
+    if (!option) throw errors.notFound()
+    if (option.definitionId) {
+      await db.transaction(async (tx) => {
+        await tx.update(optionDefinitions).set({ name: input.name, kind: input.kind, sortOrder: input.sortOrder }).where(eq(optionDefinitions.id, option.definitionId!))
+        await tx.update(productOptions).set({ name: input.name, kind: input.kind }).where(eq(productOptions.definitionId, option.definitionId!))
+      })
+    } else {
+      await db.update(productOptions).set({ name: input.name, kind: input.kind, sortOrder: input.sortOrder }).where(eq(productOptions.id, input.id))
+    }
     return input.id
   }
 
-  const [inserted] = await db.insert(productOptions).values({
-    productId,
-    name: input.name,
-    kind: input.kind,
-    sortOrder: input.sortOrder,
-  })
+  const [existing] = await db.select({ id: optionDefinitions.id }).from(optionDefinitions).where(and(eq(optionDefinitions.name, input.name), eq(optionDefinitions.kind, input.kind))).limit(1)
+  if (existing) return attachOption(productId, existing.id, input.sortOrder)
+  const [created] = await db.insert(optionDefinitions).values({ name: input.name, kind: input.kind, sortOrder: input.sortOrder })
+  return attachOption(productId, (created as unknown as { insertId: number }).insertId, input.sortOrder)
+}
 
-  return (inserted as unknown as { insertId: number }).insertId
+export async function attachOption(productId: number, definitionId: number, sortOrder: number): Promise<number> {
+  const [alreadyAttached] = await db.select({ id: productOptions.id }).from(productOptions).where(and(eq(productOptions.productId, productId), eq(productOptions.definitionId, definitionId))).limit(1)
+  if (alreadyAttached) throw errors.conflict('این ویژگی قبلاً به محصول اضافه شده است.')
+  const [definition] = await db.select().from(optionDefinitions).where(eq(optionDefinitions.id, definitionId)).limit(1)
+  if (!definition) throw errors.notFound('ویژگی سراسری پیدا نشد.')
+  const values = await db.select().from(optionDefinitionValues).where(eq(optionDefinitionValues.definitionId, definitionId)).orderBy(optionDefinitionValues.sortOrder)
+  return db.transaction(async (tx) => {
+    const [inserted] = await tx.insert(productOptions).values({ productId, definitionId, name: definition.name, kind: definition.kind, sortOrder })
+    const optionId = (inserted as unknown as { insertId: number }).insertId
+    if (values.length) await tx.insert(productOptionValues).values(values.map((value) => ({ optionId, definitionValueId: value.id, value: value.value, swatchHex: value.swatchHex, sortOrder: value.sortOrder })))
+    return optionId
+  })
+}
+
+export async function updateOptionDefinition(
+  definitionId: number,
+  input: { name: string; kind: 'size' | 'color' | 'other'; sortOrder: number },
+): Promise<void> {
+  const [definition] = await db.select({ id: optionDefinitions.id }).from(optionDefinitions).where(eq(optionDefinitions.id, definitionId)).limit(1)
+  if (!definition) throw errors.notFound('ویژگی سراسری پیدا نشد.')
+  await db.transaction(async (tx) => {
+    await tx.update(optionDefinitions).set(input).where(eq(optionDefinitions.id, definitionId))
+    await tx.update(productOptions).set({ name: input.name, kind: input.kind }).where(eq(productOptions.definitionId, definitionId))
+  })
+}
+
+export async function deleteOptionDefinition(definitionId: number): Promise<void> {
+  const [assignment] = await db.select({ id: productOptions.id }).from(productOptions).where(eq(productOptions.definitionId, definitionId)).limit(1)
+  if (assignment) throw errors.conflict('این ویژگی به یک یا چند محصول متصل است؛ ابتدا آن را از محصولات جدا کنید.')
+  await db.delete(optionDefinitions).where(eq(optionDefinitions.id, definitionId))
+}
+
+export async function updateOptionNote(productId: number, optionId: number, note: string): Promise<void> {
+  await db.update(productOptions).set({ note: note.trim() || null }).where(and(eq(productOptions.id, optionId), eq(productOptions.productId, productId)))
+}
+
+export async function deleteOption(productId: number, optionId: number): Promise<void> {
+  const [used] = await db.select({ id: variantOptionValues.variantId }).from(variantOptionValues).where(eq(variantOptionValues.optionId, optionId)).limit(1)
+  if (used) throw errors.conflict('این ویژگی در تنوع‌های محصول استفاده شده است؛ ابتدا تنوع‌های وابسته را حذف کنید.')
+  await db.delete(productOptions).where(and(eq(productOptions.id, optionId), eq(productOptions.productId, productId)))
 }
 
 export async function saveOptionValue(
@@ -347,21 +393,55 @@ export async function saveOptionValue(
   input: { id?: number; value: string; swatchHex?: string | null; sortOrder: number },
 ): Promise<number> {
   if (input.id) {
-    await db
-      .update(productOptionValues)
-      .set({ value: input.value, swatchHex: input.swatchHex ?? null, sortOrder: input.sortOrder })
-      .where(eq(productOptionValues.id, input.id))
+    const [current] = await db.select().from(productOptionValues).where(eq(productOptionValues.id, input.id)).limit(1)
+    if (!current) throw errors.notFound()
+    if (current.definitionValueId) {
+      await db.transaction(async (tx) => {
+        await tx.update(optionDefinitionValues).set({ value: input.value, swatchHex: input.swatchHex ?? null, sortOrder: input.sortOrder }).where(eq(optionDefinitionValues.id, current.definitionValueId!))
+        await tx.update(productOptionValues).set({ value: input.value, swatchHex: input.swatchHex ?? null }).where(eq(productOptionValues.definitionValueId, current.definitionValueId!))
+      })
+    } else await db.update(productOptionValues).set({ value: input.value, swatchHex: input.swatchHex ?? null, sortOrder: input.sortOrder }).where(eq(productOptionValues.id, input.id))
     return input.id
   }
 
-  const [inserted] = await db.insert(productOptionValues).values({
-    optionId,
-    value: input.value,
-    swatchHex: input.swatchHex ?? null,
-    sortOrder: input.sortOrder,
-  })
+  const [option] = await db.select().from(productOptions).where(eq(productOptions.id, optionId)).limit(1)
+  if (!option) throw errors.notFound()
+  if (option.definitionId) {
+    return db.transaction(async (tx) => {
+      const [created] = await tx.insert(optionDefinitionValues).values({ definitionId: option.definitionId!, value: input.value, swatchHex: input.swatchHex ?? null, sortOrder: input.sortOrder })
+      const definitionValueId = (created as unknown as { insertId: number }).insertId
+      const assignments = await tx.select({ id: productOptions.id }).from(productOptions).where(eq(productOptions.definitionId, option.definitionId!))
+      for (const assignment of assignments) {
+        await tx.insert(productOptionValues).values({ optionId: assignment.id, definitionValueId, value: input.value, swatchHex: input.swatchHex ?? null, sortOrder: input.sortOrder })
+          .onDuplicateKeyUpdate({ set: { definitionValueId, swatchHex: input.swatchHex ?? null, sortOrder: input.sortOrder } })
+      }
+      const [local] = await tx.select({ id: productOptionValues.id }).from(productOptionValues).where(and(eq(productOptionValues.optionId, optionId), eq(productOptionValues.definitionValueId, definitionValueId))).limit(1)
+      return local!.id
+    })
+  }
+  const [inserted] = await db.insert(productOptionValues).values({ optionId, definitionValueId: null, value: input.value, swatchHex: input.swatchHex ?? null, sortOrder: input.sortOrder })
 
   return (inserted as unknown as { insertId: number }).insertId
+}
+
+export async function deleteOptionValue(optionId: number, valueId: number): Promise<void> {
+  const [value] = await db.select().from(productOptionValues).where(and(eq(productOptionValues.id, valueId), eq(productOptionValues.optionId, optionId))).limit(1)
+  if (!value) throw errors.notFound()
+  if (value.definitionValueId) {
+    const linkedValues = await db.select({ id: productOptionValues.id }).from(productOptionValues).where(eq(productOptionValues.definitionValueId, value.definitionValueId))
+    if (linkedValues.length) {
+      const [used] = await db.select({ id: variantOptionValues.variantId }).from(variantOptionValues).where(inArray(variantOptionValues.optionValueId, linkedValues.map((item) => item.id))).limit(1)
+      if (used) throw errors.conflict('این مقدار در تنوع‌های یک یا چند محصول استفاده شده است؛ ابتدا تنوع‌های وابسته را حذف کنید.')
+    }
+    await db.transaction(async (tx) => {
+      await tx.delete(productOptionValues).where(eq(productOptionValues.definitionValueId, value.definitionValueId!))
+      await tx.delete(optionDefinitionValues).where(eq(optionDefinitionValues.id, value.definitionValueId!))
+    })
+    return
+  }
+  const [used] = await db.select({ id: variantOptionValues.variantId }).from(variantOptionValues).where(eq(variantOptionValues.optionValueId, valueId)).limit(1)
+  if (used) throw errors.conflict('این مقدار در تنوع محصول استفاده شده است؛ ابتدا تنوع وابسته را حذف کنید.')
+  await db.delete(productOptionValues).where(eq(productOptionValues.id, valueId))
 }
 
 export async function addProductImage(

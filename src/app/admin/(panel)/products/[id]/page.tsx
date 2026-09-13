@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 
 import { PageHeader } from '@/components/admin/ui'
 import { ProductEditor } from '@/components/admin/product-editor'
-import { getProductBySlug, listCategories } from '@/modules/catalog/queries'
+import { getProductBySlug, listCategories, listOptionLibrary } from '@/modules/catalog/queries'
 import { requirePermission } from '@/modules/admin/auth'
 import { db } from '@/db'
 import { products } from '@/db/schema'
@@ -22,7 +22,7 @@ export default async function AdminProductEditPage({
 
   await requirePermission(isNew ? 'products.create' : 'products.update')
 
-  const categories = await listCategories(false)
+  const [categories, optionLibrary] = await Promise.all([listCategories(false), listOptionLibrary()])
 
   if (isNew) {
     return (
@@ -38,6 +38,7 @@ export default async function AdminProductEditPage({
         />
         <ProductEditor
           product={null}
+          optionLibrary={optionLibrary}
           categories={categories.map((c) => ({ id: c.id, name: c.name }))}
         />
       </>
@@ -78,6 +79,7 @@ export default async function AdminProductEditPage({
 
       <ProductEditor
         product={product}
+        optionLibrary={optionLibrary}
         categories={categories.map((c) => ({ id: c.id, name: c.name }))}
       />
     </>

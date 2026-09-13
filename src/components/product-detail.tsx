@@ -196,6 +196,7 @@ export function ProductPurchasePanel({
               )
             })}
           </div>
+          {option.note && <p className="mt-2 text-sm leading-relaxed text-ink-muted">{option.note}</p>}
         </fieldset>
       ))}
 

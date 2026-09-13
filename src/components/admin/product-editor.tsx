@@ -6,14 +6,20 @@ import { useState, useTransition } from 'react'
 import type { ProductDetail } from '@/modules/catalog/queries'
 import {
   archiveProductAction,
+  attachOptionAction,
   createProductAction,
   deleteProductImageAction,
+  deleteOptionAction,
+  deleteOptionDefinitionAction,
+  deleteOptionValueAction,
   deleteVariantAction,
   saveOptionAction,
   saveOptionValueAction,
   saveVariantAction,
   setPrimaryImageAction,
   updateImageAltAction,
+  updateOptionDefinitionAction,
+  updateOptionNoteAction,
   updateProductAction,
   uploadProductImageAction,
 } from '@/modules/catalog/admin-actions'
@@ -24,9 +30,11 @@ import { toLatinDigits, toPersianDigits } from '@/lib/persian'
 export function ProductEditor({
   product,
   categories,
+  optionLibrary,
 }: {
   product: ProductDetail | null
   categories: { id: number; name: string }[]
+  optionLibrary: { id: number; name: string; kind: 'size' | 'color' | 'other'; values: { id: number; value: string; swatchHex: string | null }[] }[]
 }) {
   return (
     <div className="space-y-6">
@@ -34,7 +42,7 @@ export function ProductEditor({
 
       {product && (
         <>
-          <OptionsPanel product={product} />
+          <OptionsPanel product={product} optionLibrary={optionLibrary} />
           <VariantsPanel product={product} />
           <ImagesPanel product={product} />
           <DangerPanel product={product} />
@@ -260,7 +268,7 @@ function Checkbox({
   )
 }
 
-function OptionsPanel({ product }: { product: ProductDetail }) {
+function OptionsPanel({ product, optionLibrary }: { product: ProductDetail; optionLibrary: { id: number; name: string; kind: 'size' | 'color' | 'other'; values: { id: number; value: string; swatchHex: string | null }[] }[] }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
@@ -282,23 +290,47 @@ function OptionsPanel({ product }: { product: ProductDetail }) {
                   {option.kind === 'color' ? 'رنگ' : option.kind === 'size' ? 'سایز' : 'سایر'}
                 </span>
               </p>
+              <button type="button" disabled={pending} className="text-xs text-danger hover:underline" onClick={() => startTransition(async () => {
+                const result = await deleteOptionAction(product.id, option.id)
+                if (result.ok) router.refresh(); else setError(result.error)
+              })}>حذف ویژگی از محصول</button>
             </div>
+
+            <form className="mb-3 grid gap-2 sm:grid-cols-[1fr_9rem_auto]" action={(formData) => startTransition(async () => {
+              const result = await saveOptionAction(product.id, { id: option.id, name: String(formData.get('name') ?? ''), kind: String(formData.get('kind') ?? 'other') as 'size' | 'color' | 'other', sortOrder: product.options.indexOf(option) })
+              if (result.ok) router.refresh(); else setError(result.error)
+            })}>
+              <input name="name" defaultValue={option.name} required className="field py-2 text-sm" />
+              <select name="kind" defaultValue={option.kind} className="field py-2 text-sm"><option value="size">سایز</option><option value="color">رنگ</option><option value="other">سایر</option></select>
+              <button className="btn btn-secondary btn-sm" disabled={pending}>ویرایش</button>
+            </form>
+
+            <form className="mb-4 flex gap-2" action={(formData) => startTransition(async () => {
+              const result = await updateOptionNoteAction(product.id, option.id, String(formData.get('note') ?? ''))
+              if (result.ok) router.refresh(); else setError(result.error)
+            })}>
+              <input name="note" defaultValue={option.note ?? ''} maxLength={500} placeholder="نوت اختصاصی این ویژگی برای این محصول" className="field py-2 text-sm" />
+              <button className="btn btn-ghost btn-sm" disabled={pending}>ذخیره نوت</button>
+            </form>
 
             <div className="flex flex-wrap gap-2 mb-3">
               {option.values.map((value) => (
-                <span
+                <form
                   key={value.id}
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-line text-sm"
+                  action={(formData) => startTransition(async () => {
+                    const result = await saveOptionValueAction(product.id, option.id, { id: value.id, value: String(formData.get('value') ?? ''), swatchHex: option.kind === 'color' ? String(formData.get('swatchHex') ?? '') : null, sortOrder: option.values.indexOf(value) })
+                    if (result.ok) router.refresh(); else setError(result.error)
+                  })}
                 >
-                  {value.swatchHex && (
-                    <span
-                      className="w-3.5 h-3.5 rounded-full border border-line"
-                      style={{ backgroundColor: value.swatchHex }}
-                      aria-hidden="true"
-                    />
-                  )}
-                  {value.value}
-                </span>
+                  {option.kind === 'color' && <input name="swatchHex" type="color" defaultValue={value.swatchHex ?? '#000000'} className="h-6 w-6 rounded border-0 bg-transparent p-0" aria-label="رنگ" />}
+                  <input name="value" defaultValue={value.value} required className="w-24 bg-transparent outline-none" aria-label="مقدار ویژگی" />
+                  <button className="text-accent-2" disabled={pending} aria-label={`ذخیره ${value.value}`}>✓</button>
+                  <button type="button" className="text-danger" aria-label={`حذف ${value.value}`} onClick={() => startTransition(async () => {
+                    const result = await deleteOptionValueAction(product.id, option.id, value.id)
+                    if (result.ok) router.refresh(); else setError(result.error)
+                  })}>×</button>
+                </form>
               ))}
               {option.values.length === 0 && (
                 <span className="text-sm text-ink-subtle">مقداری تعریف نشده است</span>
@@ -343,6 +375,39 @@ function OptionsPanel({ product }: { product: ProductDetail }) {
           </div>
         ))}
       </div>
+
+      {optionLibrary.length > 0 && (
+        <details className="mt-5 border-t border-line pt-5">
+          <summary className="cursor-pointer font-medium text-ink">مدیریت کتابخانه ویژگی‌های سراسری</summary>
+          <p className="mt-2 text-xs leading-relaxed text-ink-subtle">ویرایش نام یا نوع روی تمام محصولات متصل اعمال می‌شود. حذف فقط وقتی ممکن است که ویژگی به هیچ محصولی متصل نباشد.</p>
+          <div className="mt-3 space-y-2">
+            {optionLibrary.map((definition, index) => (
+              <form key={definition.id} className="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_9rem_auto_auto]" action={(formData) => startTransition(async () => {
+                const result = await updateOptionDefinitionAction(product.id, definition.id, { name: String(formData.get('name') ?? ''), kind: String(formData.get('kind') ?? 'other') as 'size' | 'color' | 'other', sortOrder: index })
+                if (result.ok) router.refresh(); else setError(result.error)
+              })}>
+                <input name="name" required defaultValue={definition.name} className="field py-2 text-sm" />
+                <select name="kind" defaultValue={definition.kind} className="field py-2 text-sm"><option value="size">سایز</option><option value="color">رنگ</option><option value="other">سایر</option></select>
+                <button className="btn btn-secondary btn-sm" disabled={pending}>ذخیره سراسری</button>
+                <button type="button" className="btn btn-ghost btn-sm text-danger" disabled={pending} onClick={() => startTransition(async () => {
+                  const result = await deleteOptionDefinitionAction(product.id, definition.id)
+                  if (result.ok) router.refresh(); else setError(result.error)
+                })}>حذف سراسری</button>
+              </form>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {optionLibrary.some((definition) => !product.options.some((option) => option.definitionId === definition.id)) && (
+        <form className="flex flex-wrap gap-2 mt-5 pt-5 border-t border-line" action={(formData) => startTransition(async () => {
+          const result = await attachOptionAction(product.id, Number(formData.get('definitionId')), product.options.length)
+          if (result.ok) router.refresh(); else setError(result.error)
+        })}>
+          <select name="definitionId" required defaultValue="" className="field py-2 text-sm max-w-sm"><option value="" disabled>انتخاب از ویژگی‌های سراسری…</option>{optionLibrary.filter((definition) => !product.options.some((option) => option.definitionId === definition.id)).map((definition) => <option key={definition.id} value={definition.id}>{definition.name} ({definition.values.map((value) => value.value).join('، ') || 'بدون مقدار'})</option>)}</select>
+          <button className="btn btn-secondary btn-sm" disabled={pending}>افزودن به محصول</button>
+        </form>
+      )}
 
       <form
         className="flex flex-wrap gap-2 mt-5 pt-5 border-t border-line"
