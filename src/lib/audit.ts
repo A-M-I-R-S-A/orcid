@@ -9,6 +9,7 @@ export const AUDIT_ACTIONS = {
   'product.create': 'ایجاد محصول',
   'product.update': 'ویرایش محصول',
   'product.archive': 'بایگانی محصول',
+  'product.delete': 'حذف کامل محصول',
   'product.price_change': 'تغییر قیمت',
   'product.stock_change': 'تغییر موجودی',
 

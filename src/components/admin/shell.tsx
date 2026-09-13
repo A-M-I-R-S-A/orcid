@@ -63,6 +63,12 @@ const NAV: NavGroup[] = [
         icon: 'M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3zm0 0v18m8-13.5L12 12 4 7.5',
       },
       {
+        href: '/admin/inventory',
+        label: 'انبار',
+        permission: 'products.inventory',
+        icon: 'M4 8l8-4 8 4v11H4V8zm0 0l8 4 8-4M12 12v9M8 15h2m4 0h2',
+      },
+      {
         href: '/admin/categories',
         label: 'دسته‌بندی‌ها',
         permission: 'categories.view',

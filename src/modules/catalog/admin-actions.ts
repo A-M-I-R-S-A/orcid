@@ -1,9 +1,9 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { and, eq } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 
-import { db } from '@/db'
+import { affectedRows, db } from '@/db'
 import { categories, products, slugRedirects } from '@/db/schema'
 import * as audit from '@/lib/audit'
 import { CACHE_TAGS, invalidate } from '@/lib/cache'
@@ -27,6 +27,7 @@ async function revalidateProduct(productId: number) {
   revalidatePath(`/product/${encodeURIComponent(row.slug)}`)
   revalidatePath('/')
   revalidatePath('/admin/products')
+  revalidatePath('/admin/inventory')
 
   if (row.categoryId) {
     const [category] = await db
@@ -125,7 +126,9 @@ export async function updateStockAction(input: {
   try {
     const admin = await requirePermission('products.inventory')
 
-    if (input.stockQty < 0) throw errors.validation('موجودی نمی‌تواند منفی باشد.')
+    if (!Number.isInteger(input.stockQty) || input.stockQty < 0 || input.stockQty > 1_000_000_000) {
+      throw errors.validation('موجودی باید یک عدد صحیح و غیرمنفی باشد.')
+    }
 
     const { productVariants } = await import('@/db/schema')
 
@@ -135,12 +138,14 @@ export async function updateStockAction(input: {
       .where(eq(productVariants.id, input.variantId))
       .limit(1)
 
-    await db
+    const changed = await db
       .update(productVariants)
       .set({ stockQty: input.stockQty })
       .where(
         and(eq(productVariants.id, input.variantId), eq(productVariants.productId, input.productId)),
       )
+
+    if (affectedRows(changed) === 0) throw errors.notFound('تنوع محصول پیدا نشد.')
 
     await audit.log({
       actor: admin,
@@ -186,6 +191,71 @@ export async function saveOptionAction(
     return ok({ id })
   } catch (error) {
     return fail(error, { action: 'saveOption', productId })
+  }
+}
+
+export async function adjustStockAction(input: {
+  productId: number
+  variantId: number
+  delta: number
+}): Promise<ActionResult<{ stockQty: number }>> {
+  try {
+    const admin = await requirePermission('products.inventory')
+    if (!Number.isInteger(input.delta) || input.delta === 0 || Math.abs(input.delta) > 1_000_000) {
+      throw errors.validation('مقدار تغییر موجودی معتبر نیست.')
+    }
+
+    const { productVariants } = await import('@/db/schema')
+    const [previous] = await db
+      .select({ stockQty: productVariants.stockQty, sku: productVariants.sku })
+      .from(productVariants)
+      .where(and(eq(productVariants.id, input.variantId), eq(productVariants.productId, input.productId)))
+      .limit(1)
+    if (!previous) throw errors.notFound('تنوع محصول پیدا نشد.')
+
+    const changed = await db
+      .update(productVariants)
+      .set({ stockQty: sql`${productVariants.stockQty} + ${input.delta}` })
+      .where(and(
+        eq(productVariants.id, input.variantId),
+        eq(productVariants.productId, input.productId),
+        input.delta < 0 ? sql`${productVariants.stockQty} >= ${Math.abs(input.delta)}` : sql`1 = 1`,
+      ))
+    if (affectedRows(changed) === 0) throw errors.conflict('موجودی برای این مقدار کاهش کافی نیست.')
+
+    const [current] = await db
+      .select({ stockQty: productVariants.stockQty })
+      .from(productVariants)
+      .where(eq(productVariants.id, input.variantId))
+      .limit(1)
+    const stockQty = current?.stockQty ?? previous.stockQty + input.delta
+    await audit.log({
+      actor: admin,
+      action: 'product.stock_change',
+      entityType: 'variant',
+      entityId: input.variantId,
+      metadata: { from: previous.stockQty, to: stockQty, delta: input.delta, sku: previous.sku },
+    })
+    await revalidateProduct(input.productId)
+    return ok({ stockQty })
+  } catch (error) {
+    return fail(error, { action: 'adjustStock', variantId: input.variantId, delta: input.delta })
+  }
+}
+
+export async function deleteProductPermanentlyAction(productId: number): Promise<ActionResult<void>> {
+  try {
+    const admin = await requirePermission('products.delete')
+    const [product] = await db.select({ slug: products.slug }).from(products).where(eq(products.id, productId)).limit(1)
+    await service.deleteProductPermanently(admin, productId)
+    invalidate(CACHE_TAGS.products, CACHE_TAGS.homepage, CACHE_TAGS.sitemap)
+    revalidatePath('/')
+    if (product) revalidatePath(`/product/${encodeURIComponent(product.slug)}`)
+    revalidatePath('/admin/products')
+    revalidatePath('/admin/inventory')
+    return ok(undefined)
+  } catch (error) {
+    return fail(error, { action: 'deleteProductPermanently', productId })
   }
 }
 

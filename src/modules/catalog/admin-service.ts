@@ -1,6 +1,6 @@
 import 'server-only'
 
-import { and, eq, inArray, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm'
 
 import { db } from '@/db'
 import {
@@ -346,6 +346,31 @@ export async function saveOption(
   return attachOption(productId, (created as unknown as { insertId: number }).insertId, input.sortOrder)
 }
 
+export async function deleteProductPermanently(admin: AdminPrincipal, productId: number): Promise<void> {
+  const [product] = await db.select({ id: products.id, name: products.name }).from(products).where(eq(products.id, productId)).limit(1)
+  if (!product) throw errors.notFound('محصول پیدا نشد.')
+
+  const [[orders], [getLater], images] = await Promise.all([
+    db.execute(sql`SELECT COUNT(*) AS c FROM order_items WHERE product_id = ${productId}`) as unknown as Promise<[{ c: number }[], unknown]>,
+    db.execute(sql`SELECT COUNT(*) AS c FROM get_later_items WHERE product_id = ${productId}`) as unknown as Promise<[{ c: number }[], unknown]>,
+    db.select({ path: productImages.path }).from(productImages).where(eq(productImages.productId, productId)),
+  ])
+
+  if (Number(orders?.[0]?.c ?? 0) > 0 || Number(getLater?.[0]?.c ?? 0) > 0) {
+    throw errors.conflict('این محصول سابقه سفارش یا پرداخت بعدی دارد و برای حفظ سوابق قابل حذف کامل نیست؛ آن را بایگانی کنید.')
+  }
+
+  await db.delete(products).where(eq(products.id, productId))
+  await Promise.allSettled(images.map((image) => deleteImageSet(image.path)))
+  await audit.log({
+    actor: admin,
+    action: 'product.delete',
+    entityType: 'product',
+    entityId: productId,
+    summary: product.name,
+  })
+}
+
 export async function attachOption(productId: number, definitionId: number, sortOrder: number): Promise<number> {
   const [alreadyAttached] = await db.select({ id: productOptions.id }).from(productOptions).where(and(eq(productOptions.productId, productId), eq(productOptions.definitionId, definitionId))).limit(1)
   if (alreadyAttached) throw errors.conflict('این ویژگی قبلاً به محصول اضافه شده است.')
@@ -564,4 +589,53 @@ export async function listProductsForAdmin(options: {
 
   const total = Number(countRow?.count ?? 0)
   return { items: rows, total, page, pageCount: Math.max(1, Math.ceil(total / limit)) }
+}
+
+export async function listInventoryForAdmin(options: {
+  search?: string
+  status?: 'all' | 'low' | 'out'
+  page?: number
+  limit?: number
+}) {
+  const page = Math.max(1, options.page ?? 1)
+  const limit = Math.min(100, Math.max(1, options.limit ?? 40))
+  const conditions = []
+  if (options.search?.trim()) {
+    const term = `%${options.search.trim()}%`
+    conditions.push(sql`(${products.name} LIKE ${term} OR ${productVariants.sku} LIKE ${term})`)
+  }
+  if (options.status === 'out') conditions.push(eq(productVariants.stockQty, 0))
+  if (options.status === 'low') conditions.push(and(sql`${productVariants.stockQty} > 0`, sql`${productVariants.stockQty} <= ${productVariants.lowStockThreshold}`)!)
+  const where = conditions.length ? and(...conditions) : undefined
+
+  const [items, [countRow], [stats]] = await Promise.all([
+    db.select({
+      id: productVariants.id,
+      productId: productVariants.productId,
+      productName: products.name,
+      productSlug: products.slug,
+      sku: productVariants.sku,
+      stockQty: productVariants.stockQty,
+      lowStockThreshold: productVariants.lowStockThreshold,
+      isActive: productVariants.isActive,
+      productArchived: products.isArchived,
+      imagePath: sql<string | null>`(SELECT path FROM product_images WHERE product_id = ${products.id} ORDER BY is_primary DESC, sort_order ASC LIMIT 1)`,
+    }).from(productVariants).innerJoin(products, eq(productVariants.productId, products.id))
+      .where(where).orderBy(asc(productVariants.stockQty), asc(products.name), asc(productVariants.sku))
+      .limit(limit).offset((page - 1) * limit),
+    db.select({ count: sql<number>`COUNT(*)` }).from(productVariants).innerJoin(products, eq(productVariants.productId, products.id)).where(where),
+    db.select({
+      totalUnits: sql<number>`COALESCE(SUM(${productVariants.stockQty}), 0)`,
+      lowCount: sql<number>`SUM(CASE WHEN ${productVariants.stockQty} > 0 AND ${productVariants.stockQty} <= ${productVariants.lowStockThreshold} THEN 1 ELSE 0 END)`,
+      outCount: sql<number>`SUM(CASE WHEN ${productVariants.stockQty} = 0 THEN 1 ELSE 0 END)`,
+    }).from(productVariants),
+  ])
+  const total = Number(countRow?.count ?? 0)
+  return {
+    items,
+    total,
+    page,
+    pageCount: Math.max(1, Math.ceil(total / limit)),
+    stats: { totalUnits: Number(stats?.totalUnits ?? 0), lowCount: Number(stats?.lowCount ?? 0), outCount: Number(stats?.outCount ?? 0) },
+  }
 }

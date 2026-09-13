@@ -12,6 +12,7 @@ import {
   deleteOptionAction,
   deleteOptionDefinitionAction,
   deleteOptionValueAction,
+  deleteProductPermanentlyAction,
   deleteVariantAction,
   saveOptionAction,
   saveOptionValueAction,
@@ -801,6 +802,8 @@ function DangerPanel({ product }: { product: ProductDetail }) {
   const router = useRouter()
   const [pending, startTransition] = useTransition()
   const [confirming, setConfirming] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   return (
     <section className="card p-6 border-danger/25">
@@ -838,6 +841,25 @@ function DangerPanel({ product }: { product: ProductDetail }) {
           بایگانی محصول
         </button>
       )}
+
+      <div className="mt-6 border-t border-danger/20 pt-5">
+        <h3 className="text-sm font-medium text-danger">حذف کامل و غیرقابل بازگشت</h3>
+        <p className="mt-1 text-xs leading-relaxed text-ink-muted">تمام اطلاعات کاتالوگ و تصاویر این محصول حذف می‌شود. محصول دارای سابقه سفارش یا پرداخت بعدی قابل حذف کامل نیست.</p>
+        {deleting ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" disabled={pending} className="btn btn-sm bg-danger text-white" onClick={() => startTransition(async () => {
+              setError(null)
+              const result = await deleteProductPermanentlyAction(product.id)
+              if (result.ok) router.push('/admin/products')
+              else { setError(result.error); setDeleting(false) }
+            })}>{pending ? 'در حال حذف…' : 'تأیید حذف کامل'}</button>
+            <button type="button" disabled={pending} className="btn btn-ghost btn-sm" onClick={() => setDeleting(false)}>انصراف</button>
+          </div>
+        ) : (
+          <button type="button" className="btn btn-ghost btn-sm mt-3 text-danger" onClick={() => setDeleting(true)}>حذف کامل محصول</button>
+        )}
+        {error && <p className="mt-3 text-sm text-danger">{error}</p>}
+      </div>
     </section>
   )
 }
