@@ -837,12 +837,21 @@ function ImagesPanel({ product }: { product: ProductDetail }) {
 
       <form
         className="flex flex-wrap items-end gap-3 pt-5 border-t border-line"
-        action={(formData) => {
+        action={async (formData) => {
           setError(null)
-          const file = formData.get('file')
+          let file = formData.get('file')
           if (file instanceof File && file.size > 8 * 1024 * 1024) {
             setError('حجم تصویر نباید بیشتر از ۸ مگابایت باشد.')
             return
+          }
+          if (file instanceof File) {
+            try {
+              file = await prepareProductImage(file)
+              formData.set('file', file)
+            } catch {
+              setError('آماده‌سازی تصویر انجام نشد؛ لطفاً یک فایل JPG، PNG یا WebP دیگر انتخاب کنید.')
+              return
+            }
           }
           formData.set('productId', String(product.id))
 
@@ -884,6 +893,30 @@ function ImagesPanel({ product }: { product: ProductDetail }) {
       {error && <p className="text-sm text-danger mt-3">{error}</p>}
     </section>
   )
+}
+
+async function prepareProductImage(file: File): Promise<File> {
+  const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  try {
+    const scale = Math.min(1, 1280 / bitmap.width)
+    const width = Math.max(1, Math.round(bitmap.width * scale))
+    const height = Math.max(1, Math.round(bitmap.height * scale))
+    const canvas = document.createElement('canvas')
+    canvas.width = width
+    canvas.height = height
+    const context = canvas.getContext('2d')
+    if (!context) throw new Error('Canvas is unavailable')
+    context.drawImage(bitmap, 0, 0, width, height)
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((output) => output ? resolve(output) : reject(new Error('WebP conversion failed')), 'image/webp', 0.8)
+    })
+    return new File([blob], `${file.name.replace(/\.[^.]+$/, '')}.webp`, {
+      type: 'image/webp',
+      lastModified: Date.now(),
+    })
+  } finally {
+    bitmap.close()
+  }
 }
 
 function DangerPanel({ product }: { product: ProductDetail }) {

@@ -1,7 +1,7 @@
 import 'server-only'
 
 import { randomBytes } from 'node:crypto'
-import { mkdir, unlink } from 'node:fs/promises'
+import { mkdir, unlink, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 import sharp from 'sharp'
@@ -49,6 +49,7 @@ export interface ProcessedImage {
 export interface UploadOptions {
   folder: 'products' | 'categories' | 'blog' | 'brand' | 'homepage' | 'pages'
   singleSize?: boolean
+  acceptReadyWebp?: boolean
 }
 
 export async function processUpload(
@@ -112,6 +113,13 @@ export async function processUpload(
   try {
     const webpRel = path.posix.join(options.folder, `${name}-${primaryWidth}.webp`)
     written.push(webpRel)
+
+    // The product editor prepares this exact rendition in the browser. On
+    // constrained hosting, writing it directly avoids a second costly encode.
+    if (options.acceptReadyWebp && metadata.format === 'webp' && width <= 1280) {
+      await writeFile(path.join(uploadRoot(), webpRel), buffer)
+      return { path: webpRel, width, height, files: written }
+    }
 
     // Upload latency matters more than pre-generating ten alternate renditions.
     // A single bounded WebP is supported by all browsers targeted by this app.

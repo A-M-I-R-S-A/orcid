@@ -506,7 +506,7 @@ export async function addProductImage(
   height: number
   isPrimary: boolean
 }> {
-  const processed = await processUpload(file, { folder: 'products' })
+  const processed = await processUpload(file, { folder: 'products', acceptReadyWebp: true })
 
   const [countRow] = await db
     .select({ count: sql<number>`COUNT(*)` })
