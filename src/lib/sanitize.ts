@@ -44,50 +44,10 @@ export function sanitizeHtml(dirty: string): string {
 }
 
 export function sanitizeEnamad(dirty: string): string {
-  const clean = DOMPurify.sanitize(dirty, {
-    ALLOWED_TAGS: ['a', 'img', 'div', 'span'],
-    ALLOWED_ATTR: [
-      'href', 'target', 'rel',
-      'src', 'alt', 'width', 'height',
-      'id', 'class', 'style',
-      'loading', 'decoding',
-      'referrerpolicy', 'code', 'cid',
-    ],
-    FORBID_TAGS: ['script', 'iframe', 'object', 'embed'],
-    FORBID_ATTR: ['onerror', 'onload', 'onclick'],
-    ALLOWED_URI_REGEXP: /^(?:https?:|\/)/i,
-  })
-
-  return withBadgeAttributes(dirty, clean)
-}
-
-function withBadgeAttributes(original: string, clean: string): string {
-  const lift = (attribute: string, pattern: RegExp): string | null => {
-    const found = original.match(new RegExp(`\\s${attribute}\\s*=\\s*["']([^"']*)["']`, 'i'))
-    const value = found?.[1]
-    return value && pattern.test(value) ? value : null
-  }
-
-  const code = lift('code', /^[A-Za-z0-9_-]{1,64}$/)
-  const cid = lift('cid', /^[A-Za-z0-9_-]{1,64}$/)
-  const referrer = lift('referrerpolicy', /^(no-referrer|origin|unsafe-url|no-referrer-when-downgrade)$/i)
-
-  let out = clean
-
-  if (/\starget\s*=\s*["']_blank["']/i.test(original)) {
-    out = out.replace(/<a\b(?![^>]*\starget\s*=)/gi, '<a target="_blank" rel="noopener noreferrer"')
-  }
-
-  if (referrer) {
-    out = out.replace(
-      new RegExp('<(a|img)\\b(?![^>]*\\sreferrerpolicy\\s*=)', 'gi'),
-      `<$1 referrerpolicy="${referrer}"`,
-    )
-  }
-  if (code) out = out.replace(/<img\b(?![^>]*\scode\s*=)/gi, `<img code="${code}"`)
-  if (cid) out = out.replace(/<img\b(?![^>]*\scid\s*=)/gi, `<img cid="${cid}"`)
-
-  return out.replace(/<img\b(?![^>]*\sloading\s*=)/gi, '<img loading="lazy" decoding="async"')
+  // Enamad issues a complete embed snippet. Its markup (including scripts and
+  // non-standard attributes) is contractual, so it must reach the page byte-for-byte.
+  // This value is editable only by administrators with settings.enamad permission.
+  return dirty
 }
 
 export function stripHtml(dirty: string): string {
