@@ -9,18 +9,18 @@ import { navLinksFor } from '@/modules/content/queries'
 import { getNamespace } from '@/lib/settings'
 import { toPersianDigits } from '@/lib/persian'
 import { jalaliYear } from '@/lib/jalali'
-import { sanitizeEnamad } from '@/lib/sanitize'
 import { safePublicHref } from '@/lib/public-url'
 import { getSiteContent } from '@/lib/site-content'
 
+const ENAMAD_EMBED_CODE = `<a referrerpolicy='origin' target='_blank' href='https://trustseal.enamad.ir/?id=7749720&Code=8B7dlGZqKL7Pyh0jil9pprIPPNyfE1jn'><img referrerpolicy='origin' src='https://trustseal.enamad.ir/logo.aspx?id=7749720&Code=8B7dlGZqKL7Pyh0jil9pprIPPNyfE1jn' alt='' style='cursor:pointer' code='8B7dlGZqKL7Pyh0jil9pprIPPNyfE1jn'></a>`
+
 export async function Footer() {
-  const [categories, site, contact, social, enamad, footerPages, shopLinks, helpLinks, content] =
+  const [categories, site, contact, social, footerPages, shopLinks, helpLinks, content] =
     await Promise.all([
       listCategories(),
       getNamespace('site'),
       getNamespace('contact'),
       getNamespace('social'),
-      getNamespace('enamad'),
       db
         .select({ slug: pages.slug, title: pages.title })
         .from(pages)
@@ -64,7 +64,7 @@ export async function Footer() {
   ].filter((s) => Boolean(s.url))
 
   const hasContactColumn = Boolean(
-    contact.phone || contact.email || contact.address || contact.workingHours || enamad.embedCode,
+    contact.phone || contact.email || contact.address || contact.workingHours || ENAMAD_EMBED_CODE,
   )
 
   return (
@@ -155,12 +155,7 @@ export async function Footer() {
               {contact.workingHours && <li>{contact.workingHours}</li>}
             </ul>
 
-            {enamad.embedCode ? (
-              <span
-                className="contents"
-                dangerouslySetInnerHTML={{ __html: sanitizeEnamad(enamad.embedCode) }}
-              />
-            ) : null}
+            <span className="contents" dangerouslySetInnerHTML={{ __html: ENAMAD_EMBED_CODE }} />
           </div>
           ) : null}
         </div>

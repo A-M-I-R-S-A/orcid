@@ -6,7 +6,7 @@ import { db } from '@/db'
 import { pages } from '@/db/schema'
 import { CACHE_TAGS, cached } from '@/lib/cache'
 import { toPersianDigits } from '@/lib/persian'
-import { sanitizeEnamad, sanitizeHtml } from '@/lib/sanitize'
+import { sanitizeHtml } from '@/lib/sanitize'
 import { getNamespace } from '@/lib/settings'
 import { getSiteContent, type CopyKey } from '@/lib/site-content'
 import { splitLead } from '@/lib/rich-text'
@@ -63,10 +63,9 @@ export async function ContactPage({
   breadcrumbs: { name: string; path: string }[]
   sections: PageSectionRecord[]
 }) {
-  const [contact, social, enamad, shortcuts, content] = await Promise.all([
+  const [contact, social, shortcuts, content] = await Promise.all([
     getNamespace('contact'),
     getNamespace('social'),
-    getNamespace('enamad'),
     loadShortcuts(),
     getSiteContent(),
   ])
@@ -271,12 +270,6 @@ export async function ContactPage({
                 )}
               </div>
 
-              {enamad.embedCode && (
-                <span
-                  className="contents"
-                  dangerouslySetInnerHTML={{ __html: sanitizeEnamad(enamad.embedCode) }}
-                />
-              )}
             </div>
           </div>
         </section>
