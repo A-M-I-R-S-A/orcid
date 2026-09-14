@@ -272,13 +272,10 @@ export async function ContactPage({
               </div>
 
               {enamad.embedCode && (
-                <div className="relative mt-12 border-t border-line pt-9">
-                  <p className="eyebrow"><SiteStyledText contentKey="contact.enamad">{content.text('contact.enamad')}</SiteStyledText></p>
-                  <div
-                    className="mt-5 inline-block rounded-lg bg-white p-2 [&_img]:h-auto [&_img]:max-w-[110px]"
-                    dangerouslySetInnerHTML={{ __html: sanitizeEnamad(enamad.embedCode) }}
-                  />
-                </div>
+                <span
+                  className="contents"
+                  dangerouslySetInnerHTML={{ __html: sanitizeEnamad(enamad.embedCode) }}
+                />
               )}
             </div>
           </div>

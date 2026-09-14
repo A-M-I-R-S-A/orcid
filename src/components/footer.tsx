@@ -156,13 +156,10 @@ export async function Footer() {
             </ul>
 
             {enamad.embedCode ? (
-              <div className="mt-6">
-                <p className="eyebrow mb-3"><SiteStyledText contentKey="footer.trust">{content.text('footer.trust')}</SiteStyledText></p>
-                <div
-                  className="inline-block bg-white rounded-lg p-2 [&_img]:max-w-[110px] [&_img]:h-auto"
-                  dangerouslySetInnerHTML={{ __html: sanitizeEnamad(enamad.embedCode) }}
-                />
-              </div>
+              <span
+                className="contents"
+                dangerouslySetInnerHTML={{ __html: sanitizeEnamad(enamad.embedCode) }}
+              />
             ) : null}
           </div>
           ) : null}
